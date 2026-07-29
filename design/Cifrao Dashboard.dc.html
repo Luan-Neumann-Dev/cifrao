@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{background:#FAFAFC}
+  :root{
+    --primary:#820AD1;--primary-hover:#6B08AD;--primary-soft:#F3E8FF;
+    --bg:#FAFAFC;--surface:#FFFFFF;--surface-2:#F3F1F7;--line:#E8E4EF;
+    --ink:#1A1523;--ink-2:#6B6577;
+    --positive:#00A868;--negative:#E5484D;--warn:#F5A524;--invest:#0F9B8E;
+    --card-shadow:0 1px 3px rgba(26,21,35,.06);--card-border:transparent;
+    --ring:0 0 0 4px rgba(130,10,209,.22);--fab-shadow:0 12px 30px rgba(130,10,209,.34);
+    --track:#E8E4EF;--overlay:rgba(26,21,35,.04);
+  }
+  [data-theme="dark"]{
+    --primary:#A855F7;--primary-hover:#9333EA;--primary-soft:#2A1140;
+    --bg:#0E0B12;--surface:#171320;--surface-2:#211B2E;--line:#2E2740;
+    --ink:#F5F3F8;--ink-2:#A79FB8;
+    --positive:#3DD68C;--negative:#FF6369;--warn:#F7B955;--invest:#22C3B0;
+    --card-shadow:none;--card-border:#2E2740;
+    --ring:0 0 0 4px rgba(168,85,247,.32);--fab-shadow:0 12px 32px rgba(168,85,247,.28);
+    --track:#2E2740;--overlay:rgba(255,255,255,.05);
+  }
+  a{color:var(--primary);text-decoration:none}
+  a:hover{color:var(--primary-hover)}
+  .cf-scroll::-webkit-scrollbar{height:7px}
+  .cf-scroll::-webkit-scrollbar-thumb{background:var(--line);border-radius:99px}
+  .cf-scroll::-webkit-scrollbar-track{background:transparent}
+  @media (prefers-reduced-motion: reduce){*{animation-duration:.001ms !important;transition-duration:.001ms !important}}
+</style>
+</helmet>
+
+<div data-theme="{{ theme }}" style="min-height:100dvh;background:var(--bg);color:var(--ink);font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased">
+
+  <!-- ===== reviewer toolbar ===== -->
+  <div style="height:57px;display:flex;align-items:center;gap:14px;padding:0 18px;border-bottom:1px solid var(--line);background:var(--surface);position:sticky;top:0;z-index:30;overflow-x:auto;white-space:nowrap">
+    <span style="display:inline-flex;align-items:center;gap:8px;flex:none;margin-right:2px">
+      <span style="width:26px;height:26px;border-radius:8px;background:var(--primary);display:flex;align-items:center;justify-content:center"><span style="font-family:Manrope,sans-serif;font-weight:800;font-size:15px;color:#fff">$</span></span>
+      <span style="font-family:Manrope,sans-serif;font-weight:700;font-size:13px;color:var(--ink)">Cifrão</span>
+      <span style="font-size:11px;color:var(--ink-2);letter-spacing:.06em;text-transform:uppercase">Início</span>
+    </span>
+    <span style="width:1px;height:22px;background:var(--line);flex:none"></span>
+    <div style="display:flex;background:var(--surface-2);border-radius:10px;padding:3px;flex:none">
+      <button onClick="{{ setDesktop }}" style="height:26px;padding:0 12px;border:none;border-radius:8px;font-family:Inter,sans-serif;font-weight:600;font-size:12px;cursor:pointer;background:{{ deskBg }};color:{{ deskColor }}">Desktop</button>
+      <button onClick="{{ setMobile }}" style="height:26px;padding:0 12px;border:none;border-radius:8px;font-family:Inter,sans-serif;font-weight:600;font-size:12px;cursor:pointer;background:{{ mobBg }};color:{{ mobColor }}">Mobile</button>
+    </div>
+    <button onClick="{{ togglePending }}" style="height:32px;padding:0 13px;border:1px solid var(--line);border-radius:999px;font-family:Inter,sans-serif;font-weight:600;font-size:12.5px;cursor:pointer;background:{{ pendBg }};color:{{ pendColor }};flex:none">Pendências</button>
+    <button onClick="{{ replay }}" style="height:32px;padding:0 13px;border:1px solid var(--line);border-radius:999px;font-family:Inter,sans-serif;font-weight:600;font-size:12.5px;cursor:pointer;background:transparent;color:var(--ink-2);flex:none;display:inline-flex;align-items:center;gap:6px" style-hover="background:var(--surface-2)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"></path><path d="M3 3v5h5"></path></svg>Animação</button>
+    <div style="margin-left:auto;display:flex;gap:8px;align-items:center;flex:none;padding-left:12px">
+      <button onClick="{{ togglePrivacy }}" title="Privacidade" style="width:34px;height:34px;border-radius:10px;background:var(--surface);border:1px solid var(--line);color:var(--ink);display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="background:var(--surface-2)">
+        <sc-if value="{{ privacy }}" hint-placeholder-val="{{ false }}"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9.9 4.24A9.1 9.1 0 0 1 12 4c7 0 10 8 10 8a13.2 13.2 0 0 1-1.67 2.68"></path><path d="M6.6 6.6A13.5 13.5 0 0 0 2 12s3 8 10 8a9.7 9.7 0 0 0 5.4-1.6"></path><path d="m2 2 20 20"></path><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"></path></svg></sc-if>
+        <sc-if value="{{ notPrivacy }}" hint-placeholder-val="{{ true }}"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"></path><circle cx="12" cy="12" r="3"></circle></svg></sc-if>
+      </button>
+      <button onClick="{{ toggleTheme }}" title="Tema" style="width:34px;height:34px;border-radius:10px;background:var(--surface);border:1px solid var(--line);color:var(--ink);display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="background:var(--surface-2)">
+        <sc-if value="{{ themeIsDark }}" hint-placeholder-val="{{ false }}"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg></sc-if>
+        <sc-if value="{{ themeIsLight }}" hint-placeholder-val="{{ true }}"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6.4 6.4 0 0 0 9 9 9 9 0 1 1-9-9Z"></path></svg></sc-if>
+      </button>
+    </div>
+  </div>
+
+  <!-- ===== stage ===== -->
+  <div style="display:flex;justify-content:center;padding:{{ stagePad }}">
+    <div style="{{ stageStyle }}">
+
+      <!-- HEADER -->
+      <header style="display:flex;align-items:center;justify-content:space-between;gap:16px">
+        <div>
+          <div style="font-size:14px;color:var(--ink-2)">{{ greeting }}</div>
+          <div style="display:flex;align-items:center;gap:8px;margin-top:3px">
+            <button onClick="{{ prevMonth }}" style="width:30px;height:30px;border-radius:9px;border:1px solid var(--line);background:var(--surface);color:var(--ink-2);display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="background:var(--surface-2);color:var(--ink)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"></path></svg></button>
+            <span style="font-family:Manrope,sans-serif;font-weight:700;font-size:18px;color:var(--ink);min-width:118px;text-align:center">{{ monthLabel }}</span>
+            <button onClick="{{ nextMonth }}" style="width:30px;height:30px;border-radius:9px;border:1px solid var(--line);background:var(--surface);color:var(--ink-2);display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="background:var(--surface-2);color:var(--ink)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"></path></svg></button>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <button onClick="{{ togglePrivacy }}" title="Modo privacidade" style="width:42px;height:42px;border-radius:13px;background:var(--surface);border:1px solid var(--line);color:var(--ink);display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="background:var(--surface-2)">
+            <sc-if value="{{ privacy }}" hint-placeholder-val="{{ false }}"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9.9 4.24A9.1 9.1 0 0 1 12 4c7 0 10 8 10 8a13.2 13.2 0 0 1-1.67 2.68"></path><path d="M6.6 6.6A13.5 13.5 0 0 0 2 12s3 8 10 8a9.7 9.7 0 0 0 5.4-1.6"></path><path d="m2 2 20 20"></path><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"></path></svg></sc-if>
+            <sc-if value="{{ notPrivacy }}" hint-placeholder-val="{{ true }}"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"></path><circle cx="12" cy="12" r="3"></circle></svg></sc-if>
+          </button>
+          <div style="width:42px;height:42px;border-radius:50%;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-family:Manrope,sans-serif;font-weight:700;font-size:16px">L</div>
+        </div>
+      </header>
+
+      <!-- BALANCE HERO -->
+      <section style="background:var(--surface);border-radius:20px;box-shadow:var(--card-shadow);border:1px solid var(--card-border);padding:26px 28px;margin-top:18px">
+        <div style="font-size:14px;color:var(--ink-2)">Saldo disponível hoje</div>
+        <div style="display:flex;align-items:baseline;margin-top:6px;font-family:Manrope,sans-serif;font-weight:700;letter-spacing:-.02em;color:var(--ink);line-height:1">
+          <span style="font-size:20px;font-weight:600;color:var(--ink-2);margin-right:8px">R$</span>
+          <span style="font-size:40px">{{ hojeInt }}</span>
+          <span style="font-size:22px;opacity:.6">{{ hojeCents }}</span>
+        </div>
+        <!-- predicted: the real answer, emphasized -->
+        <div style="display:flex;align-items:center;gap:14px;margin-top:18px;padding:15px 18px;border-radius:16px;background:var(--primary-soft)">
+          <div style="width:40px;height:40px;border-radius:12px;background:var(--primary);display:flex;align-items:center;justify-content:center;flex:none">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"></path><path d="M21 7v5h-5"></path></svg>
+          </div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:12.5px;font-weight:600;color:var(--primary);letter-spacing:.01em">Disponível de verdade até 31/07</div>
+            <div style="display:flex;align-items:baseline;gap:10px;margin-top:2px;flex-wrap:wrap">
+              <span style="font-family:Manrope,sans-serif;font-weight:700;font-variant-numeric:tabular-nums;font-size:26px;letter-spacing:-.01em;color:var(--ink)">{{ prevStr }}</span>
+              <span style="font-size:12.5px;color:var(--ink-2)">{{ committedStr }} já comprometidos</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- MONTH RULER (signature) -->
+      <section style="background:var(--surface);border-radius:20px;box-shadow:var(--card-shadow);border:1px solid var(--card-border);padding:22px 8px 14px;margin-top:16px;overflow:hidden">
+        <div style="display:flex;align-items:baseline;justify-content:space-between;padding:0 18px;margin-bottom:4px">
+          <span style="font-family:Manrope,sans-serif;font-weight:700;font-size:16px;color:var(--ink)">O que vem por aí</span>
+          <span style="font-size:13px;color:var(--ink-2);white-space:nowrap">Fatura fecha em <span style="color:var(--warn);font-weight:600">12 dias</span></span>
+        </div>
+        <div class="cf-scroll" style="overflow-x:auto;overflow-y:hidden;padding:0 8px">
+          <div ref="{{ setRulerRef }}" style="position:relative;height:176px;min-width:560px">
+            <div style="position:absolute;left:5%;right:8%;top:88px;height:3px;border-radius:3px;background:var(--track)"></div>
+            <div data-ruler-fill style="position:absolute;left:36.2%;width:53.8%;top:88px;height:3px;border-radius:3px;background:linear-gradient(90deg,var(--primary),color-mix(in oklab,var(--primary),transparent 55%));transform-origin:left center"></div>
+
+            <!-- past (grey, below) -->
+            <div data-ruler-item style="position:absolute;left:16.3%;top:90px;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:4px;width:92px">
+              <span style="width:10px;height:10px;border-radius:50%;background:var(--surface);border:2.5px solid var(--ink-2);opacity:.7"></span>
+              <span style="width:2px;height:14px;background:var(--ink-2);opacity:.3"></span>
+              <span style="font-weight:600;font-size:12px;color:var(--ink-2)">Salário</span>
+              <span style="font-family:Manrope,sans-serif;font-size:10.5px;color:var(--ink-2);opacity:.8">5 · recebido</span>
+            </div>
+            <div data-ruler-item style="position:absolute;left:30.5%;top:90px;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:4px;width:92px">
+              <span style="width:10px;height:10px;border-radius:50%;background:var(--surface);border:2.5px solid var(--ink-2);opacity:.7"></span>
+              <span style="width:2px;height:26px;background:var(--ink-2);opacity:.3"></span>
+              <span style="font-weight:600;font-size:12px;color:var(--ink-2)">Aluguel</span>
+              <span style="font-family:Manrope,sans-serif;font-size:10.5px;color:var(--ink-2);opacity:.8">10 · pago</span>
+            </div>
+
+            <!-- future (color, above) -->
+            <div data-ruler-item style="position:absolute;left:58.8%;top:0;height:88px;transform:translateX(-50%);display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:4px;width:96px">
+              <span style="font-weight:600;font-size:12px;color:var(--ink)">Assinaturas</span>
+              <span style="font-family:Manrope,sans-serif;font-size:10.5px;color:var(--ink-2)">20 · R$ 76</span>
+              <span style="width:2px;height:18px;background:var(--primary);opacity:.5"></span>
+              <span style="width:10px;height:10px;border-radius:50%;background:var(--primary)"></span>
+            </div>
+            <div data-ruler-item style="position:absolute;left:70.2%;top:0;height:88px;transform:translateX(-50%);display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:4px;width:104px">
+              <span style="display:inline-flex;align-items:center;gap:5px;font-weight:700;font-size:12px;color:var(--warn)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h16.9a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"></path><path d="M12 9v3M12 16h.01"></path></svg>Fatura</span>
+              <span style="font-family:Manrope,sans-serif;font-size:10.5px;color:var(--ink-2)">24 · R$ 3.210</span>
+              <span style="width:2px;height:34px;background:var(--warn);opacity:.6"></span>
+              <span style="width:13px;height:13px;border-radius:50%;background:var(--warn);box-shadow:0 0 0 4px rgba(245,165,36,.18)"></span>
+            </div>
+            <div data-ruler-item style="position:absolute;left:81.5%;top:0;height:88px;transform:translateX(-50%);display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:4px;width:88px">
+              <span style="font-weight:600;font-size:12px;color:var(--ink)">Internet</span>
+              <span style="font-family:Manrope,sans-serif;font-size:10.5px;color:var(--ink-2)">28 · R$ 120</span>
+              <span style="width:2px;height:16px;background:var(--primary);opacity:.5"></span>
+              <span style="width:10px;height:10px;border-radius:50%;background:var(--primary)"></span>
+            </div>
+            <div data-ruler-item style="position:absolute;left:88%;top:0;height:88px;transform:translateX(-50%);display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:4px;width:74px">
+              <span style="font-weight:600;font-size:12px;color:var(--positive)">Salário</span>
+              <span style="font-family:Manrope,sans-serif;font-size:10.5px;color:var(--ink-2)">31 · previsto</span>
+              <span style="width:2px;height:42px;background:var(--positive);opacity:.5"></span>
+              <span style="width:10px;height:10px;border-radius:50%;background:var(--positive)"></span>
+            </div>
+
+            <!-- today -->
+            <div style="position:absolute;left:36.2%;top:0;height:88px;transform:translateX(-50%);display:flex;flex-direction:column;justify-content:flex-end;align-items:center;pointer-events:none">
+              <div data-ruler-today style="display:flex;flex-direction:column;align-items:center;gap:3px">
+                <span style="font-family:Manrope,sans-serif;font-weight:700;font-size:10.5px;letter-spacing:.1em;color:var(--primary)">HOJE</span>
+                <span style="font-family:Manrope,sans-serif;font-size:10.5px;color:var(--ink-2)">12 jul</span>
+                <span style="width:2.5px;height:22px;background:var(--primary);border-radius:2px"></span>
+                <span style="width:15px;height:15px;border-radius:50%;background:var(--primary);border:3px solid var(--surface);box-shadow:0 0 0 2.5px var(--primary)"></span>
+              </div>
+            </div>
+
+            <div style="position:absolute;left:0;right:0;top:152px;font-family:Manrope,sans-serif;font-size:10px;color:var(--ink-2);opacity:.6">
+              <span style="position:absolute;left:5%;transform:translateX(-50%)">1</span>
+              <span style="position:absolute;left:30.5%;transform:translateX(-50%)">10</span>
+              <span style="position:absolute;left:58.8%;transform:translateX(-50%)">20</span>
+              <span style="position:absolute;left:88%;transform:translateX(-50%)">31</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- THREE STAT CARDS -->
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:16px">
+        <sc-for list="{{ stats }}" as="s" hint-placeholder-count="3">
+          <div style="background:var(--surface);border-radius:20px;box-shadow:var(--card-shadow);border:1px solid var(--card-border);padding:16px 16px 14px;min-width:0">
+            <div style="font-size:12.5px;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ s.label }}</div>
+            <div style="font-family:Manrope,sans-serif;font-weight:700;font-variant-numeric:tabular-nums;font-size:19px;color:var(--ink);margin-top:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ s.value }}</div>
+            <div style="display:flex;flex-direction:column;gap:9px;margin-top:9px">
+              <span style="display:inline-flex;align-items:center;gap:3px;font-size:12px;font-weight:600;white-space:nowrap;color:{{ s.deltaColor }}">{{ s.delta }}</span>
+              <svg width="100%" height="20" viewBox="0 0 72 24" preserveAspectRatio="none" style="width:100%;display:block"><polyline points="{{ s.points }}" fill="none" stroke="{{ s.deltaColor }}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"></polyline></svg>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+
+      <!-- PENDING STRIP -->
+      <sc-if value="{{ showPending }}" hint-placeholder-val="{{ true }}">
+      <div style="display:flex;align-items:center;gap:14px;margin-top:16px;padding:16px 18px;border-radius:18px;background:var(--primary);color:#fff">
+        <div style="width:42px;height:42px;border-radius:12px;background:rgba(255,255,255,.16);display:flex;align-items:center;justify-content:center;flex:none">
+          <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.2-8.5"></path><path d="M22 4 12 14.01l-3-3"></path></svg>
+        </div>
+        <div style="flex:1;min-width:0">
+          <div style="font-family:Manrope,sans-serif;font-weight:700;font-size:15px">12 lançamentos aguardando revisão</div>
+          <div style="font-size:13px;color:rgba(255,255,255,.8);margin-top:1px">Importados do cartão. Confira e categorize.</div>
+        </div>
+        <button style="height:40px;padding:0 18px;border:none;border-radius:999px;background:#fff;color:var(--primary);font-family:Inter,sans-serif;font-weight:600;font-size:14px;cursor:pointer;flex:none;transition:transform .18s" style-active="transform:scale(.97)">Revisar</button>
+      </div>
+      </sc-if>
+
+      <!-- SPLIT: 2/3 + 1/3 -->
+      <div style="display:grid;grid-template-columns:{{ splitCols }};gap:16px;margin-top:16px;align-items:start">
+
+        <!-- LEFT RAIL -->
+        <div style="display:flex;flex-direction:column;gap:16px;min-width:0">
+
+          <!-- OPEN INVOICES -->
+          <section style="min-width:0">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+              <h3 style="margin:0;font-family:Manrope,sans-serif;font-weight:700;font-size:16px;color:var(--ink)">Faturas abertas</h3>
+              <span style="font-size:13px;color:var(--ink-2)">3 cartões</span>
+            </div>
+            <div class="cf-scroll" style="display:flex;gap:12px;overflow-x:auto;padding-bottom:6px;scroll-snap-type:x mandatory">
+              <sc-for list="{{ invoices }}" as="c" hint-placeholder-count="3">
+                <div style="flex:0 0 auto;width:262px;scroll-snap-align:start;background:var(--surface);border-radius:20px;box-shadow:var(--card-shadow);border:1px solid var(--card-border);padding:18px;position:relative;overflow:hidden">
+                  <span style="position:absolute;top:0;left:0;width:100%;height:5px;background:{{ c.color }}"></span>
+                  <div style="display:flex;align-items:center;justify-content:space-between;margin-top:4px">
+                    <div style="display:flex;align-items:center;gap:10px">
+                      <span style="width:34px;height:34px;border-radius:10px;background:{{ c.color }};color:#fff;display:flex;align-items:center;justify-content:center;font-family:Manrope,sans-serif;font-weight:700;font-size:15px">{{ c.initial }}</span>
+                      <span style="font-family:Manrope,sans-serif;font-weight:700;font-size:15px;color:var(--ink)">{{ c.name }}</span>
+                    </div>
+                    <button title="Cor do cartão" style="width:24px;height:24px;border-radius:8px;border:1px solid var(--line);background:transparent;color:var(--ink-2);display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="background:var(--surface-2)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"></path></svg></button>
+                  </div>
+                  <div style="font-family:Manrope,sans-serif;font-weight:700;font-variant-numeric:tabular-nums;font-size:24px;color:var(--ink);margin-top:14px">{{ c.partial }}</div>
+                  <div style="font-size:12px;color:var(--ink-2);margin-top:2px">fatura parcial</div>
+                  <div style="height:7px;border-radius:99px;background:var(--track);margin-top:14px;overflow:hidden"><div style="height:100%;border-radius:99px;background:{{ c.color }};width:{{ c.usedPct }}%"></div></div>
+                  <div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;font-size:12px;color:var(--ink-2)"><span>{{ c.usedStr }} de {{ c.limitStr }}</span><span style="font-weight:600;color:{{ c.closesColor }}">{{ c.closes }}</span></div>
+                </div>
+              </sc-for>
+            </div>
+          </section>
+
+          <!-- CATEGORY DONUT -->
+          <section style="background:var(--surface);border-radius:20px;box-shadow:var(--card-shadow);border:1px solid var(--card-border);padding:22px 24px">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+              <h3 style="margin:0;font-family:Manrope,sans-serif;font-weight:700;font-size:16px;color:var(--ink)">Gastos por categoria</h3>
+              <sc-if value="{{ hasActiveCat }}" hint-placeholder-val="{{ false }}"><button onClick="{{ clearCat }}" style="display:inline-flex;align-items:center;gap:5px;height:28px;padding:0 10px;border:none;border-radius:999px;background:var(--primary-soft);color:var(--primary);font-family:Inter,sans-serif;font-weight:600;font-size:12px;cursor:pointer">Filtrando {{ activeCatLabel }} ✕</button></sc-if>
+            </div>
+            <div style="display:flex;align-items:center;gap:24px;flex-wrap:wrap">
+              <div style="position:relative;width:168px;height:168px;flex:none">
+                <svg width="168" height="168" viewBox="0 0 168 168" style="transform:rotate(-90deg)">
+                  <sc-for list="{{ donut }}" as="d" hint-placeholder-count="6">
+                    <circle cx="84" cy="84" r="60" fill="none" stroke="{{ d.color }}" stroke-width="{{ d.width }}" stroke-dasharray="{{ d.dash }}" stroke-dashoffset="{{ d.offset }}" opacity="{{ d.opacity }}" onClick="{{ d.onClick }}" style="cursor:pointer;transition:stroke-width .18s,opacity .18s"></circle>
+                  </sc-for>
+                </svg>
+                <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;pointer-events:none">
+                  <span style="font-size:11px;color:var(--ink-2);white-space:nowrap">gasto em jul</span>
+                  <span style="font-family:Manrope,sans-serif;font-weight:700;font-variant-numeric:tabular-nums;font-size:22px;color:var(--ink);margin-top:2px">{{ spentTotal }}</span>
+                </div>
+              </div>
+              <div style="flex:1;min-width:170px;display:flex;flex-direction:column;gap:2px">
+                <sc-for list="{{ donut }}" as="d" hint-placeholder-count="6">
+                  <button onClick="{{ d.onClick }}" style="display:flex;align-items:center;gap:10px;padding:7px 8px;border:none;background:{{ d.rowBg }};border-radius:10px;cursor:pointer;text-align:left;width:100%;transition:background .15s">
+                    <span style="width:10px;height:10px;border-radius:3px;background:{{ d.color }};flex:none"></span>
+                    <span style="flex:1;font-size:13.5px;font-weight:{{ d.rowWeight }};color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ d.label }}</span>
+                    <span style="font-family:Manrope,sans-serif;font-variant-numeric:tabular-nums;font-size:13px;color:var(--ink-2)">{{ d.pct }}%</span>
+                    <span style="font-family:Manrope,sans-serif;font-weight:600;font-variant-numeric:tabular-nums;font-size:13px;color:var(--ink);min-width:74px;text-align:right">{{ d.value }}</span>
+                  </button>
+                </sc-for>
+              </div>
+            </div>
+          </section>
+
+          <!-- BUDGET -->
+          <section style="background:var(--surface);border-radius:20px;box-shadow:var(--card-shadow);border:1px solid var(--card-border);padding:22px 24px">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+              <h3 style="margin:0;font-family:Manrope,sans-serif;font-weight:700;font-size:16px;color:var(--ink)">Orçamento</h3>
+              <span style="font-size:13px;color:var(--ink-2)">4 categorias</span>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:16px">
+              <sc-for list="{{ budgets }}" as="b" hint-placeholder-count="4">
+                <div>
+                  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:7px">
+                    <span style="display:inline-flex;align-items:center;gap:8px;font-size:14px;color:var(--ink)"><span style="width:9px;height:9px;border-radius:50%;background:{{ b.color }}"></span>{{ b.label }}</span>
+                    <span style="font-family:Manrope,sans-serif;font-variant-numeric:tabular-nums;font-size:13px;color:var(--ink-2);white-space:nowrap;flex:none;padding-left:10px"><span style="font-weight:600;color:{{ b.textColor }}">{{ b.spent }}</span> / {{ b.limit }}</span>
+                  </div>
+                  <div style="height:8px;border-radius:99px;background:var(--track);overflow:hidden"><div style="height:100%;border-radius:99px;background:{{ b.color }};width:{{ b.barPct }}%"></div></div>
+                </div>
+              </sc-for>
+            </div>
+          </section>
+
+          <!-- LATEST TRANSACTIONS -->
+          <section style="background:var(--surface);border-radius:20px;box-shadow:var(--card-shadow);border:1px solid var(--card-border);padding:22px 24px">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+              <h3 style="margin:0;font-family:Manrope,sans-serif;font-weight:700;font-size:16px;color:var(--ink)">Últimos lançamentos</h3>
+              <a style="font-size:13px;font-weight:600;color:var(--primary);cursor:pointer">Ver todos</a>
+            </div>
+            <sc-for list="{{ txs }}" as="t" hint-placeholder-count="5">
+              <div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--line)">
+                <span style="width:36px;height:36px;border-radius:11px;background:var(--surface-2);display:flex;align-items:center;justify-content:center;flex:none"><span style="width:9px;height:9px;border-radius:50%;background:{{ t.dot }}"></span></span>
+                <div style="flex:1;min-width:0">
+                  <div style="font-size:14.5px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ t.name }}</div>
+                  <div style="font-size:12px;color:var(--ink-2)">{{ t.cat }} · {{ t.d }}</div>
+                </div>
+                <span style="font-family:Manrope,sans-serif;font-weight:600;font-variant-numeric:tabular-nums;font-size:14.5px;color:{{ t.color }};flex:none;white-space:nowrap">{{ t.amt }}</span>
+              </div>
+            </sc-for>
+          </section>
+        </div>
+
+        <!-- RIGHT RAIL -->
+        <div style="display:flex;flex-direction:column;gap:16px;min-width:0">
+
+          <!-- PATRIMÔNIO -->
+          <section style="background:var(--surface);border-radius:20px;box-shadow:var(--card-shadow);border:1px solid var(--card-border);padding:22px 24px">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+              <h3 style="margin:0;font-family:Manrope,sans-serif;font-weight:700;font-size:16px;color:var(--ink)">Patrimônio</h3>
+              <span style="display:inline-flex;align-items:center;gap:4px;font-size:13px;font-weight:600;color:var(--positive)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M9 7h8v8"></path></svg>+2,4%</span>
+            </div>
+            <div style="font-family:Manrope,sans-serif;font-weight:700;font-variant-numeric:tabular-nums;font-size:30px;letter-spacing:-.01em;color:var(--ink)">{{ patTotal }}</div>
+            <div style="font-size:12.5px;color:var(--ink-2);margin-top:2px">total · contas + investimentos</div>
+            <div style="display:flex;flex-direction:column;gap:10px;margin-top:18px">
+              <div style="display:flex;align-items:center;justify-content:space-between">
+                <span style="display:inline-flex;align-items:center;gap:8px;font-size:13.5px;color:var(--ink)"><span style="width:9px;height:9px;border-radius:50%;background:var(--primary)"></span>Saldo em contas</span>
+                <span style="font-family:Manrope,sans-serif;font-weight:600;font-variant-numeric:tabular-nums;font-size:14px;color:var(--ink)">{{ patContas }}</span>
+              </div>
+              <div style="display:flex;align-items:center;justify-content:space-between">
+                <span style="display:inline-flex;align-items:center;gap:8px;font-size:13.5px;color:var(--ink)"><span style="width:9px;height:9px;border-radius:50%;background:var(--invest)"></span>Investimentos</span>
+                <span style="font-family:Manrope,sans-serif;font-weight:600;font-variant-numeric:tabular-nums;font-size:14px;color:var(--invest)">{{ patInvest }}</span>
+              </div>
+            </div>
+          </section>
+
+          <!-- INSIGHT -->
+          <section style="border-radius:20px;background:var(--primary-soft);padding:22px 24px;border:1px solid var(--card-border)">
+            <div style="display:flex;align-items:center;gap:8px;color:var(--primary);font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.3 1 2.3h6c0-1 .4-1.8 1-2.3A7 7 0 0 0 12 2Z"></path></svg>
+              Insight do mês
+            </div>
+            <p style="margin:14px 0 0;font-size:17px;line-height:1.5;color:var(--ink)">Você gastou <b style="font-family:Manrope,sans-serif;font-weight:700">{{ insightAmount }}</b> em delivery — <b style="color:var(--warn);font-family:Manrope,sans-serif;font-weight:700">34% acima</b> da sua média. Foram <b style="font-family:Manrope,sans-serif;font-weight:700">19 pedidos</b>.</p>
+            <button style="height:40px;padding:0 18px;margin-top:18px;border:none;border-radius:999px;background:var(--primary);color:#fff;font-family:Inter,sans-serif;font-weight:600;font-size:13.5px;cursor:pointer;white-space:nowrap;transition:background .18s" style-hover="background:var(--primary-hover)">Ver delivery</button>
+          </section>
+        </div>
+      </div>
+
+      <div style="height:40px"></div>
+    </div>
+  </div>
+
+  <!-- FAB -->
+  <button title="Novo lançamento · N" style="position:fixed;right:28px;bottom:28px;width:60px;height:60px;border-radius:50%;border:none;background:var(--primary);color:#fff;box-shadow:var(--fab-shadow);display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:40;transition:transform .18s,background .18s" style-hover="background:var(--primary-hover);transform:translateY(-2px)" style-active="transform:scale(.94)">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"></path></svg>
+  </button>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{
+  &quot;device&quot;: { &quot;editor&quot;: &quot;enum&quot;, &quot;options&quot;: [&quot;Desktop&quot;, &quot;Mobile&quot;], &quot;default&quot;: &quot;Desktop&quot;, &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Protótipo&quot; },
+  &quot;showPending&quot;: { &quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: true, &quot;tsType&quot;: &quot;boolean&quot;, &quot;section&quot;: &quot;Protótipo&quot; },
+  &quot;privacyDefault&quot;: { &quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: false, &quot;tsType&quot;: &quot;boolean&quot;, &quot;section&quot;: &quot;Aparência&quot; },
+  &quot;theme&quot;: { &quot;editor&quot;: &quot;enum&quot;, &quot;options&quot;: [&quot;Claro&quot;, &quot;Escuro&quot;], &quot;default&quot;: &quot;Claro&quot;, &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Aparência&quot; }
+}">
+class Component extends DCLogic {
+  constructor(props){
+    super(props);
+    this.C = 2 * Math.PI * 60;
+    this.state = {
+      theme: props.theme === 'Escuro' ? 'dark' : 'light',
+      device: props.device === 'Mobile' ? 'mobile' : 'desktop',
+      privacy: !!props.privacyDefault,
+      showPending: props.showPending !== false,
+      monthIdx: 6,
+      activeCat: null,
+      hoje: 0, prev: 0
+    };
+    this._prevPrivacy = this.state.privacy;
+    this.HOJE = 12480.90;
+    this.PREV = 8174.90;
+    this.months = ['Janeiro 2026','Fevereiro 2026','Março 2026','Abril 2026','Maio 2026','Junho 2026','Julho 2026','Agosto 2026'];
+  }
+  componentDidMount(){
+    const mq = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)');
+    this.reduced = mq && mq.matches;
+    if(this.props.device == null && window.innerWidth < 900) this.setState({ device: 'mobile' });
+    this.animateNums();
+    this.playRuler();
+  }
+  componentDidUpdate(prev){
+    prev = prev || {};
+    if(prev.theme !== this.props.theme) this.setState({ theme: this.props.theme === 'Escuro' ? 'dark' : 'light' });
+    if(prev.device !== this.props.device) this.setState({ device: this.props.device === 'Mobile' ? 'mobile' : 'desktop' });
+    if(prev.showPending !== this.props.showPending) this.setState({ showPending: this.props.showPending !== false });
+    if(prev.privacyDefault !== this.props.privacyDefault) this.setState({ privacy: !!this.props.privacyDefault });
+  }
+  componentWillUnmount(){ if(this._raf) cancelAnimationFrame(this._raf); }
+  fmt(n){ return Number(n).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+  fmt0(n){ return Number(n).toLocaleString('pt-BR', { maximumFractionDigits: 0 }); }
+  money(n){ return this.state.privacy ? 'R$ ••••' : 'R$ ' + this.fmt(n); }
+  money0(n){ return this.state.privacy ? 'R$ ••••' : 'R$ ' + this.fmt0(n); }
+  animateNums(){
+    if(this.reduced){ this.setState({ hoje: this.HOJE, prev: this.PREV }); return; }
+    if(this._raf) cancelAnimationFrame(this._raf);
+    const dur = 1050, t0 = performance.now();
+    const step = (now) => {
+      const p = Math.min(1, (now - t0) / dur);
+      const e = 1 - Math.pow(1 - p, 3);
+      this.setState({ hoje: this.HOJE * e, prev: this.PREV * e });
+      if(p < 1) this._raf = requestAnimationFrame(step);
+      else this.setState({ hoje: this.HOJE, prev: this.PREV });
+    };
+    this._raf = requestAnimationFrame(step);
+  }
+  playRuler(){
+    const root = this.rulerRef;
+    if(!root || this.reduced) return;
+    const ease = 'cubic-bezier(.22,1,.36,1)';
+    const fill = root.querySelector('[data-ruler-fill]');
+    if(fill) fill.animate([{ transform:'scaleX(0)' }, { transform:'scaleX(1)' }], { duration: 820, easing: ease, fill: 'both' });
+    root.querySelectorAll('[data-ruler-item]').forEach((el, i) => {
+      el.animate([{ opacity: 0, transform:'translateY(10px)' }, { opacity: 1, transform:'translateY(0)' }],
+        { duration: 460, delay: 300 + i * 80, easing: ease, fill: 'both' });
+    });
+    const today = root.querySelector('[data-ruler-today]');
+    if(today) today.animate([{ opacity: 0, transform:'translateY(-8px) scale(.8)' }, { opacity: 1, transform:'translateY(0) scale(1)' }],
+      { duration: 520, delay: 160, easing: 'cubic-bezier(.34,1.56,.64,1)', fill: 'both' });
+  }
+  renderVals(){
+    const p = this.state.privacy;
+    const hj = this.fmt(this.state.hoje).split(',');
+    const stat = (label, val, delta, up, good, points) => ({
+      label, value: this.money0(val), delta: (up ? '↑ ' : '↓ ') + delta,
+      deltaColor: good ? 'var(--positive)' : 'var(--negative)', points
+    });
+    // donut
+    const cats = [
+      { label:'Moradia', value:2100, color:'var(--primary)' },
+      { label:'Alimentação', value:900, color:'#F5A524' },
+      { label:'Delivery', value:412, color:'#EC4899' },
+      { label:'Lazer', value:200, color:'#0EA5E9' },
+      { label:'Transporte', value:180, color:'var(--invest)' },
+      { label:'Assinaturas', value:98, color:'#8B5CF6' }
+    ];
+    const total = cats.reduce((a, c) => a + c.value, 0);
+    let acc = 0;
+    const donut = cats.map((c) => {
+      const frac = c.value / total;
+      const len = frac * this.C;
+      const active = this.state.activeCat === c.label;
+      const dim = this.state.activeCat && !active;
+      const seg = {
+        label: c.label, color: c.color, value: this.money0(c.value), pct: Math.round(frac * 100),
+        width: active ? 22 : 16, opacity: dim ? '0.32' : '1',
+        dash: (Math.max(0, len - 2)).toFixed(2) + ' ' + (this.C - Math.max(0, len - 2)).toFixed(2),
+        offset: (-acc).toFixed(2),
+        rowBg: active ? 'var(--surface-2)' : 'transparent',
+        rowWeight: active ? '700' : '500',
+        onClick: () => this.setState(s => ({ activeCat: s.activeCat === c.label ? null : c.label }))
+      };
+      acc += len;
+      return seg;
+    });
+    const budgets = [
+      { label:'Delivery', spent:412, limit:300 },
+      { label:'Alimentação', spent:900, limit:1200 },
+      { label:'Lazer', spent:380, limit:400 },
+      { label:'Transporte', spent:180, limit:400 }
+    ].map(b => {
+      const pct = b.spent / b.limit * 100;
+      const over = pct >= 90;
+      return {
+        label: b.label, spent: this.money0(b.spent), limit: this.money0(b.limit),
+        barPct: Math.min(100, pct).toFixed(0),
+        color: over ? 'var(--negative)' : 'var(--primary)',
+        textColor: over ? 'var(--negative)' : 'var(--ink)'
+      };
+    });
+    const invoices = [
+      { name:'Nubank', initial:'N', color:'#820AD1', partial:3210.45, used:3210.45, limit:8000, closes:'fecha em 12 dias', warn:false },
+      { name:'Inter', initial:'I', color:'#FF7A00', partial:1204.00, used:1204.00, limit:5000, closes:'fecha em 6 dias', warn:true },
+      { name:'C6', initial:'C', color:'#242424', partial:640.90, used:640.90, limit:12000, closes:'fecha em 20 dias', warn:false }
+    ].map(c => ({
+      name:c.name, initial:c.initial, color:c.color,
+      partial:this.money(c.partial), usedStr:this.money0(c.used), limitStr:this.money0(c.limit),
+      usedPct:Math.round(c.used / c.limit * 100), closes:c.closes,
+      closesColor: c.warn ? 'var(--warn)' : 'var(--ink-2)'
+    }));
+    const txs = [
+      { d:'12 jul', name:'iFood', cat:'Delivery', dot:'#EC4899', val:-48.90 },
+      { d:'12 jul', name:'Uber · Centro', cat:'Transporte', dot:'var(--invest)', val:-22.40 },
+      { d:'11 jul', name:'Mercado Extra', cat:'Alimentação', dot:'#F5A524', val:-214.30 },
+      { d:'10 jul', name:'Aluguel', cat:'Moradia', dot:'var(--primary)', val:-2100.00 },
+      { d:'05 jul', name:'Salário', cat:'Salário', dot:'var(--positive)', val:8200.00 }
+    ].map(t => ({
+      d:t.d, name:t.name, cat:t.cat, dot:t.dot,
+      amt: (t.val < 0 ? '− ' : '+ ') + this.money(Math.abs(t.val)).replace('R$ ', 'R$ '),
+      color: t.val < 0 ? 'var(--ink)' : 'var(--positive)'
+    }));
+    const isD = this.state.device === 'desktop';
+    return {
+      theme: this.state.theme,
+      themeIsDark: this.state.theme === 'dark', themeIsLight: this.state.theme !== 'dark',
+      privacy: p, notPrivacy: !p,
+      showPending: this.state.showPending,
+      greeting: (() => { const h = new Date().getHours(); const g = h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite'; return g + ', Léo'; })(),
+      monthLabel: this.months[this.state.monthIdx],
+      hojeInt: p ? '••••' : hj[0], hojeCents: p ? '' : (',' + hj[1]),
+      prevStr: this.money(this.state.prev), committedStr: this.money0(4306),
+      stats: [
+        stat('Entradas', 8200, '5% vs. jun', true, true, '0,20 14,17 28,18 42,11 56,12 72,5'),
+        stat('Saídas', 3890, '18% vs. jun', true, false, '0,17 14,12 28,15 42,9 56,13 72,6'),
+        stat('Sobrou', 4310, '9% vs. jun', false, false, '0,6 14,9 28,7 42,13 56,12 72,19')
+      ],
+      invoices, donut, budgets, txs,
+      spentTotal: this.money0(total),
+      hasActiveCat: !!this.state.activeCat, activeCatLabel: this.state.activeCat || '',
+      clearCat: () => this.setState({ activeCat: null }),
+      patTotal: this.money(76690.90), patContas: this.money(12480.90), patInvest: this.money(64210.00),
+      insightAmount: p ? 'R$ ••••' : 'R$ 412',
+      isDesktop: isD, isMobile: !isD,
+      stageStyle: isD
+        ? 'width:100%;max-width:1140px;padding:26px 24px 0'
+        : 'width:412px;max-width:100%;background:var(--surface);border:1px solid var(--line);border-radius:34px;box-shadow:0 24px 60px rgba(26,21,35,.12);padding:24px 18px 0;margin-top:4px',
+      stagePad: isD ? '0' : '18px 16px 40px',
+      splitCols: isD ? '2fr 1fr' : '1fr',
+      deskBg: isD ? 'var(--surface)' : 'transparent', deskColor: isD ? 'var(--ink)' : 'var(--ink-2)',
+      mobBg: !isD ? 'var(--surface)' : 'transparent', mobColor: !isD ? 'var(--ink)' : 'var(--ink-2)',
+      pendBg: this.state.showPending ? 'var(--primary-soft)' : 'transparent',
+      pendColor: this.state.showPending ? 'var(--primary)' : 'var(--ink-2)',
+      prevMonth: () => this.setState(s => ({ monthIdx: Math.max(0, s.monthIdx - 1) })),
+      nextMonth: () => this.setState(s => ({ monthIdx: Math.min(this.months.length - 1, s.monthIdx + 1) })),
+      setDesktop: () => this.setState({ device: 'desktop' }), setMobile: () => this.setState({ device: 'mobile' }),
+      togglePending: () => this.setState(s => ({ showPending: !s.showPending })),
+      togglePrivacy: () => this.setState(s => ({ privacy: !s.privacy })),
+      toggleTheme: () => this.setState(s => ({ theme: s.theme === 'dark' ? 'light' : 'dark' })),
+      replay: () => { this.animateNums(); this.playRuler(); },
+      setRulerRef: (el) => { this.rulerRef = el; }
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Manrope:wght@500;600;700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{background:#FAFAFC}
+  :root{
+    --primary:#820AD1;--primary-hover:#6B08AD;--primary-soft:#F3E8FF;
+    --bg:#FAFAFC;--surface:#FFFFFF;--surface-2:#F3F1F7;--line:#E8E4EF;
+    --ink:#1A1523;--ink-2:#6B6577;
+    --positive:#00A868;--negative:#E5484D;--warn:#F5A524;--invest:#0F9B8E;
+    --card-shadow:0 1px 3px rgba(26,21,35,.06);--card-border:transparent;
+    --ring:0 0 0 4px rgba(130,10,209,.22);--fab-shadow:0 12px 30px rgba(130,10,209,.34);
+    --track:#E8E4EF;--overlay:rgba(26,21,35,.04);--scrim:rgba(26,21,35,.32);
+    --pos-soft:rgba(0,168,104,.12);--warn-soft:rgba(245,165,36,.14);
+  }
+  [data-theme="dark"]{
+    --primary:#A855F7;--primary-hover:#9333EA;--primary-soft:#2A1140;
+    --bg:#0E0B12;--surface:#171320;--surface-2:#211B2E;--line:#2E2740;
+    --ink:#F5F3F8;--ink-2:#A79FB8;
+    --positive:#3DD68C;--negative:#FF6369;--warn:#F7B955;--invest:#22C3B0;
+    --card-shadow:none;--card-border:#2E2740;
+    --ring:0 0 0 4px rgba(168,85,247,.32);--fab-shadow:0 12px 32px rgba(168,85,247,.28);
+    --track:#2E2740;--overlay:rgba(255,255,255,.05);--scrim:rgba(0,0,0,.55);
+    --pos-soft:rgba(61,214,140,.14);--warn-soft:rgba(247,185,85,.16);
+  }
+  a{color:var(--primary);text-decoration:none}
+  a:hover{color:var(--primary-hover)}
+  input::placeholder{color:var(--ink-2);opacity:.6}
+  .cf-scroll::-webkit-scrollbar{height:7px;width:7px}
+  .cf-scroll::-webkit-scrollbar-thumb{background:var(--line);border-radius:99px}
+  .cf-scroll::-webkit-scrollbar-track{background:transparent}
+  @keyframes cf-fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+  @keyframes cf-modal{from{opacity:0;transform:translateY(10px) scale(.98)}to{opacity:1;transform:translateY(0) scale(1)}}
+  @keyframes cf-scrim{from{opacity:0}to{opacity:1}}
+  @keyframes cf-draw{from{stroke-dashoffset:var(--len)}to{stroke-dashoffset:0}}
+  @media (prefers-reduced-motion: reduce){*{animation-duration:.001ms !important;transition-duration:.001ms !important}}
+</style>
+</helmet>
+
+<div data-theme="{{ theme }}" style="min-height:100dvh;background:var(--bg);color:var(--ink);font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased">
+
+  <!-- ===== reviewer toolbar ===== -->
+  <div style="height:57px;display:flex;align-items:center;gap:12px;padding:0 18px;border-bottom:1px solid var(--line);background:var(--surface);position:sticky;top:0;z-index:60;overflow-x:auto;white-space:nowrap">
+    <span style="display:inline-flex;align-items:center;gap:8px;flex:none;margin-right:2px">
+      <span style="width:26px;height:26px;border-radius:8px;background:var(--primary);display:flex;align-items:center;justify-content:center"><span style="font-family:Manrope,sans-serif;font-weight:800;font-size:15px;color:#fff">$</span></span>
+      <span style="font-family:Manrope,sans-serif;font-weight:700;font-size:13px;color:var(--ink)">Cifrão</span>
+      <span style="font-size:11px;color:var(--ink-2);letter-spacing:.06em;text-transform:uppercase">Contas</span>
+    </span>
+    <span style="width:1px;height:22px;background:var(--line);flex:none"></span>
+    <div style="display:flex;gap:6px;flex:none">
+      <sc-for list="{{ navChips }}" as="c" hint-placeholder-count="4">
+        <button onClick="{{ c.onClick }}" style="height:32px;padding:0 13px;border:1px solid var(--line);border-radius:999px;font-family:Inter,sans-serif;font-weight:600;font-size:12.5px;cursor:pointer;transition:background .15s,color .15s;background:{{ c.bg }};color:{{ c.color }}">{{ c.label }}</button>
+      </sc-for>
+    </div>
+    <div style="margin-left:auto;display:flex;gap:8px;align-items:center;flex:none;padding-left:12px">
+      <div style="display:flex;background:var(--surface-2);border-radius:10px;padding:3px">
+        <button onClick="{{ setDesktop }}" style="height:26px;padding:0 12px;border:none;border-radius:8px;font-family:Inter,sans-serif;font-weight:600;font-size:12px;cursor:pointer;background:{{ deskBg }};color:{{ deskColor }}">Desktop</button>
+        <button onClick="{{ setMobile }}" style="height:26px;padding:0 12px;border:none;border-radius:8px;font-family:Inter,sans-serif;font-weight:600;font-size:12px;cursor:pointer;background:{{ mobBg }};color:{{ mobColor }}">Mobile</button>
+      </div>
+      <button onClick="{{ toggleTheme }}" title="Tema" style="width:34px;height:34px;border-radius:10px;background:var(--surface);border:1px solid var(--line);color:var(--ink);display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="background:var(--surface-2)">
+        <sc-if value="{{ themeIsDark }}" hint-placeholder-val="{{ false }}"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg></sc-if>
+        <sc-if value="{{ themeIsLight }}" hint-placeholder-val="{{ true }}"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6.4 6.4 0 0 0 9 9 9 9 0 1 1-9-9Z"></path></svg></sc-if>
+      </button>
+    </div>
+  </div>
+
+  <div style="display:flex;justify-content:center;padding:{{ stagePad }}">
+    <div style="{{ stageStyle }}">
+
+      <!-- ===================== LIST ===================== -->
+      <sc-if value="{{ isList }}" hint-placeholder-val="{{ true }}">
+      <div style="animation:cf-fade .2s ease-out">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:4px 2px 0">
+          <h1 style="margin:0;font-family:Manrope,sans-serif;font-weight:700;font-size:26px;letter-spacing:-.015em;color:var(--ink)">Contas</h1>
+          <button onClick="{{ goTransfer }}" style="height:44px;padding:0 18px 0 15px;border:1px solid var(--line);border-radius:999px;background:var(--surface);color:var(--ink);font-family:Inter,sans-serif;font-weight:600;font-size:14px;cursor:pointer;display:inline-flex;align-items:center;gap:7px;flex:none;transition:background .18s" style-hover="background:var(--surface-2)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4 3 8l4 4M3 8h14M17 20l4-4-4-4M21 16H7"></path></svg>Transferir</button>
+        </div>
+
+        <!-- consolidated total -->
+        <div style="background:linear-gradient(135deg,#820AD1,#5B08A0);border-radius:20px;padding:24px 26px;color:#fff;margin-top:18px;position:relative;overflow:hidden;box-shadow:0 10px 26px rgba(130,10,209,.28)">
+          <span style="position:absolute;right:-40px;top:-50px;width:170px;height:170px;border-radius:50%;background:rgba(255,255,255,.08)"></span>
+          <div style="font-size:13px;color:rgba(255,255,255,.78);position:relative">Patrimônio em contas</div>
+          <div style="display:flex;align-items:baseline;margin-top:6px;font-family:Manrope,sans-serif;font-weight:700;letter-spacing:-.02em;line-height:1;position:relative">
+            <span style="font-size:19px;font-weight:600;color:rgba(255,255,255,.8);margin-right:7px">R$</span>
+            <span style="font-size:38px">80.421</span><span style="font-size:22px;opacity:.7">,80</span>
+          </div>
+          <div style="font-size:12.5px;color:rgba(255,255,255,.72);margin-top:10px;position:relative">4 contas · atualizado agora</div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:10px;margin-top:16px">
+          <sc-for list="{{ accounts }}" as="a" hint-placeholder-count="4">
+            <button onClick="{{ a.onOpen }}" style="display:flex;align-items:center;gap:14px;padding:16px 18px;border-radius:18px;background:var(--surface);box-shadow:var(--card-shadow);border:1px solid var(--card-border);cursor:pointer;text-align:left;transition:transform .16s" style-hover="transform:translateY(-2px)">
+              <span style="width:46px;height:46px;border-radius:13px;background:{{ a.color }};color:#fff;display:flex;align-items:center;justify-content:center;font-family:Manrope,sans-serif;font-weight:800;font-size:18px;flex:none">{{ a.mark }}</span>
+              <div style="flex:1;min-width:0">
+                <div style="font-family:Manrope,sans-serif;font-weight:700;font-size:15.5px;color:var(--ink)">{{ a.name }}</div>
+                <div style="display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--ink-2);margin-top:3px"><span style="width:6px;height:6px;border-radius:2px;background:{{ a.typeColor }}"></span>{{ a.type }}</div>
+              </div>
+              <div style="text-align:right;flex:none">
+                <div style="font-family:Manrope,sans-serif;font-weight:700;font-variant-numeric:tabular-nums;font-size:16px;color:{{ a.balColor }}">{{ a.balance }}</div>
+                <div style="font-size:11.5px;color:var(--ink-2);margin-top:2px">saldo atual</div>
+              </div>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="m9 18 6-6-6-6"></path></svg>
+            </button>
+          </sc-for>
+        </div>
+        <button style="width:100%;height:48px;margin-top:14px;border:1px dashed var(--line);border-radius:14px;background:transparent;color:var(--primary);font-family:Inter,sans-serif;font-weight:600;font-size:14px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px" style-hover="border-color:var(--primary);background:var(--primary-soft)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"></path></svg>Nova conta</button>
+      </div>
+      </sc-if>
+
+      <!-- ===================== DETAIL ===================== -->
+      <sc-if value="{{ isDetail }}" hint-placeholder-val="{{ false }}">
+      <div style="animation:cf-fade .2s ease-out">
+        <button onClick="{{ goList }}" style="display:inline-flex;align-items:center;gap:7px;height:36px;padding:0 6px;border:none;background:transparent;color:var(--ink-2);font-family:Inter,sans-serif;font-weight:600;font-size:13.5px;cursor:pointer;margin-bottom:6px" style-hover="color:var(--ink)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"></path></svg>Contas</button>
+
+        <!-- balance + chart -->
+        <div style="background:var(--surface);border-radius:20px;box-shadow:var(--card-shadow);border:1px solid var(--card-border);padding:24px 26px">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap">
+            <div style="display:flex;align-items:center;gap:13px">
+              <span style="width:46px;height:46px;border-radius:13px;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-family:Manrope,sans-serif;font-weight:800;font-size:18px;flex:none">N</span>
+              <div>
+                <div style="font-family:Manrope,sans-serif;font-weight:700;font-size:17px;color:var(--ink)">Nubank · Conta</div>
+                <div style="font-size:12.5px;color:var(--ink-2);margin-top:2px">Conta corrente</div>
+              </div>
+            </div>
+            <div style="display:flex;gap:8px">
+              <button onClick="{{ openAdjust }}" style="height:40px;padding:0 15px;border:1px solid var(--line);border-radius:999px;background:var(--surface);color:var(--ink);font-family:Inter,sans-serif;font-weight:600;font-size:13.5px;cursor:pointer;display:inline-flex;align-items:center;gap:7px;transition:background .18s" style-hover="background:var(--surface-2)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-5"></path><path d="M18.4 3.6a2 2 0 0 1 3 3L12 16l-4 1 1-4Z"></path></svg>Ajustar saldo</button>
+            </div>
+          </div>
+          <div style="display:flex;align-items:baseline;margin-top:20px;font-family:Manrope,sans-serif;font-weight:700;letter-spacing:-.02em;color:var(--ink);line-height:1">
+            <span style="font-size:19px;font-weight:600;color:var(--ink-2);margin-right:7px">R$</span>
+            <span style="font-size:40px">12.480</span><span style="font-size:22px;opacity:.6">,90</span>
+          </div>
+          <div style="display:inline-flex;align-items:center;gap:6px;margin-top:10px;font-size:13px;font-weight:600;color:var(--positive)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M9 7h8v8"></path></svg>+ R$ 1.240 nos últimos 6 meses</div>
+
+          <!-- 6-month balance chart -->
+          <div style="margin-top:22px">
+            <div style="font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-2);margin-bottom:10px">Evolução do saldo · 6 meses</div>
+            <div style="position:relative;height:150px">
+              <svg ref="{{ setChartRef }}" viewBox="0 0 600 150" preserveAspectRatio="none" style="width:100%;height:100%;overflow:visible">
+                <defs><linearGradient id="cfArea" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="var(--primary)" stop-opacity="0.22"></stop><stop offset="100%" stop-color="var(--primary)" stop-opacity="0"></stop></linearGradient></defs>
+                <path d="{{ chartArea }}" fill="url(#cfArea)"></path>
+                <path data-chart-line d="{{ chartLine }}" fill="none" stroke="var(--primary)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"></path>
+                <sc-for list="{{ chartDots }}" as="d" hint-placeholder-count="6"><circle cx="{{ d.x }}" cy="{{ d.y }}" r="3.5" fill="var(--surface)" stroke="var(--primary)" stroke-width="2.5"></circle></sc-for>
+              </svg>
+            </div>
+            <div style="display:flex;justify-content:space-between;margin-top:8px;font-family:Manrope,sans-serif;font-size:11px;color:var(--ink-2)">
+              <sc-for list="{{ chartMonths }}" as="m" hint-placeholder-count="6"><span>{{ m }}</span></sc-for>
+            </div>
+          </div>
+        </div>
+
+        <!-- statement filters (same as lançamentos) -->
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:22px;margin-bottom:12px">
+          <h3 style="margin:0;font-family:Manrope,sans-serif;font-weight:700;font-size:16px;color:var(--ink)">Extrato</h3>
+          <span style="font-size:13px;color:var(--ink-2)">junho</span>
+        </div>
+        <div class="cf-scroll" style="display:flex;gap:8px;overflow-x:auto;padding-bottom:8px">
+          <div style="display:inline-flex;align-items:center;gap:7px;height:36px;padding:0 12px;border:1px solid var(--line);border-radius:11px;background:var(--surface);font-size:13px;font-weight:500;color:var(--ink);cursor:pointer;flex:none" style-hover="border-color:var(--primary)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--ink-2)" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"></rect><path d="M8 2v4M16 2v4M3 10h18"></path></svg>Este mês<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg></div>
+          <div style="display:inline-flex;align-items:center;gap:7px;height:36px;padding:0 12px;border:1px solid var(--line);border-radius:11px;background:var(--surface);font-size:13px;font-weight:500;color:var(--ink);cursor:pointer;flex:none" style-hover="border-color:var(--primary)">Tipo<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg></div>
+          <div style="display:inline-flex;align-items:center;gap:7px;height:36px;padding:0 12px;border:1px solid var(--line);border-radius:11px;background:var(--surface);font-size:13px;font-weight:500;color:var(--ink);cursor:pointer;flex:none" style-hover="border-color:var(--primary)">Categoria<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg></div>
+          <div style="display:inline-flex;align-items:center;gap:7px;height:36px;padding:0 14px;border:1px solid var(--line);border-radius:11px;background:var(--surface);font-size:13px;color:var(--ink-2);flex:none;min-width:130px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><path d="m21 21-4.3-4.3"></path></svg>Buscar</div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:18px;margin-top:8px">
+          <sc-for list="{{ dayGroups }}" as="g" hint-placeholder-count="2">
+            <div>
+              <div style="display:flex;align-items:baseline;justify-content:space-between;padding:0 4px 9px">
+                <span style="font-family:Manrope,sans-serif;font-weight:700;font-size:13px;color:var(--ink)">{{ g.label }}</span>
+                <span style="font-family:Manrope,sans-serif;font-variant-numeric:tabular-nums;font-size:13px;color:var(--ink-2)">{{ g.total }}</span>
+              </div>
+              <div style="background:var(--surface);border-radius:18px;box-shadow:var(--card-shadow);border:1px solid var(--card-border);overflow:hidden">
+                <sc-for list="{{ g.rows }}" as="r" hint-placeholder-count="3">
+                  <div style="display:flex;align-items:center;gap:13px;padding:14px 16px;border-bottom:1px solid var(--line)">
+                    <span style="width:38px;height:38px;border-radius:50%;background:{{ r.soft }};display:flex;align-items:center;justify-content:center;color:{{ r.color }};flex:none">{{ r.icon }}</span>
+                    <div style="flex:1;min-width:0">
+                      <div style="font-size:15px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.name }}</div>
+                      <div style="font-size:12px;color:var(--ink-2);margin-top:3px">{{ r.cat }}</div>
+                    </div>
+                    <span style="font-family:Manrope,sans-serif;font-weight:600;font-variant-numeric:tabular-nums;font-size:15px;color:{{ r.amtColor }};flex:none;white-space:nowrap">{{ r.amount }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+      </sc-if>
+
+      <!-- ===================== TRANSFER ===================== -->
+      <sc-if value="{{ isTransfer }}" hint-placeholder-val="{{ false }}">
+      <div style="animation:cf-fade .2s ease-out;max-width:480px;margin:0 auto">
+        <button onClick="{{ goList }}" style="display:inline-flex;align-items:center;gap:7px;height:36px;padding:0 6px;border:none;background:transparent;color:var(--ink-2);font-family:Inter,sans-serif;font-weight:600;font-size:13.5px;cursor:pointer;margin-bottom:6px" style-hover="color:var(--ink)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"></path></svg>Contas</button>
+        <h1 style="margin:0 0 4px;font-family:Manrope,sans-serif;font-weight:700;font-size:24px;letter-spacing:-.015em;color:var(--ink)">Nova transferência</h1>
+        <p style="margin:0 0 20px;font-size:14px;color:var(--ink-2)">Entre suas contas. Não conta como gasto nem receita.</p>
+
+        <!-- value -->
+        <div style="background:var(--surface);border-radius:20px;box-shadow:var(--card-shadow);border:1px solid var(--card-border);padding:22px 24px;text-align:center">
+          <div style="font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-2)">Valor</div>
+          <div style="display:flex;align-items:baseline;justify-content:center;gap:8px;margin-top:8px">
+            <span style="font-family:Manrope,sans-serif;font-weight:600;font-size:22px;color:var(--ink-2)">R$</span>
+            <span style="font-family:Manrope,sans-serif;font-weight:700;font-variant-numeric:tabular-nums;font-size:40px;letter-spacing:-.02em;color:var(--ink)">500,00</span>
+          </div>
+        </div>
+
+        <!-- from / swap / to -->
+        <div style="position:relative;margin-top:16px">
+          <div style="background:var(--surface);border-radius:16px;box-shadow:var(--card-shadow);border:1px solid var(--card-border);padding:16px 18px">
+            <div style="font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-2);margin-bottom:10px">De</div>
+            <div style="display:flex;align-items:center;gap:12px">
+              <span style="width:38px;height:38px;border-radius:11px;background:{{ fromColor }};color:#fff;display:flex;align-items:center;justify-content:center;font-family:Manrope,sans-serif;font-weight:800;font-size:15px;flex:none">{{ fromMark }}</span>
+              <div style="flex:1;min-width:0"><div style="font-family:Manrope,sans-serif;font-weight:600;font-size:15px;color:var(--ink)">{{ fromName }}</div><div style="font-size:12px;color:var(--ink-2)">saldo {{ fromBalance }}</div></div>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg>
+            </div>
+          </div>
+
+          <div style="display:flex;justify-content:center;margin:-13px 0;position:relative;z-index:2">
+            <button onClick="{{ swap }}" title="Trocar" style="width:46px;height:46px;border-radius:50%;border:3px solid var(--bg);background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 6px 16px rgba(130,10,209,.32);transition:transform .2s" style-hover="transform:rotate(180deg)" style-active="transform:scale(.92)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3 4 7l4 4M4 7h13M16 21l4-4-4-4M20 17H7"></path></svg></button>
+          </div>
+
+          <div style="background:var(--surface);border-radius:16px;box-shadow:var(--card-shadow);border:1px solid var(--card-border);padding:16px 18px">
+            <div style="font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-2);margin-bottom:10px">Para</div>
+            <div style="display:flex;align-items:center;gap:12px">
+              <span style="width:38px;height:38px;border-radius:11px;background:{{ toColor }};color:#fff;display:flex;align-items:center;justify-content:center;font-family:Manrope,sans-serif;font-weight:800;font-size:15px;flex:none">{{ toMark }}</span>
+              <div style="flex:1;min-width:0"><div style="font-family:Manrope,sans-serif;font-weight:600;font-size:15px;color:var(--ink)">{{ toName }}</div><div style="font-size:12px;color:var(--ink-2)">saldo {{ toBalance }}</div></div>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex;align-items:center;gap:9px;margin-top:16px;padding:12px 15px;border-radius:12px;background:var(--surface-2);font-size:12.5px;line-height:1.4;color:var(--ink-2)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--ink-2)" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4M12 8h.01"></path></svg>
+          <span>Move saldo entre contas — não entra como gasto nem receita no mês.</span>
+        </div>
+
+        <button onClick="{{ doTransfer }}" style="width:100%;height:54px;margin-top:18px;border:none;border-radius:999px;background:var(--primary);color:#fff;font-family:Inter,sans-serif;font-weight:600;font-size:16px;cursor:pointer;transition:background .18s,transform .15s" style-hover="background:var(--primary-hover)" style-active="transform:scale(.99)">Transferir R$ 500,00</button>
+      </div>
+      </sc-if>
+
+      <div style="height:40px"></div>
+    </div>
+  </div>
+
+  <!-- ===== ADJUST BALANCE MODAL ===== -->
+  <sc-if value="{{ adjustOpen }}" hint-placeholder-val="{{ false }}">
+  <div style="position:fixed;inset:0;z-index:80;display:flex;justify-content:center;{{ adjustAlign }};background:var(--scrim);animation:cf-scrim .18s ease-out" onClick="{{ closeAdjust }}">
+    <div onClick="{{ stop }}" style="{{ adjustPanel }}">
+      <sc-if value="{{ isMobile }}" hint-placeholder-val="{{ false }}"><div style="display:flex;justify-content:center;padding:10px 0 2px"><span style="width:38px;height:5px;border-radius:99px;background:var(--line)"></span></div></sc-if>
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 22px 6px">
+        <h2 style="margin:0;font-family:Manrope,sans-serif;font-weight:700;font-size:19px;color:var(--ink)">Ajustar saldo</h2>
+        <button onClick="{{ closeAdjust }}" style="width:34px;height:34px;border:none;border-radius:10px;background:var(--surface-2);color:var(--ink-2);display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="color:var(--ink)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"></path></svg></button>
+      </div>
+      <div style="padding:6px 22px 0">
+        <p style="margin:0 0 18px;font-size:14px;line-height:1.5;color:var(--ink-2)">Diga o saldo que aparece no banco. O Cifrão cria um lançamento de ajuste pra bater — sem apagar seu histórico.</p>
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-radius:14px;background:var(--surface-2)">
+            <span style="font-size:13.5px;color:var(--ink-2)">Saldo no app</span>
+            <span style="font-family:Manrope,sans-serif;font-weight:600;font-variant-numeric:tabular-nums;font-size:15px;color:var(--ink)">R$ 12.480,90</span>
+          </div>
+          <div>
+            <label style="display:block;font-size:13px;font-weight:500;color:var(--ink-2);margin-bottom:7px">Saldo real no banco</label>
+            <div style="display:flex;align-items:center;gap:8px;height:56px;padding:0 16px;border-radius:14px;border:1.5px solid var(--primary);background:var(--surface);box-shadow:var(--ring)">
+              <span style="font-family:Manrope,sans-serif;font-weight:600;font-size:20px;color:var(--ink-2)">R$</span>
+              <span style="font-family:Manrope,sans-serif;font-weight:700;font-variant-numeric:tabular-nums;font-size:26px;color:var(--ink)">{{ realStr }}</span>
+              <span style="width:2px;height:26px;background:var(--primary);margin-left:1px;border-radius:2px"></span>
+            </div>
+          </div>
+          <!-- computed adjustment -->
+          <div style="display:flex;align-items:center;gap:12px;padding:15px 16px;border-radius:14px;background:{{ adjSoft }}">
+            <span style="width:40px;height:40px;border-radius:11px;background:{{ adjColor }};color:#fff;display:flex;align-items:center;justify-content:center;flex:none">{{ adjIcon }}</span>
+            <div style="flex:1"><div style="font-size:12.5px;color:var(--ink-2)">Lançamento de ajuste</div><div style="font-family:Manrope,sans-serif;font-weight:700;font-variant-numeric:tabular-nums;font-size:18px;color:{{ adjColor }};margin-top:1px">{{ adjStr }}</div></div>
+            <span style="font-size:12px;color:var(--ink-2);text-align:right;max-width:120px">{{ adjNote }}</span>
+          </div>
+        </div>
+        <!-- quick nudge controls (demo) -->
+        <div style="display:flex;gap:8px;margin-top:14px">
+          <button onClick="{{ nudgeDown }}" style="flex:1;height:40px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-family:Manrope,sans-serif;font-weight:600;font-size:13px;cursor:pointer" style-hover="background:var(--surface-2)">− R$ 3</button>
+          <button onClick="{{ nudgeReset }}" style="flex:1;height:40px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--ink-2);font-family:Inter,sans-serif;font-weight:600;font-size:13px;cursor:pointer" style-hover="background:var(--surface-2)">igual</button>
+          <button onClick="{{ nudgeUp }}" style="flex:1;height:40px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-family:Manrope,sans-serif;font-weight:600;font-size:13px;cursor:pointer" style-hover="background:var(--surface-2)">+ R$ 50</button>
+        </div>
+      </div>
+      <div style="position:sticky;bottom:0;background:var(--surface);padding:16px 22px calc(16px + env(safe-area-inset-bottom));margin-top:18px;border-top:1px solid var(--line)">
+        <button onClick="{{ confirmAdjust }}" style="width:100%;height:52px;border:none;border-radius:999px;background:var(--primary);color:#fff;font-family:Inter,sans-serif;font-weight:600;font-size:16px;cursor:pointer;transition:background .18s,transform .15s;opacity:{{ adjustBtnOpacity }}" style-hover="background:var(--primary-hover)" style-active="transform:scale(.99)">{{ adjustBtnLabel }}</button>
+      </div>
+    </div>
+  </div>
+  </sc-if>
+
+  <!-- ===== toast ===== -->
+  <sc-if value="{{ toastOpen }}" hint-placeholder-val="{{ false }}">
+  <div style="position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:90;display:flex;align-items:center;gap:14px;padding:13px 14px 13px 18px;border-radius:14px;background:var(--ink);color:#fff;box-shadow:0 16px 40px rgba(26,21,35,.32);animation:cf-modal .22s ease-out;max-width:calc(100vw - 32px)">
+    <span style="width:26px;height:26px;border-radius:50%;background:var(--positive);display:flex;align-items:center;justify-content:center;flex:none"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg></span>
+    <span style="font-size:14px;font-weight:500;white-space:nowrap">{{ toastMsg }}</span>
+    <button onClick="{{ dismissToast }}" style="height:34px;padding:0 14px;border:none;border-radius:999px;background:rgba(255,255,255,.14);color:#fff;font-family:Inter,sans-serif;font-weight:600;font-size:13.5px;cursor:pointer;flex:none" style-hover="background:rgba(255,255,255,.24)">Desfazer</button>
+  </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{
+  &quot;defaultView&quot;: { &quot;editor&quot;: &quot;enum&quot;, &quot;options&quot;: [&quot;Lista&quot;, &quot;Detalhe&quot;, &quot;Transferência&quot;], &quot;default&quot;: &quot;Lista&quot;, &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Protótipo&quot; },
+  &quot;device&quot;: { &quot;editor&quot;: &quot;enum&quot;, &quot;options&quot;: [&quot;Desktop&quot;, &quot;Mobile&quot;], &quot;default&quot;: &quot;Desktop&quot;, &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Protótipo&quot; },
+  &quot;theme&quot;: { &quot;editor&quot;: &quot;enum&quot;, &quot;options&quot;: [&quot;Claro&quot;, &quot;Escuro&quot;], &quot;default&quot;: &quot;Claro&quot;, &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Aparência&quot; }
+}">
+class Component extends DCLogic {
+  constructor(props){
+    super(props);
+    this.state = {
+      theme: props.theme === 'Escuro' ? 'dark' : 'light',
+      device: props.device === 'Mobile' ? 'mobile' : 'desktop',
+      view: this.mapView(props.defaultView) || 'list',
+      adjustOpen: false,
+      realBalance: 12480.90,   // adjust modal: user-stated real balance
+      appBalance: 12480.90,
+      swapped: false,
+      toastOpen: false, toastMsg: ''
+    };
+    this._toastT = null;
+  }
+  mapView(v){ return ({ 'Lista':'list','Detalhe':'detail','Transferência':'transfer' })[v]; }
+  componentDidMount(){ this.drawChart(); }
+  componentDidUpdate(prev){
+    prev = prev || {};
+    if(prev.theme !== this.props.theme) this.setState({ theme: this.props.theme === 'Escuro' ? 'dark' : 'light' });
+    if(prev.device !== this.props.device) this.setState({ device: this.props.device === 'Mobile' ? 'mobile' : 'desktop' });
+    if(prev.defaultView !== this.props.defaultView){ const v = this.mapView(this.props.defaultView); if(v) this.setState({ view: v }); }
+    if(this.state.view === 'detail') this.drawChart();
+  }
+  componentWillUnmount(){ if(this._toastT) clearTimeout(this._toastT); }
+  drawChart(){
+    const mq = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)');
+    if(mq && mq.matches) return;
+    const el = this.chartRef; if(!el) return;
+    const line = el.querySelector('[data-chart-line]');
+    if(!line || line._drawn) return;
+    const len = line.getTotalLength ? line.getTotalLength() : 600;
+    line.style.setProperty('--len', len);
+    line.style.strokeDasharray = len;
+    line.style.animation = 'cf-draw 1s cubic-bezier(.22,1,.36,1) forwards';
+    line._drawn = true;
+  }
+  fireToast(msg){ if(this._toastT) clearTimeout(this._toastT); this.setState({ toastOpen:true, toastMsg:msg }); this._toastT = setTimeout(() => this.setState({ toastOpen:false }), 4200); }
+  brl(n){ return 'R$ ' + Number(Math.abs(n)).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+  icon(name){
+    const m = {
+      food:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M4 3v7a3 3 0 0 0 6 0V3M7 3v18M21 3c-2 0-3 2-3 6s1 4 1 6-1 6-1 6"></path></svg>',
+      cart:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="20" r="1"></circle><circle cx="18" cy="20" r="1"></circle><path d="M2 3h3l2.5 13h11L21 7H6.5"></path></svg>',
+      wave:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>',
+      swap:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4 3 8l4 4M3 8h14M17 20l4-4-4-4M21 16H7"></path></svg>',
+      adjust:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"></path></svg>'
+    };
+    return React.createElement('span', { style:{display:'inline-flex'}, dangerouslySetInnerHTML:{ __html: m[name] } });
+  }
+  renderVals(){
+    const st = this.state, isD = st.device === 'desktop';
+    const view = st.view;
+    const navChips = [['list','Lista'],['detail','Detalhe'],['transfer','Transferência']].map(([v,label]) => ({
+      label, onClick: () => this.setState({ view: v }),
+      bg: view===v ? 'var(--primary)' : 'transparent', color: view===v ? '#fff' : 'var(--ink-2)' }));
+    const accounts = [
+      { mark:'N', name:'Nubank · Conta', type:'Conta corrente', typeColor:'var(--primary)', color:'#820AD1', balance:this.brl(12480.90), balColor:'var(--ink)', onOpen:()=>this.setState({view:'detail'}) },
+      { mark:'I', name:'Inter · Conta', type:'Conta corrente', typeColor:'var(--primary)', color:'#FF7A00', balance:this.brl(3210.00), balColor:'var(--ink)', onOpen:()=>this.setState({view:'detail'}) },
+      { mark:'$', name:'Dinheiro', type:'Carteira física', typeColor:'var(--positive)', color:'#00A868', balance:this.brl(520.00), balColor:'var(--ink)', onOpen:()=>this.setState({view:'detail'}) },
+      { mark:'NU', name:'NuInvest', type:'Corretora', typeColor:'var(--invest)', color:'#0F9B8E', balance:this.brl(64210.90), balColor:'var(--invest)', onOpen:()=>this.setState({view:'detail'}) }
+    ];
+    // 6-month chart
+    const vals = [11240, 10980, 11620, 11310, 12040, 12480];
+    const months = ['jan','fev','mar','abr','mai','jun'];
+    const min = 10600, max = 12700, W = 600, H = 150, pad = 10;
+    const pts = vals.map((v, i) => {
+      const x = (i / (vals.length - 1)) * (W - pad*2) + pad;
+      const y = H - pad - ((v - min) / (max - min)) * (H - pad*2);
+      return { x: +x.toFixed(1), y: +y.toFixed(1) };
+    });
+    const chartLine = pts.map((p, i) => (i ? 'L' : 'M') + p.x + ' ' + p.y).join(' ');
+    const chartArea = 'M' + pts[0].x + ' ' + H + ' ' + pts.map(p => 'L' + p.x + ' ' + p.y).join(' ') + ' L' + pts[pts.length-1].x + ' ' + H + ' Z';
+    // statement
+    const mk = (name, cat, icon, color, soft, amt) => ({ name, cat, icon:this.icon(icon), color, soft,
+      amount: (amt<0?'− ':'+ ') + this.brl(amt), amtColor: amt<0?'var(--ink)':'var(--positive)' });
+    const dayGroups = [
+      { label:'Qua, 12 jun', total:'− R$ 71,30', rows:[
+        mk('iFood','Delivery','food','#EC4899','rgba(236,72,153,.12)',-48.90),
+        mk('Uber','Transporte','swap','var(--invest)','rgba(15,155,142,.12)',-22.40)
+      ]},
+      { label:'Ter, 11 jun', total:'+ R$ 7.985,70', rows:[
+        mk('Mercado Extra','Alimentação','cart','#F5A524','rgba(245,165,36,.14)',-214.30),
+        mk('Salário','Receita','wave','var(--positive)','rgba(0,168,104,.14)',8200.00)
+      ]}
+    ];
+    // adjust logic
+    const diff = +(st.realBalance - st.appBalance).toFixed(2);
+    const noDiff = Math.abs(diff) < 0.005;
+    const adj = {
+      color: noDiff ? 'var(--ink-2)' : (diff > 0 ? 'var(--positive)' : 'var(--negative)'),
+      soft: noDiff ? 'var(--surface-2)' : (diff > 0 ? 'var(--pos-soft)' : 'rgba(229,72,77,.1)'),
+      str: noDiff ? 'R$ 0,00' : (diff > 0 ? '+ ' : '− ') + this.brl(diff),
+      note: noDiff ? 'Já está batendo' : (diff > 0 ? 'entrada de ajuste' : 'saída de ajuste')
+    };
+    // transfer
+    const nu = { mark:'N', name:'Nubank · Conta', color:'#820AD1', balance:this.brl(12480.90) };
+    const inv = { mark:'NU', name:'NuInvest · Corretora', color:'#0F9B8E', balance:this.brl(64210.90) };
+    const from = st.swapped ? inv : nu, to = st.swapped ? nu : inv;
+    return {
+      theme: st.theme, themeIsDark: st.theme==='dark', themeIsLight: st.theme!=='dark',
+      isDesktop:isD, isMobile:!isD,
+      stagePad: isD?'0':'16px 14px 40px',
+      stageStyle: isD ? 'width:100%;max-width:'+((view==='detail')?'720px':'560px')+';padding:22px 24px 0'
+        : 'width:412px;max-width:100%;background:var(--surface);border:1px solid var(--line);border-radius:32px;box-shadow:0 24px 60px rgba(26,21,35,.12);padding:16px 15px 0',
+      deskBg:isD?'var(--surface)':'transparent', deskColor:isD?'var(--ink)':'var(--ink-2)',
+      mobBg:!isD?'var(--surface)':'transparent', mobColor:!isD?'var(--ink)':'var(--ink-2)',
+      setDesktop:()=>this.setState({device:'desktop'}), setMobile:()=>this.setState({device:'mobile'}),
+      toggleTheme:()=>this.setState(s=>({theme:s.theme==='dark'?'light':'dark'})),
+      navChips,
+      isList: view==='list', isDetail: view==='detail', isTransfer: view==='transfer',
+      goList:()=>this.setState({view:'list'}), goTransfer:()=>this.setState({view:'transfer'}),
+      accounts,
+      setChartRef:(el)=>{ this.chartRef = el; },
+      chartLine, chartArea, chartDots: pts, chartMonths: months,
+      dayGroups,
+      // adjust
+      adjustOpen: st.adjustOpen,
+      openAdjust:()=>this.setState({adjustOpen:true, realBalance:12480.90}),
+      closeAdjust:()=>this.setState({adjustOpen:false}), stop:(e)=>e.stopPropagation(),
+      adjustAlign: isD?'align-items:center':'align-items:flex-end',
+      adjustPanel: (isD ? 'width:440px;max-width:calc(100vw - 32px);max-height:calc(100dvh - 48px);border-radius:24px;animation:cf-modal .2s ease-out;'
+        : 'width:100%;max-width:520px;max-height:94dvh;border-radius:26px 26px 0 0;animation:cf-modal .24s ease-out;')
+        + 'background:var(--surface);border:1px solid var(--card-border);box-shadow:0 24px 70px rgba(26,21,35,.32);overflow-y:auto;display:flex;flex-direction:column;position:relative',
+      realStr: Number(st.realBalance).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}),
+      adjColor: adj.color, adjSoft: adj.soft, adjStr: adj.str, adjNote: adj.note, adjIcon: this.icon('adjust'),
+      nudgeDown:()=>this.setState(s=>({realBalance:+(s.realBalance-3).toFixed(2)})),
+      nudgeUp:()=>this.setState(s=>({realBalance:+(s.realBalance+50).toFixed(2)})),
+      nudgeReset:()=>this.setState({realBalance:12480.90}),
+      adjustBtnLabel: noDiff ? 'Sem ajuste necessário' : 'Criar lançamento de ajuste',
+      adjustBtnOpacity: noDiff ? '0.5' : '1',
+      confirmAdjust:()=>{ if(noDiff){ this.setState({adjustOpen:false}); return; } this.setState({adjustOpen:false}); this.fireToast('Saldo ajustado com um lançamento'); },
+      // transfer
+      fromMark:from.mark, fromName:from.name, fromColor:from.color, fromBalance:from.balance,
+      toMark:to.mark, toName:to.name, toColor:to.color, toBalance:to.balance,
+      swap:()=>this.setState(s=>({swapped:!s.swapped})),
+      doTransfer:()=>{ this.setState({view:'list'}); this.fireToast('Transferência registrada'); },
+      // toast
+      toastOpen: st.toastOpen, toastMsg: st.toastMsg, dismissToast:()=>this.setState({toastOpen:false})
+    };
+  }
+}
+</script>
+</body>
+</html>

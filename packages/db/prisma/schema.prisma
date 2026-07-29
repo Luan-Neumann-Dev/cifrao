@@ -1,0 +1,14 @@
+// Schema do Cifrão. As entidades de domínio (User, Account, CreditCard,
+// Invoice, Transaction, ...) descritas na Seção 6 do CLAUDE.md serão
+// adicionadas nas fases seguintes. Aqui, na Fase 0, apenas inicializamos
+// o Prisma com datasource (pooler) + directUrl (migrations).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}

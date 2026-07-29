@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Manrope:wght@500;600;700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{background:#FAFAFC}
+  :root{
+    --primary:#820AD1;--primary-hover:#6B08AD;--primary-soft:#F3E8FF;
+    --bg:#FAFAFC;--surface:#FFFFFF;--surface-2:#F3F1F7;--line:#E8E4EF;
+    --ink:#1A1523;--ink-2:#6B6577;
+    --positive:#00A868;--negative:#E5484D;--warn:#F5A524;--invest:#0F9B8E;
+    --card-shadow:0 1px 3px rgba(26,21,35,.06);--card-border:transparent;
+    --ring:0 0 0 4px rgba(130,10,209,.22);--track:#E8E4EF;--overlay:rgba(26,21,35,.04);
+    --pos-soft:rgba(0,168,104,.12);--warn-soft:rgba(245,165,36,.14);--neg-soft:rgba(229,72,77,.1);
+  }
+  [data-theme="dark"]{
+    --primary:#A855F7;--primary-hover:#9333EA;--primary-soft:#2A1140;
+    --bg:#0E0B12;--surface:#171320;--surface-2:#211B2E;--line:#2E2740;
+    --ink:#F5F3F8;--ink-2:#A79FB8;
+    --positive:#3DD68C;--negative:#FF6369;--warn:#F7B955;--invest:#22C3B0;
+    --card-shadow:none;--card-border:#2E2740;
+    --ring:0 0 0 4px rgba(168,85,247,.32);--track:#2E2740;--overlay:rgba(255,255,255,.05);
+    --pos-soft:rgba(61,214,140,.14);--warn-soft:rgba(247,185,85,.16);--neg-soft:rgba(255,99,105,.16);
+  }
+  a{color:var(--primary);text-decoration:none}
+  a:hover{color:var(--primary-hover)}
+  .cf-scroll::-webkit-scrollbar{height:7px;width:7px}
+  .cf-scroll::-webkit-scrollbar-thumb{background:var(--line);border-radius:99px}
+  .cf-scroll::-webkit-scrollbar-track{background:transparent}
+  @keyframes cf-fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+  @keyframes cf-bar{from{transform:scaleY(0)}to{transform:scaleY(1)}}
+  @media (prefers-reduced-motion: reduce){*{animation-duration:.001ms !important;transition-duration:.001ms !important}}
+</style>
+</helmet>
+
+<div data-theme="{{ theme }}" style="min-height:100dvh;background:var(--bg);color:var(--ink);font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased">
+
+  <!-- ===== reviewer toolbar ===== -->
+  <div style="height:57px;display:flex;align-items:center;gap:12px;padding:0 18px;border-bottom:1px solid var(--line);background:var(--surface);position:sticky;top:0;z-index:60;overflow-x:auto;white-space:nowrap">
+    <span style="display:inline-flex;align-items:center;gap:8px;flex:none;margin-right:2px">
+      <span style="width:26px;height:26px;border-radius:8px;background:var(--primary);display:flex;align-items:center;justify-content:center"><span style="font-family:Manrope,sans-serif;font-weight:800;font-size:15px;color:#fff">$</span></span>
+      <span style="font-family:Manrope,sans-serif;font-weight:700;font-size:13px;color:var(--ink)">Cifrão</span>
+      <span style="font-size:11px;color:var(--ink-2);letter-spacing:.06em;text-transform:uppercase">Relatórios</span>
+    </span>
+    <div style="margin-left:auto;display:flex;gap:8px;align-items:center;flex:none;padding-left:12px">
+      <div style="display:flex;background:var(--surface-2);border-radius:10px;padding:3px">
+        <button onClick="{{ setDesktop }}" style="height:26px;padding:0 12px;border:none;border-radius:8px;font-family:Inter,sans-serif;font-weight:600;font-size:12px;cursor:pointer;background:{{ deskBg }};color:{{ deskColor }}">Desktop</button>
+        <button onClick="{{ setMobile }}" style="height:26px;padding:0 12px;border:none;border-radius:8px;font-family:Inter,sans-serif;font-weight:600;font-size:12px;cursor:pointer;background:{{ mobBg }};color:{{ mobColor }}">Mobile</button>
+      </div>
+      <button onClick="{{ toggleTheme }}" title="Tema" style="width:34px;height:34px;border-radius:10px;background:var(--surface);border:1px solid var(--line);color:var(--ink);display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="background:var(--surface-2)">
+        <sc-if value="{{ themeIsDark }}" hint-placeholder-val="{{ false }}"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg></sc-if>
+        <sc-if value="{{ themeIsLight }}" hint-placeholder-val="{{ true }}"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6.4 6.4 0 0 0 9 9 9 9 0 1 1-9-9Z"></path></svg></sc-if>
+      </button>
+    </div>
+  </div>
+
+  <!-- ===== GLOBAL PERIOD SELECTOR (sticky) ===== -->
+  <div style="position:sticky;top:57px;z-index:40;background:var(--bg);border-bottom:1px solid var(--line);padding:14px 0">
+    <div style="max-width:900px;margin:0 auto;padding:0 20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <span style="display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-2);flex:none"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"></rect><path d="M8 2v4M16 2v4M3 10h18"></path></svg>Período</span>
+      <div class="cf-scroll" style="display:flex;gap:7px;overflow-x:auto;flex:1;min-width:0">
+        <sc-for list="{{ periodPresets }}" as="p" hint-placeholder-count="5">
+          <button onClick="{{ p.onClick }}" style="height:36px;padding:0 14px;border-radius:999px;border:1.5px solid {{ p.border }};background:{{ p.bg }};color:{{ p.color }};font-family:Inter,sans-serif;font-weight:600;font-size:13px;cursor:pointer;flex:none;transition:all .15s">{{ p.label }}</button>
+        </sc-for>
+        <button onClick="{{ setCustom }}" style="height:36px;padding:0 14px;border-radius:999px;border:1.5px solid {{ customBorder }};background:{{ customBg }};color:{{ customColor }};font-family:Inter,sans-serif;font-weight:600;font-size:13px;cursor:pointer;flex:none;display:inline-flex;align-items:center;gap:6px;transition:all .15s"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"></rect><path d="M8 2v4M16 2v4M3 10h18M8 14h.01M12 14h.01M16 14h.01"></path></svg>Personalizado</button>
+      </div>
+      <span style="font-family:Manrope,sans-serif;font-variant-numeric:tabular-nums;font-size:12.5px;color:var(--ink-2);flex:none">{{ periodRange }}</span>
+    </div>
+  </div>
+
+  <div style="display:flex;justify-content:center;padding:{{ stagePad }}">
+    <div style="{{ stageStyle }}">
+
+      <!-- tabs -->
+      <div class="cf-scroll" style="display:flex;gap:6px;overflow-x:auto;padding:2px 0 4px;margin-bottom:18px">
+        <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="6">
+          <button onClick="{{ t.onClick }}" style="height:38px;padding:0 15px;border-radius:11px;border:1px solid {{ t.border }};background:{{ t.bg }};color:{{ t.color }};font-family:Inter,sans-serif;font-weight:600;font-size:13px;cursor:pointer;flex:none;transition:all .15s">{{ t.label }}</button>
+        </sc-for>
+      </div>
+
+      <!-- section header w/ export -->
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:16px">
+        <div>
+          <h1 style="margin:0;font-family:Manrope,sans-serif;font-weight:700;font-size:22px;letter-spacing:-.015em;color:var(--ink)">{{ sectionTitle }}</h1>
+          <p style="margin:5px 0 0;font-size:13px;color:var(--ink-2)">{{ sectionSub }}</p>
+        </div>
+        <div style="display:flex;gap:8px;flex:none">
+          <button onClick="{{ exportCsv }}" style="height:38px;padding:0 14px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--ink);font-family:Inter,sans-serif;font-weight:600;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;gap:7px;transition:background .18s" style-hover="background:var(--surface-2)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M8 11l4 4 4-4M5 21h14"></path></svg>CSV</button>
+          <button onClick="{{ exportPdf }}" style="height:38px;padding:0 14px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--ink);font-family:Inter,sans-serif;font-weight:600;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;gap:7px;transition:background .18s" style-hover="background:var(--surface-2)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3v5h5M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"></path></svg>PDF</button>
+        </div>
+      </div>
+
+      <!-- ============ CASH FLOW ============ -->
+      <sc-if value="{{ isCashflow }}" hint-placeholder-val="{{ true }}">
+      <div style="background:var(--surface);border-radius:20px;box-shadow:var(--card-shadow);border:1px solid var(--card-border);padding:22px 24px;animation:cf-fade .2s ease-out">
+        <div style="display:flex;gap:18px;flex-wrap:wrap;margin-bottom:8px">
+          <span style="display:inline-flex;align-items:center;gap:7px;font-size:12.5px;color:var(--ink-2)"><span style="width:11px;height:11px;border-radius:3px;background:var(--positive)"></span>Entradas</span>
+          <span style="display:inline-flex;align-items:center;gap:7px;font-size:12.5px;color:var(--ink-2)"><span style="width:11px;height:11px;border-radius:3px;background:var(--negative)"></span>Saídas</span>
+          <span style="display:inline-flex;align-items:center;gap:7px;font-size:12.5px;color:var(--ink-2)"><span style="width:16px;height:3px;border-radius:2px;background:var(--primary)"></span>Saldo acumulado</span>
+        </div>
+        <div class="cf-scroll" style="overflow-x:auto">
+          <div style="min-width:620px;position:relative;height:250px">
+            <svg viewBox="0 0 640 250" preserveAspectRatio="none" style="width:100%;height:100%;overflow:visible">
+              <sc-for list="{{ cfGrid }}" as="y" hint-placeholder-count="4"><line x1="0" y1="{{ y.y }}" x2="640" y2="{{ y.y }}" stroke="var(--line)" stroke-width="1"></line></sc-for>
+              <sc-for list="{{ cfBars }}" as="b" hint-placeholder-count="12">
+                <rect x="{{ b.inX }}" y="{{ b.inY }}" width="{{ b.bw }}" height="{{ b.inH }}" rx="3" fill="var(--positive)" onMouseMove="{{ b.tipIn }}" onMouseLeave="{{ hideTip }}" style="cursor:pointer"></rect>
+                <rect x="{{ b.outX }}" y="{{ b.outY }}" width="{{ b.bw }}" height="{{ b.outH }}" rx="3" fill="var(--negative)" onMouseMove="{{ b.tipOut }}" onMouseLeave="{{ hideTip }}" style="cursor:pointer"></rect>
+              </sc-for>
+              <path d="{{ cfLine }}" fill="none" stroke="var(--primary)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"></path>
+              <sc-for list="{{ cfLineDots }}" as="d" hint-placeholder-count="12"><circle cx="{{ d.x }}" cy="{{ d.y }}" r="3.5" fill="var(--surface)" stroke="var(--primary)" stroke-width="2.5" onMouseMove="{{ d.tip }}" onMouseLeave="{{ hideTip }}" style="cursor:pointer"></circle></sc-for>
+            </svg>
+          </div>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-top:8px;font-family:Manrope,sans-serif;font-size:10.5px;color:var(--ink-2);min-width:620px">
+          <sc-for list="{{ months12 }}" as="m" hint-placeholder-count="12"><span style="flex:1;text-align:center">{{ m }}</span></sc-for>
+        </div>
+      </div>
+      </sc-if>
+
+      <!-- ============ BY CATEGORY (drill-down) ============ -->
+      <sc-if value="{{ isCategory }}" hint-placeholder-val="{{ false }}">
+      <div style="animation:cf-fade .2s ease-out">
+        <sc-if value="{{ hasDrill }}" hint-placeholder-val="{{ false }}">
+          <button onClick="{{ drillUp }}" style="display:inline-flex;align-items:center;gap:7px;height:34px;padding:0 12px 0 8px;border:1px solid var(--line);border-radius:999px;background:var(--surface);color:var(--ink-2);font-family:Inter,sans-serif;font-weight:600;font-size:13px;cursor:pointer;margin-bottom:14px" style-hover="color:var(--ink)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"></path></svg>{{ drillCrumb }}</button>
+        </sc-if>
+        <div style="background:var(--surface);border-radius:20px;box-shadow:var(--card-shadow);border:1px solid var(--card-border);padding:22px 24px">
+          <div style="display:grid;grid-template-columns:{{ catCols }};gap:24px;align-items:center">
+            <sc-if value="{{ showDonut }}" hint-placeholder-val="{{ true }}">
+            <div style="display:flex;justify-content:center">
+              <div style="position:relative;width:180px;height:180px;flex:none">
+                <svg width="180" height="180" viewBox="0 0 180 180" style="transform:rotate(-90deg)">
+                  <sc-for list="{{ catDonut }}" as="d" hint-placeholder-count="6"><circle cx="90" cy="90" r="66" fill="none" stroke="{{ d.color }}" stroke-width="18" stroke-dasharray="{{ d.dash }}" stroke-dashoffset="{{ d.offset }}" onMouseMove="{{ d.tip }}" onMouseLeave="{{ hideTip }}" style="cursor:pointer"></circle></sc-for>
+                </svg>
+                <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;pointer-events:none">
+                  <span style="font-size:11px;color:var(--ink-2)">total</span>
+                  <span style="font-family:Manrope,sans-serif;font-weight:700;font-variant-numeric:tabular-nums;font-size:19px;color:var(--ink)">{{ catTotal }}</span>
+                </div>
+              </div>
+            </div>
+            </sc-if>
+            <div class="cf-scroll" style="overflow-x:auto;min-width:0">
+              <div style="min-width:520px">
+                <div style="display:grid;grid-template-columns:1.4fr 96px 60px 60px 92px 84px;gap:10px;padding:0 6px 10px;font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-2);font-weight:600">
+                  <span>{{ catColLabel }}</span><span style="text-align:right">Valor</span><span style="text-align:right">%</span><span style="text-align:right">Nº</span><span style="text-align:right">Média</span><span style="text-align:right">vs. ant.</span>
+                </div>
+                <sc-for list="{{ catRows }}" as="r" hint-placeholder-count="6">
+                  <button onClick="{{ r.onDrill }}" style="display:grid;grid-template-columns:1.4fr 96px 60px 60px 92px 84px;gap:10px;align-items:center;width:100%;padding:11px 6px;border:none;border-bottom:1px solid var(--line);background:{{ r.rowBg }};cursor:{{ r.cursor }};text-align:left;transition:background .12s" style-hover="background:var(--overlay)">
+                    <span style="display:inline-flex;align-items:center;gap:9px;min-width:0"><span style="width:9px;height:9px;border-radius:3px;background:{{ r.color }};flex:none"></span><span style="font-size:13.5px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.label }}</span><sc-if value="{{ r.canDrill }}" hint-placeholder-val="{{ true }}"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="m9 18 6-6-6-6"></path></svg></sc-if></span>
+                    <span style="font-family:Manrope,sans-serif;font-weight:600;font-variant-numeric:tabular-nums;font-size:13px;color:var(--ink);text-align:right">{{ r.value }}</span>
+                    <span style="font-family:Manrope,sans-serif;font-variant-numeric:tabular-nums;font-size:12.5px;color:var(--ink-2);text-align:right">{{ r.pct }}%</span>
+                    <span style="font-family:Manrope,sans-serif;font-variant-numeric:tabular-nums;font-size:12.5px;color:var(--ink-2);text-align:right">{{ r.count }}</span>
+                    <span style="font-family:Manrope,sans-serif;font-variant-numeric:tabular-nums;font-size:12.5px;color:var(--ink-2);text-align:right">{{ r.avg }}</span>
+                    <span style="font-family:Manrope,sans-serif;font-weight:600;font-variant-numeric:tabular-nums;font-size:12.5px;color:{{ r.varColor }};text-align:right">{{ r.var }}</span>
+                  </button>
+                </sc-for>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      </sc-if>
+
+      <!-- ============ EVOLUTION (multi-line) ============ -->
+      <sc-if value="{{ isEvolution }}" hint-placeholder-val="{{ false }}">
+      <div style="background:var(--surface);border-radius:20px;box-shadow:var(--card-shadow);border:1px solid var(--card-border);padding:22px 24px;animation:cf-fade .2s ease-out">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">
+          <sc-for list="{{ evoToggles }}" as="t" hint-placeholder-count="6">
+            <button onClick="{{ t.onClick }}" style="display:inline-flex;align-items:center;gap:7px;height:32px;padding:0 12px;border-radius:999px;border:1px solid {{ t.border }};background:{{ t.bg }};color:{{ t.textColor }};font-family:Inter,sans-serif;font-weight:600;font-size:12.5px;cursor:pointer;transition:all .15s;opacity:{{ t.opacity }}"><span style="width:9px;height:9px;border-radius:3px;background:{{ t.color }}"></span>{{ t.label }}</button>
+          </sc-for>
+        </div>
+        <div class="cf-scroll" style="overflow-x:auto">
+          <div style="min-width:600px;position:relative;height:250px">
+            <svg viewBox="0 0 620 250" preserveAspectRatio="none" style="width:100%;height:100%;overflow:visible">
+              <sc-for list="{{ evoGrid }}" as="y" hint-placeholder-count="4"><line x1="0" y1="{{ y.y }}" x2="620" y2="{{ y.y }}" stroke="var(--line)" stroke-width="1"></line></sc-for>
+              <sc-for list="{{ evoLines }}" as="ln" hint-placeholder-count="6">
+                <path d="{{ ln.d }}" fill="none" stroke="{{ ln.color }}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"></path>
+                <sc-for list="{{ ln.dots }}" as="dt" hint-placeholder-count="6"><circle cx="{{ dt.x }}" cy="{{ dt.y }}" r="3.2" fill="var(--surface)" stroke="{{ ln.color }}" stroke-width="2.5" onMouseMove="{{ dt.tip }}" onMouseLeave="{{ hideTip }}" style="cursor:pointer"></circle></sc-for>
+              </sc-for>
+            </svg>
+          </div>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-top:8px;font-family:Manrope,sans-serif;font-size:10.5px;color:var(--ink-2);min-width:600px">
+          <sc-for list="{{ months6 }}" as="m" hint-placeholder-count="6"><span style="flex:1;text-align:center">{{ m }}</span></sc-for>
+        </div>
+      </div>
+      </sc-if>
+
+      <!-- ============ COMPARE ============ -->
+      <sc-if value="{{ isCompare }}" hint-placeholder-val="{{ false }}">
+      <div style="animation:cf-fade .2s ease-out">
+        <div style="background:var(--surface);border-radius:20px;box-shadow:var(--card-shadow);border:1px solid var(--card-border);padding:20px 24px;margin-bottom:14px">
+          <div style="font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-2);margin-bottom:14px">Maiores variações</div>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <sc-for list="{{ topVars }}" as="v" hint-placeholder-count="3">
+              <div style="display:flex;align-items:center;gap:12px">
+                <span style="width:9px;height:9px;border-radius:3px;background:{{ v.color }};flex:none"></span>
+                <span style="flex:1;font-size:14px;color:var(--ink)">{{ v.label }}</span>
+                <span style="font-family:Manrope,sans-serif;font-variant-numeric:tabular-nums;font-size:13px;color:var(--ink-2)">{{ v.from }} → {{ v.to }}</span>
+                <span style="font-family:Manrope,sans-serif;font-weight:700;font-variant-numeric:tabular-nums;font-size:14px;color:{{ v.color }};min-width:66px;text-align:right">{{ v.delta }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <sc-for list="{{ compareCats }}" as="c" hint-placeholder-count="6">
+            <div style="background:var(--surface);border-radius:14px;box-shadow:var(--card-shadow);border:1px solid var(--card-border);padding:14px 16px">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><span style="width:8px;height:8px;border-radius:3px;background:{{ c.color }}"></span><span style="font-size:13px;font-weight:600;color:var(--ink)">{{ c.label }}</span></div>
+              <div style="display:flex;flex-direction:column;gap:8px">
+                <div><div style="display:flex;justify-content:space-between;font-size:11px;color:var(--ink-2);margin-bottom:4px"><span>Jun</span><span style="font-family:Manrope,sans-serif;font-variant-numeric:tabular-nums">{{ c.aStr }}</span></div><div style="height:7px;border-radius:99px;background:var(--track);overflow:hidden"><div style="height:100%;border-radius:99px;background:var(--ink-2);width:{{ c.aPct }}%"></div></div></div>
+                <div><div style="display:flex;justify-content:space-between;font-size:11px;color:var(--ink-2);margin-bottom:4px"><span>Jul</span><span style="font-family:Manrope,sans-serif;font-variant-numeric:tabular-nums;color:{{ c.color }};font-weight:600">{{ c.bStr }}</span></div><div style="height:7px;border-radius:99px;background:var(--track);overflow:hidden"><div style="height:100%;border-radius:99px;background:{{ c.color }};width:{{ c.bPct }}%"></div></div></div>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+      </sc-if>
+
+      <!-- ============ TOP SPENDS ============ -->
+      <sc-if value="{{ isTop }}" hint-placeholder-val="{{ false }}">
+      <div style="display:grid;grid-template-columns:{{ topCols }};gap:14px;animation:cf-fade .2s ease-out">
+        <div style="background:var(--surface);border-radius:20px;box-shadow:var(--card-shadow);border:1px solid var(--card-border);padding:20px 22px">
+          <h3 style="margin:0 0 14px;font-family:Manrope,sans-serif;font-weight:700;font-size:15px;color:var(--ink)">20 maiores lançamentos</h3>
+          <div style="display:flex;flex-direction:column">
+            <sc-for list="{{ topTx }}" as="t" hint-placeholder-count="8">
+              <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--line)">
+                <span style="font-family:Manrope,sans-serif;font-weight:700;font-variant-numeric:tabular-nums;font-size:13px;color:var(--ink-2);width:22px;flex:none">{{ t.rank }}</span>
+                <div style="flex:1;min-width:0"><div style="font-size:14px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ t.name }}</div><div style="font-size:11.5px;color:var(--ink-2)">{{ t.cat }} · {{ t.date }}</div></div>
+                <span style="font-family:Manrope,sans-serif;font-weight:600;font-variant-numeric:tabular-nums;font-size:14px;color:var(--ink);flex:none">{{ t.amount }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+        <div style="background:var(--surface);border-radius:20px;box-shadow:var(--card-shadow);border:1px solid var(--card-border);padding:20px 22px">
+          <h3 style="margin:0 0 14px;font-family:Manrope,sans-serif;font-weight:700;font-size:15px;color:var(--ink)">10 estabelecimentos + frequentes</h3>
+          <div style="display:flex;flex-direction:column">
+            <sc-for list="{{ topMerchants }}" as="m" hint-placeholder-count="6">
+              <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--line)">
+                <span style="font-family:Manrope,sans-serif;font-weight:700;font-variant-numeric:tabular-nums;font-size:13px;color:var(--ink-2);width:22px;flex:none">{{ m.rank }}</span>
+                <div style="flex:1;min-width:0"><div style="font-size:14px;color:var(--ink)">{{ m.name }}</div><div style="font-size:11.5px;color:var(--ink-2)">{{ m.count }} lançamentos</div></div>
+                <span style="font-family:Manrope,sans-serif;font-weight:600;font-variant-numeric:tabular-nums;font-size:14px;color:var(--ink);flex:none">{{ m.total }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+      </sc-if>
+
+      <!-- ============ NET WORTH ============ -->
+      <sc-if value="{{ isNetworth }}" hint-placeholder-val="{{ false }}">
+      <div style="animation:cf-fade .2s ease-out">
+        <div style="display:grid;grid-template-columns:{{ nwCols }};gap:12px;margin-bottom:14px">
+          <div style="background:var(--surface);border-radius:16px;box-shadow:var(--card-shadow);border:1px solid var(--card-border);padding:16px 18px"><div style="font-size:12px;color:var(--ink-2)">Contas</div><div style="font-family:Manrope,sans-serif;font-weight:700;font-variant-numeric:tabular-nums;font-size:18px;color:var(--ink);margin-top:4px">+ R$ 16.211</div></div>
+          <div style="background:var(--surface);border-radius:16px;box-shadow:var(--card-shadow);border:1px solid var(--card-border);padding:16px 18px"><div style="font-size:12px;color:var(--ink-2)">Investimentos</div><div style="font-family:Manrope,sans-serif;font-weight:700;font-variant-numeric:tabular-nums;font-size:18px;color:var(--invest);margin-top:4px">+ R$ 64.210</div></div>
+          <div style="background:var(--surface);border-radius:16px;box-shadow:var(--card-shadow);border:1px solid var(--card-border);padding:16px 18px"><div style="font-size:12px;color:var(--ink-2)">Faturas em aberto</div><div style="font-family:Manrope,sans-serif;font-weight:700;font-variant-numeric:tabular-nums;font-size:18px;color:var(--negative);margin-top:4px">− R$ 5.055</div></div>
+        </div>
+        <div style="background:var(--surface);border-radius:20px;box-shadow:var(--card-shadow);border:1px solid var(--card-border);padding:22px 24px">
+          <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:8px">
+            <div><div style="font-size:12.5px;color:var(--ink-2)">Patrimônio líquido</div><div style="font-family:Manrope,sans-serif;font-weight:700;font-variant-numeric:tabular-nums;font-size:26px;color:var(--ink)">R$ 75.366</div></div>
+            <span style="display:inline-flex;align-items:center;gap:5px;font-size:13px;font-weight:600;color:var(--positive)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M9 7h8v8"></path></svg>+ 8,2% no período</span>
+          </div>
+          <div class="cf-scroll" style="overflow-x:auto">
+            <div style="min-width:560px;position:relative;height:220px">
+              <svg viewBox="0 0 600 220" preserveAspectRatio="none" style="width:100%;height:100%;overflow:visible">
+                <defs><linearGradient id="cfNW" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="var(--primary)" stop-opacity="0.22"></stop><stop offset="100%" stop-color="var(--primary)" stop-opacity="0"></stop></linearGradient></defs>
+                <sc-for list="{{ nwGrid }}" as="y" hint-placeholder-count="4"><line x1="0" y1="{{ y.y }}" x2="600" y2="{{ y.y }}" stroke="var(--line)" stroke-width="1"></line></sc-for>
+                <path d="{{ nwArea }}" fill="url(#cfNW)"></path>
+                <path d="{{ nwLine }}" fill="none" stroke="var(--primary)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"></path>
+                <sc-for list="{{ nwDots }}" as="d" hint-placeholder-count="12"><circle cx="{{ d.x }}" cy="{{ d.y }}" r="3.5" fill="var(--surface)" stroke="var(--primary)" stroke-width="2.5" onMouseMove="{{ d.tip }}" onMouseLeave="{{ hideTip }}" style="cursor:pointer"></circle></sc-for>
+              </svg>
+            </div>
+          </div>
+          <div style="display:flex;justify-content:space-between;margin-top:8px;font-family:Manrope,sans-serif;font-size:10.5px;color:var(--ink-2);min-width:560px">
+            <sc-for list="{{ months12 }}" as="m" hint-placeholder-count="12"><span style="flex:1;text-align:center">{{ m }}</span></sc-for>
+          </div>
+        </div>
+      </div>
+      </sc-if>
+
+      <div style="height:40px"></div>
+    </div>
+  </div>
+
+  <!-- ===== TOOLTIP ===== -->
+  <sc-if value="{{ tipShow }}" hint-placeholder-val="{{ false }}">
+  <div style="position:fixed;left:{{ tipX }}px;top:{{ tipY }}px;transform:translate(-50%,-140%);z-index:95;pointer-events:none;background:var(--ink);color:#fff;border-radius:10px;padding:8px 12px;box-shadow:0 10px 26px rgba(26,21,35,.32);white-space:nowrap">
+    <div style="font-size:11px;color:rgba(255,255,255,.7)">{{ tipTitle }}</div>
+    <div style="font-family:Manrope,sans-serif;font-weight:700;font-variant-numeric:tabular-nums;font-size:15px;margin-top:1px">{{ tipValue }}</div>
+  </div>
+  </sc-if>
+
+  <!-- ===== toast ===== -->
+  <sc-if value="{{ toastOpen }}" hint-placeholder-val="{{ false }}">
+  <div style="position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:90;display:flex;align-items:center;gap:14px;padding:13px 18px;border-radius:14px;background:var(--ink);color:#fff;box-shadow:0 16px 40px rgba(26,21,35,.32);animation:cf-fade .22s ease-out;max-width:calc(100vw - 32px)">
+    <span style="width:24px;height:24px;border-radius:50%;background:var(--positive);display:flex;align-items:center;justify-content:center;flex:none"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg></span>
+    <span style="font-size:14px;font-weight:500;white-space:nowrap">{{ toastMsg }}</span>
+  </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{
+  &quot;defaultTab&quot;: { &quot;editor&quot;: &quot;enum&quot;, &quot;options&quot;: [&quot;Fluxo de caixa&quot;, &quot;Por categoria&quot;, &quot;Evolução&quot;, &quot;Comparativo&quot;, &quot;Maiores gastos&quot;, &quot;Patrimônio&quot;], &quot;default&quot;: &quot;Fluxo de caixa&quot;, &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Protótipo&quot; },
+  &quot;device&quot;: { &quot;editor&quot;: &quot;enum&quot;, &quot;options&quot;: [&quot;Desktop&quot;, &quot;Mobile&quot;], &quot;default&quot;: &quot;Desktop&quot;, &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Protótipo&quot; },
+  &quot;theme&quot;: { &quot;editor&quot;: &quot;enum&quot;, &quot;options&quot;: [&quot;Claro&quot;, &quot;Escuro&quot;], &quot;default&quot;: &quot;Claro&quot;, &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Aparência&quot; }
+}">
+class Component extends DCLogic {
+  constructor(props){
+    super(props);
+    this.C = 2 * Math.PI * 66;
+    this.state = {
+      theme: props.theme === 'Escuro' ? 'dark' : 'light',
+      device: props.device === 'Mobile' ? 'mobile' : 'desktop',
+      tab: this.mapTab(props.defaultTab) || 'cashflow',
+      period: '12m',
+      drill: null,       // null | catKey | {cat, sub}
+      hidden: {},        // evolution hidden lines
+      tip: null,
+      toastOpen: false, toastMsg: ''
+    };
+    this._toastT = null;
+    this.months12 = ['jul','ago','set','out','nov','dez','jan','fev','mar','abr','mai','jun'];
+    this.months6 = ['jan','fev','mar','abr','mai','jun'];
+  }
+  mapTab(v){ return ({ 'Fluxo de caixa':'cashflow','Por categoria':'category','Evolução':'evolution','Comparativo':'compare','Maiores gastos':'top','Patrimônio':'networth' })[v]; }
+  componentDidUpdate(prev){
+    prev = prev || {};
+    if(prev.theme !== this.props.theme) this.setState({ theme: this.props.theme === 'Escuro' ? 'dark' : 'light' });
+    if(prev.device !== this.props.device) this.setState({ device: this.props.device === 'Mobile' ? 'mobile' : 'desktop' });
+    if(prev.defaultTab !== this.props.defaultTab){ const t = this.mapTab(this.props.defaultTab); if(t) this.setState({ tab:t }); }
+  }
+  componentWillUnmount(){ if(this._toastT) clearTimeout(this._toastT); }
+  fireToast(msg){ if(this._toastT) clearTimeout(this._toastT); this.setState({ toastOpen:true, toastMsg:msg }); this._toastT = setTimeout(() => this.setState({ toastOpen:false }), 3200); }
+  brl(n){ return 'R$ ' + Number(n).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+  brl0(n){ return 'R$ ' + Number(n).toLocaleString('pt-BR', { maximumFractionDigits: 0 }); }
+  setTip(e, title, value){ this.setState({ tip: { x: e.clientX, y: e.clientY, title, value } }); }
+  renderVals(){
+    const st = this.state, isD = st.device === 'desktop';
+    const hideTip = () => this.setState({ tip: null });
+    // period
+    const presets = [['1m','Este mês'],['3m','3 meses'],['6m','6 meses'],['12m','12 meses'],['ytd','Ano']];
+    const periodPresets = presets.map(([k,label]) => {
+      const on = st.period === k;
+      return { label, onClick: () => this.setState({ period: k }),
+        bg: on ? 'var(--primary)' : 'var(--surface)', color: on ? '#fff' : 'var(--ink)', border: on ? 'var(--primary)' : 'var(--line)' };
+    });
+    const custom = st.period === 'custom';
+    // tabs
+    const tabDefs = [['cashflow','Fluxo de caixa'],['category','Por categoria'],['evolution','Evolução'],['compare','Comparativo'],['top','Maiores gastos'],['networth','Patrimônio']];
+    const tabs = tabDefs.map(([k,label]) => {
+      const on = st.tab === k;
+      return { label, onClick: () => this.setState({ tab:k, drill:null }),
+        bg: on ? 'var(--primary)' : 'var(--surface)', color: on ? '#fff' : 'var(--ink)', border: on ? 'var(--primary)' : 'var(--line)' };
+    });
+    const titles = {
+      cashflow:['Fluxo de caixa','Entradas, saídas e saldo acumulado mês a mês'],
+      category:['Por categoria','Onde o dinheiro foi — clique para abrir'],
+      evolution:['Evolução por categoria','O gasto que cresce devagar aparece aqui'],
+      compare:['Comparativo','Dois períodos lado a lado'],
+      top:['Maiores gastos','Ranking de lançamentos e estabelecimentos'],
+      networth:['Patrimônio líquido','Contas + investimentos − faturas em aberto']
+    };
+    // ---- CASH FLOW ----
+    const inV  = [8200,8200,8600,8200,8200,9400,8200,8200,8200,8600,8200,8200];
+    const outV = [6100,5800,7200,6400,5900,8800,6200,7100,5600,6900,6300,7900];
+    const W = 640, H = 250, pad = 12, n = 12;
+    const maxBar = 10000, groupW = (W - pad*2) / n, bw = groupW * 0.34;
+    const cfBars = inV.map((iv, i) => {
+      const cx = pad + groupW*i + groupW/2;
+      const inH = (iv/maxBar)*(H-30), outH = (outV[i]/maxBar)*(H-30);
+      const m = this.months12[i];
+      return { bw: +bw.toFixed(1),
+        inX: +(cx - bw - 1).toFixed(1), inY: +(H-30-inH).toFixed(1), inH: +inH.toFixed(1),
+        outX: +(cx + 1).toFixed(1), outY: +(H-30-outH).toFixed(1), outH: +outH.toFixed(1),
+        tipIn: (e) => this.setTip(e, 'Entradas · '+m, this.brl(iv)),
+        tipOut: (e) => this.setTip(e, 'Saídas · '+m, this.brl(outV[i])) };
+    });
+    let cum = 0; const cumV = inV.map((iv,i) => (cum += iv - outV[i]));
+    const cmin = Math.min.apply(null,cumV), cmax = Math.max.apply(null,cumV), cspan=(cmax-cmin)||1;
+    const cfLineDots = cumV.map((v,i) => {
+      const x = pad + groupW*i + groupW/2;
+      const y = 14 + (1-(v-cmin)/cspan)*(H-60);
+      return { x:+x.toFixed(1), y:+y.toFixed(1), tip:(e)=>this.setTip(e,'Acumulado · '+this.months12[i], this.brl(v)) };
+    });
+    const cfLine = cfLineDots.map((p,i)=>(i?'L':'M')+p.x+' '+p.y).join(' ');
+    const cfGrid = [0,1,2,3].map(i => ({ y: 14 + i*((H-44)/3) }));
+    // ---- BY CATEGORY (drill) ----
+    const catColors = ['#820AD1','#F5A524','#EC4899','#0EA5E9','var(--invest)','#8B5CF6'];
+    const level0 = [
+      { key:'moradia', label:'Moradia', value:6300, count:6, prev:6300, color:catColors[0] },
+      { key:'alimentacao', label:'Alimentação', value:2700, count:38, prev:2280, color:catColors[1] },
+      { key:'delivery', label:'Delivery', value:1236, count:19, prev:920, color:catColors[2] },
+      { key:'transporte', label:'Transporte', value:640, count:24, prev:710, color:catColors[3] },
+      { key:'lazer', label:'Lazer', value:540, count:9, prev:480, color:catColors[4] },
+      { key:'assinaturas', label:'Assinaturas', value:294, count:7, prev:294, color:catColors[5] }
+    ];
+    const subMap = {
+      alimentacao: [ {label:'Mercado', value:1680, count:12, prev:1400, color:catColors[1]}, {label:'Padaria', value:560, count:18, prev:520, color:'#F7B955'}, {label:'Restaurante', value:460, count:8, prev:360, color:'#E8912A'} ],
+      delivery: [ {label:'iFood', value:940, count:14, prev:700, color:catColors[2]}, {label:'Rappi', value:296, count:5, prev:220, color:'#F472B6'} ]
+    };
+    const txMap = { 'alimentacao/Mercado': [
+      {name:'Mercado Extra', date:'11/06', value:214.30}, {name:'Pão de Açúcar', date:'04/06', value:186.50}, {name:'Assaí', date:'18/06', value:312.90}
+    ], 'delivery/iFood': [ {name:'iFood', date:'12/06', value:89.90}, {name:'iFood', date:'08/06', value:48.90}, {name:'iFood', date:'02/06', value:63.40} ] };
+    let catRows, catDonut, catTotal, catColLabel, showDonut, drillCrumb, hasDrill;
+    const drill = st.drill;
+    if(drill == null){
+      const total = level0.reduce((a,c)=>a+c.value,0);
+      catTotal = this.brl0(total); catColLabel = 'Categoria'; showDonut = true; hasDrill = false; drillCrumb = '';
+      let acc = 0;
+      catDonut = level0.map(c => { const len=(c.value/total)*this.C; const s={ color:c.color, dash:(Math.max(0,len-1.5)).toFixed(2)+' '+(this.C-Math.max(0,len-1.5)).toFixed(2), offset:(-acc).toFixed(2), tip:(e)=>this.setTip(e,c.label,this.brl(c.value)) }; acc+=len; return s; });
+      catRows = level0.map(c => {
+        const canDrill = !!subMap[c.key];
+        const dv = c.value - c.prev, near = c.prev===0?0:dv/c.prev;
+        return { label:c.label, color:c.color, value:this.brl0(c.value), pct:Math.round(c.value/total*100), count:c.count, avg:this.brl0(c.value/c.count),
+          var: (dv>0?'+':'')+Math.round(near*100)+'%', varColor: Math.abs(near)<0.02?'var(--ink-2)':(dv>0?'var(--warn)':'var(--positive)'),
+          canDrill, cursor: canDrill?'pointer':'default', rowBg:'transparent',
+          onDrill: canDrill ? (()=>this.setState({drill:c.key})) : (()=>{}) };
+      });
+    } else if(typeof drill === 'string'){
+      const parent = level0.find(c=>c.key===drill); const subs = subMap[drill] || [];
+      const total = subs.reduce((a,c)=>a+c.value,0);
+      catTotal = this.brl0(total); catColLabel = 'Subcategoria'; showDonut = true; hasDrill = true; drillCrumb = parent.label;
+      let acc = 0;
+      catDonut = subs.map(c => { const len=(c.value/total)*this.C; const s={ color:c.color, dash:(Math.max(0,len-1.5)).toFixed(2)+' '+(this.C-Math.max(0,len-1.5)).toFixed(2), offset:(-acc).toFixed(2), tip:(e)=>this.setTip(e,c.label,this.brl(c.value)) }; acc+=len; return s; });
+      catRows = subs.map(c => {
+        const canDrill = !!txMap[drill+'/'+c.label];
+        const dv=c.value-c.prev, near=c.prev===0?0:dv/c.prev;
+        return { label:c.label, color:c.color, value:this.brl0(c.value), pct:Math.round(c.value/total*100), count:c.count, avg:this.brl0(c.value/c.count),
+          var:(dv>0?'+':'')+Math.round(near*100)+'%', varColor:Math.abs(near)<0.02?'var(--ink-2)':(dv>0?'var(--warn)':'var(--positive)'),
+          canDrill, cursor: canDrill?'pointer':'default', rowBg:'transparent',
+          onDrill: canDrill ? (()=>this.setState({drill:{cat:drill, sub:c.label}})) : (()=>{}) };
+      });
+    } else {
+      const txs = txMap[drill.cat+'/'+drill.sub] || [];
+      const total = txs.reduce((a,t)=>a+t.value,0);
+      catTotal = this.brl0(total); catColLabel = 'Lançamento'; showDonut = false; hasDrill = true; drillCrumb = drill.sub;
+      catDonut = [];
+      catRows = txs.map(t => ({ label:t.name+' · '+t.date, color:'var(--ink-2)', value:this.brl(t.value), pct:Math.round(t.value/total*100), count:1, avg:this.brl(t.value),
+        var:'—', varColor:'var(--ink-2)', canDrill:false, cursor:'default', rowBg:'transparent', onDrill:()=>{} }));
+    }
+    // ---- EVOLUTION ----
+    const evoDefs = [
+      { key:'alimentacao', label:'Alimentação', color:catColors[1], v:[420,440,460,470,480,510].map(x=>x*4) },
+      { key:'delivery', label:'Delivery', color:catColors[2], v:[180,240,290,340,380,412] },
+      { key:'transporte', label:'Transporte', color:catColors[3], v:[210,180,160,150,140,130] },
+      { key:'lazer', label:'Lazer', color:'var(--invest)', v:[120,300,180,260,220,540] },
+      { key:'assinaturas', label:'Assinaturas', color:catColors[5], v:[210,210,232,232,294,294] }
+    ];
+    const eW=620, eH=250, eMax=2100;
+    const evoLines = evoDefs.filter(d=>!st.hidden[d.key]).map(d => {
+      const dots = d.v.map((val,i)=>{ const x=12+(i/(d.v.length-1))*(eW-24); const y=12+(1-val/eMax)*(eH-40); return { x:+x.toFixed(1), y:+y.toFixed(1), tip:(e)=>this.setTip(e, d.label+' · '+this.months6[i], this.brl(val)) }; });
+      return { color:d.color, d: dots.map((p,i)=>(i?'L':'M')+p.x+' '+p.y).join(' '), dots };
+    });
+    const evoToggles = evoDefs.map(d => { const on=!st.hidden[d.key]; return { label:d.label, color:d.color, onClick:()=>this.setState(s=>({hidden:Object.assign({},s.hidden,{[d.key]:on})})),
+      bg: on?'var(--surface)':'transparent', textColor: on?'var(--ink)':'var(--ink-2)', border: on?'var(--line)':'var(--line)', opacity: on?'1':'0.5' }; });
+    const evoGrid = [0,1,2,3].map(i => ({ y: 12 + i*((eH-28)/3) }));
+    // ---- COMPARE ----
+    const cmp = [
+      { label:'Delivery', a:920, b:1236, color:catColors[2] },
+      { label:'Alimentação', a:2280, b:2700, color:catColors[1] },
+      { label:'Transporte', a:710, b:640, color:catColors[3] },
+      { label:'Lazer', a:480, b:540, color:'var(--invest)' },
+      { label:'Moradia', a:6300, b:6300, color:catColors[0] },
+      { label:'Assinaturas', a:294, b:294, color:catColors[5] }
+    ];
+    const cmpMax = Math.max.apply(null, cmp.flatMap(c=>[c.a,c.b]));
+    const compareCats = cmp.map(c => ({ label:c.label, color:c.color, aStr:this.brl0(c.a), bStr:this.brl0(c.b), aPct:Math.round(c.a/cmpMax*100), bPct:Math.round(c.b/cmpMax*100) }));
+    const topVars = cmp.map(c=>({ ...c, dv:c.b-c.a })).filter(c=>c.dv!==0).sort((a,b)=>Math.abs(b.dv)-Math.abs(a.dv)).slice(0,3).map(c => ({
+      label:c.label, from:this.brl0(c.a), to:this.brl0(c.b), delta:(c.dv>0?'+':'−')+this.brl0(c.dv), color: c.dv>0?'var(--warn)':'var(--positive)'
+    }));
+    // ---- TOP ----
+    const topTxRaw = [
+      ['Aluguel','Moradia','10/06',2100],['Notebook Dell','Eletrônicos','10/06',416.58],['iPhone 16','Eletrônicos','09/06',708.32],['Mercado Assaí','Alimentação','18/06',312.90],['Plano de saúde','Saúde','05/06',389],['Mercado Extra','Alimentação','11/06',214.30],['Zara','Vestuário','07/06',213.90],['Pão de Açúcar','Alimentação','04/06',186.50]
+    ];
+    const topTx = topTxRaw.map((t,i)=>({ rank:i+1, name:t[0], cat:t[1], date:t[2], amount:this.brl0(t[3]) }));
+    const topMerchants = [ ['iFood',14,940],['Uber',22,498],['Amazon',9,1290],['Pão de Açúcar',7,860],['Posto Ipiranga',6,720],['Spotify',1,21.90] ].map((m,i)=>({ rank:i+1, name:m[0], count:m[1], total:this.brl0(m[2]) }));
+    // ---- NET WORTH ----
+    const nwV = [64200,65800,66900,68100,69400,70200,71100,72400,73200,74100,74900,75366];
+    const nwMin=62000, nwMax=77000, nwSpan=nwMax-nwMin, nwW=600, nwH=220;
+    const nwDots = nwV.map((v,i)=>{ const x=12+(i/(nwV.length-1))*(nwW-24); const y=12+(1-(v-nwMin)/nwSpan)*(nwH-28); return { x:+x.toFixed(1), y:+y.toFixed(1), tip:(e)=>this.setTip(e,'Patrimônio · '+this.months12[i], this.brl(v)) }; });
+    const nwLine = nwDots.map((p,i)=>(i?'L':'M')+p.x+' '+p.y).join(' ');
+    const nwArea = 'M'+nwDots[0].x+' '+nwH+' '+nwDots.map(p=>'L'+p.x+' '+p.y).join(' ')+' L'+nwDots[nwDots.length-1].x+' '+nwH+' Z';
+    const nwGrid = [0,1,2,3].map(i => ({ y: 12 + i*((nwH-20)/3) }));
+    const t = st.tip;
+    return {
+      theme: st.theme, themeIsDark: st.theme==='dark', themeIsLight: st.theme!=='dark',
+      isDesktop:isD,
+      stagePad: isD?'0':'16px 14px 40px',
+      stageStyle: isD ? 'width:100%;max-width:900px;padding:20px 24px 0'
+        : 'width:412px;max-width:100%;background:var(--surface);border:1px solid var(--line);border-radius:32px;box-shadow:0 24px 60px rgba(26,21,35,.12);padding:16px 15px 0',
+      deskBg:isD?'var(--surface)':'transparent', deskColor:isD?'var(--ink)':'var(--ink-2)',
+      mobBg:!isD?'var(--surface)':'transparent', mobColor:!isD?'var(--ink)':'var(--ink-2)',
+      setDesktop:()=>this.setState({device:'desktop'}), setMobile:()=>this.setState({device:'mobile'}),
+      toggleTheme:()=>this.setState(s=>({theme:s.theme==='dark'?'light':'dark'})),
+      periodPresets, setCustom:()=>this.setState({period:'custom'}),
+      customBg: custom?'var(--primary)':'var(--surface)', customColor: custom?'#fff':'var(--ink)', customBorder: custom?'var(--primary)':'var(--line)',
+      periodRange: '01 jul 25 — 30 jun 26',
+      tabs,
+      sectionTitle: titles[st.tab][0], sectionSub: titles[st.tab][1],
+      exportCsv:()=>this.fireToast('Exportando CSV…'), exportPdf:()=>this.fireToast('Exportando PDF…'),
+      isCashflow: st.tab==='cashflow', isCategory: st.tab==='category', isEvolution: st.tab==='evolution',
+      isCompare: st.tab==='compare', isTop: st.tab==='top', isNetworth: st.tab==='networth',
+      months12: this.months12, months6: this.months6,
+      // cashflow
+      cfBars, cfLine, cfLineDots, cfGrid,
+      // category
+      catCols: (showDonut && isD) ? 'auto 1fr' : '1fr', catDonut, catRows, catTotal, catColLabel, showDonut,
+      hasDrill, drillCrumb, drillUp:()=>this.setState(s=>({ drill: (typeof s.drill==='object'&&s.drill)? s.drill.cat : null })),
+      // evolution
+      evoLines, evoToggles, evoGrid,
+      // compare
+      topVars, compareCats,
+      // top
+      topCols: isD?'1fr 1fr':'1fr', topTx, topMerchants,
+      // networth
+      nwCols: isD?'1fr 1fr 1fr':'1fr', nwDots, nwLine, nwArea, nwGrid,
+      // tooltip
+      hideTip,
+      tipShow: !!t, tipX: t?t.x:0, tipY: t?t.y:0, tipTitle: t?t.title:'', tipValue: t?t.value:'',
+      // toast
+      toastOpen: st.toastOpen, toastMsg: st.toastMsg
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{background:#FAFAFC}
+  :root{
+    --primary:#820AD1;--primary-hover:#6B08AD;--primary-soft:#F3E8FF;
+    --bg:#FAFAFC;--surface:#FFFFFF;--surface-2:#F3F1F7;--line:#E8E4EF;
+    --ink:#1A1523;--ink-2:#6B6577;
+    --positive:#00A868;--negative:#E5484D;--warn:#F5A524;--invest:#0F9B8E;
+    --card-shadow:0 1px 3px rgba(26,21,35,.06);--card-border:transparent;
+    --ring:0 0 0 4px rgba(130,10,209,.22);--track:#E8E4EF;
+  }
+  [data-theme="dark"]{
+    --primary:#A855F7;--primary-hover:#9333EA;--primary-soft:#2A1140;
+    --bg:#0E0B12;--surface:#171320;--surface-2:#211B2E;--line:#2E2740;
+    --ink:#F5F3F8;--ink-2:#A79FB8;
+    --positive:#3DD68C;--negative:#FF6369;--warn:#F7B955;--invest:#22C3B0;
+    --card-shadow:none;--card-border:#2E2740;
+    --ring:0 0 0 4px rgba(168,85,247,.32);--track:#2E2740;
+  }
+  a{color:var(--primary);text-decoration:none}
+  a:hover{color:var(--primary-hover)}
+  input::placeholder{color:var(--ink-2);opacity:.6}
+  @media (prefers-reduced-motion: reduce){*{animation-duration:.001ms !important;transition-duration:.001ms !important}}
+</style>
+</helmet>
+
+<div data-theme="{{ theme }}" style="min-height:100dvh;background:var(--bg);color:var(--ink);font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased">
+
+  <!-- ===== reviewer toolbar (meta) ===== -->
+  <div style="height:57px;display:flex;align-items:center;gap:14px;padding:0 18px;border-bottom:1px solid var(--line);background:var(--surface);position:sticky;top:0;z-index:20;overflow-x:auto;white-space:nowrap">
+    <span style="display:inline-flex;align-items:center;gap:8px;flex:none;margin-right:4px">
+      <span style="width:26px;height:26px;border-radius:8px;background:var(--primary);display:flex;align-items:center;justify-content:center"><span style="font-family:Manrope,sans-serif;font-weight:800;font-size:15px;color:#fff">$</span></span>
+      <span style="font-family:Manrope,sans-serif;font-weight:700;font-size:13px;color:var(--ink)">Cifrão</span>
+      <span style="font-size:11px;color:var(--ink-2);letter-spacing:.06em;text-transform:uppercase">Auth</span>
+    </span>
+    <span style="width:1px;height:22px;background:var(--line);flex:none"></span>
+    <div style="display:flex;gap:6px;flex:none">
+      <sc-for list="{{ chips }}" as="c" hint-placeholder-count="7">
+        <button onClick="{{ c.onClick }}" style="height:32px;padding:0 13px;border:1px solid var(--line);border-radius:999px;font-family:Inter,sans-serif;font-weight:600;font-size:12.5px;cursor:pointer;transition:background .15s,color .15s;background:{{ c.bg }};color:{{ c.color }}">{{ c.label }}</button>
+      </sc-for>
+    </div>
+    <span style="width:1px;height:22px;background:var(--line);flex:none"></span>
+    <div style="display:flex;gap:6px;flex:none">
+      <button onClick="{{ goCred }}" style="height:32px;padding:0 13px;border:1px solid var(--line);border-radius:999px;font-family:Inter,sans-serif;font-weight:600;font-size:12.5px;cursor:pointer;background:transparent;color:var(--negative);display:inline-flex;align-items:center;gap:7px" style-hover="background:var(--surface-2)"><span style="width:7px;height:7px;border-radius:50%;background:var(--negative)"></span>Erro: credencial</button>
+      <button onClick="{{ goExpired }}" style="height:32px;padding:0 13px;border:1px solid var(--line);border-radius:999px;font-family:Inter,sans-serif;font-weight:600;font-size:12.5px;cursor:pointer;background:transparent;color:var(--warn);display:inline-flex;align-items:center;gap:7px" style-hover="background:var(--surface-2)"><span style="width:7px;height:7px;border-radius:50%;background:var(--warn)"></span>Erro: código</button>
+    </div>
+    <div style="margin-left:auto;display:flex;gap:8px;align-items:center;flex:none;padding-left:12px">
+      <div style="display:flex;background:var(--surface-2);border-radius:10px;padding:3px">
+        <button onClick="{{ setDesktop }}" style="height:26px;padding:0 12px;border:none;border-radius:8px;font-family:Inter,sans-serif;font-weight:600;font-size:12px;cursor:pointer;background:{{ deskBg }};color:{{ deskColor }}">Desktop</button>
+        <button onClick="{{ setMobile }}" style="height:26px;padding:0 12px;border:none;border-radius:8px;font-family:Inter,sans-serif;font-weight:600;font-size:12px;cursor:pointer;background:{{ mobBg }};color:{{ mobColor }}">Mobile</button>
+      </div>
+      <button onClick="{{ toggleTheme }}" title="Tema" style="width:34px;height:34px;border-radius:10px;background:var(--surface);border:1px solid var(--line);color:var(--ink);display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="background:var(--surface-2)">
+        <sc-if value="{{ themeIsDark }}" hint-placeholder-val="{{ false }}"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg></sc-if>
+        <sc-if value="{{ themeIsLight }}" hint-placeholder-val="{{ true }}"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6.4 6.4 0 0 0 9 9 9 9 0 1 1-9-9Z"></path></svg></sc-if>
+      </button>
+    </div>
+  </div>
+
+  <!-- ===== app ===== -->
+  <div style="display:flex;min-height:calc(100dvh - 57px)">
+
+    <!-- LEFT PANEL (desktop) -->
+    <sc-if value="{{ isDesktop }}" hint-placeholder-val="{{ true }}">
+    <aside style="flex:0 0 46%;max-width:620px;background:var(--primary);position:relative;overflow:hidden;display:flex;flex-direction:column;justify-content:space-between;padding:52px 56px">
+      <div style="position:absolute;inset:0;background-image:radial-gradient(circle, rgba(255,255,255,.07) 1.2px, transparent 1.4px);background-size:26px 26px;pointer-events:none"></div>
+      <span style="position:absolute;right:-70px;bottom:-150px;font-family:Manrope,sans-serif;font-weight:800;font-size:560px;line-height:.8;color:rgba(255,255,255,.09);user-select:none;pointer-events:none">$</span>
+      <span style="position:absolute;left:-40px;top:-60px;font-family:Manrope,sans-serif;font-weight:800;font-size:260px;line-height:.8;color:rgba(255,255,255,.05);user-select:none;pointer-events:none">$</span>
+      <div style="position:relative;display:flex;align-items:center;gap:13px">
+        <div style="width:46px;height:46px;border-radius:14px;background:#fff;display:flex;align-items:center;justify-content:center"><span style="font-family:Manrope,sans-serif;font-weight:800;font-size:26px;color:var(--primary)">$</span></div>
+        <span style="font-family:Manrope,sans-serif;font-weight:800;font-size:23px;color:#fff;letter-spacing:-.02em">Cifrão</span>
+      </div>
+      <div style="position:relative">
+        <h2 style="margin:0;font-family:Manrope,sans-serif;font-weight:700;font-size:38px;line-height:1.12;letter-spacing:-.02em;color:#fff;max-width:12ch">Menos digitar.<br>Mais decidir.</h2>
+        <p style="margin:20px 0 0;font-size:16px;line-height:1.5;color:rgba(255,255,255,.72);max-width:34ch">Seu mês inteiro num relance — o que caiu, o que fecha, o que vem por aí.</p>
+      </div>
+      <div style="position:relative;font-size:13px;color:rgba(255,255,255,.55)">Finanças pessoais · só suas</div>
+    </aside>
+    </sc-if>
+
+    <!-- FORM STAGE -->
+    <main style="flex:1;display:flex;align-items:center;justify-content:center;padding:clamp(28px,4vw,56px) 24px">
+      <div style="{{ stageStyle }}">
+
+        <!-- mobile top logo -->
+        <sc-if value="{{ isMobile }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:12px;margin-bottom:30px">
+            <div style="width:52px;height:52px;border-radius:16px;background:var(--primary);display:flex;align-items:center;justify-content:center"><span style="font-family:Manrope,sans-serif;font-weight:800;font-size:29px;color:#fff">$</span></div>
+            <span style="font-family:Manrope,sans-serif;font-weight:800;font-size:19px;color:var(--ink);letter-spacing:-.02em">Cifrão</span>
+          </div>
+        </sc-if>
+
+        <div ref="{{ setFormRef }}">
+
+          <!-- ===== ENTRAR ===== -->
+          <sc-if value="{{ isLogin }}" hint-placeholder-val="{{ true }}">
+          <div>
+            <h1 style="margin:0;font-family:Manrope,sans-serif;font-weight:700;font-size:28px;letter-spacing:-.015em;color:var(--ink)">Entrar</h1>
+            <p style="margin:8px 0 26px;font-size:15px;color:var(--ink-2)">Entre para ver o que vem por aí.</p>
+            <label style="display:block;font-size:13px;font-weight:500;color:var(--ink-2);margin-bottom:7px">E-mail</label>
+            <input type="email" placeholder="voce@email.com" style="width:100%;height:50px;padding:0 16px;border-radius:14px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-family:Inter,sans-serif;font-size:15px;outline:none;transition:border-color .18s,box-shadow .18s" style-focus="border-color:var(--primary);box-shadow:var(--ring)">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin:16px 0 7px">
+              <label style="font-size:13px;font-weight:500;color:var(--ink-2)">Senha</label>
+              <a onClick="{{ goForgot }}" style="font-size:13px;font-weight:500;color:var(--primary);cursor:pointer">Esqueci minha senha</a>
+            </div>
+            <div style="position:relative">
+              <input type="{{ loginPwType }}" placeholder="Sua senha" style="width:100%;height:50px;padding:0 46px 0 16px;border-radius:14px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-family:Inter,sans-serif;font-size:15px;outline:none;transition:border-color .18s,box-shadow .18s" style-focus="border-color:var(--primary);box-shadow:var(--ring)">
+              <button onClick="{{ toggleLoginPw }}" tabindex="-1" style="position:absolute;right:8px;top:8px;width:34px;height:34px;border:none;background:transparent;color:var(--ink-2);display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:9px" style-hover="background:var(--surface-2)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"></path><circle cx="12" cy="12" r="3"></circle></svg></button>
+            </div>
+            <sc-if value="{{ loginError }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;align-items:center;gap:7px;margin-top:12px;padding:11px 14px;border-radius:12px;background:rgba(229,72,77,.09);color:var(--negative);font-size:13px;font-weight:500"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><circle cx="12" cy="12" r="10"></circle><path d="M12 8v4M12 16h.01"></path></svg>E-mail ou senha não conferem. Tente de novo.</div>
+            </sc-if>
+            <button onClick="{{ go2fa }}" style="width:100%;height:52px;margin-top:20px;border:none;border-radius:999px;background:var(--primary);color:#fff;font-family:Inter,sans-serif;font-weight:600;font-size:15px;cursor:pointer;transition:background .18s,transform .18s" style-hover="background:var(--primary-hover)" style-active="transform:scale(.98)" style-focus="box-shadow:var(--ring);outline:none">Entrar</button>
+            <div style="display:flex;align-items:center;gap:12px;margin:18px 0"><div style="flex:1;height:1px;background:var(--line)"></div><span style="font-size:12px;color:var(--ink-2)">ou</span><div style="flex:1;height:1px;background:var(--line)"></div></div>
+            <button style="width:100%;height:52px;border:1px solid var(--line);border-radius:999px;background:var(--surface);color:var(--ink);font-family:Inter,sans-serif;font-weight:600;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:11px;transition:background .18s" style-hover="background:var(--surface-2)"><span style="width:22px;height:22px;border-radius:50%;background:#fff;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-family:Manrope,sans-serif;font-weight:800;font-size:14px;color:#4285F4">G</span>Entrar com Google</button>
+            <p style="text-align:center;margin:24px 0 0;font-size:14px;color:var(--ink-2)">Não tem conta? <a onClick="{{ goSignup }}" style="color:var(--primary);font-weight:600;cursor:pointer">Criar conta</a></p>
+          </div>
+          </sc-if>
+
+          <!-- ===== CRIAR CONTA ===== -->
+          <sc-if value="{{ isSignup }}" hint-placeholder-val="{{ false }}">
+          <div>
+            <h1 style="margin:0;font-family:Manrope,sans-serif;font-weight:700;font-size:28px;letter-spacing:-.015em;color:var(--ink)">Criar conta</h1>
+            <p style="margin:8px 0 26px;font-size:15px;color:var(--ink-2)">Leva 30 segundos. Depois o app faz o resto.</p>
+            <label style="display:block;font-size:13px;font-weight:500;color:var(--ink-2);margin-bottom:7px">Nome</label>
+            <input placeholder="Como te chamar" style="width:100%;height:50px;padding:0 16px;border-radius:14px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-family:Inter,sans-serif;font-size:15px;outline:none;transition:border-color .18s,box-shadow .18s" style-focus="border-color:var(--primary);box-shadow:var(--ring)">
+            <label style="display:block;font-size:13px;font-weight:500;color:var(--ink-2);margin:16px 0 7px">E-mail</label>
+            <input type="email" placeholder="voce@email.com" style="width:100%;height:50px;padding:0 16px;border-radius:14px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-family:Inter,sans-serif;font-size:15px;outline:none;transition:border-color .18s,box-shadow .18s" style-focus="border-color:var(--primary);box-shadow:var(--ring)">
+            <label style="display:block;font-size:13px;font-weight:500;color:var(--ink-2);margin:16px 0 7px">Senha</label>
+            <div style="position:relative">
+              <input type="{{ signupPwType }}" value="{{ signupPw }}" onInput="{{ onSignupPw }}" placeholder="Crie uma senha" style="width:100%;height:50px;padding:0 46px 0 16px;border-radius:14px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-family:Inter,sans-serif;font-size:15px;outline:none;transition:border-color .18s,box-shadow .18s" style-focus="border-color:var(--primary);box-shadow:var(--ring)">
+              <button onClick="{{ toggleSignupPw }}" tabindex="-1" style="position:absolute;right:8px;top:8px;width:34px;height:34px;border:none;background:transparent;color:var(--ink-2);display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:9px" style-hover="background:var(--surface-2)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"></path><circle cx="12" cy="12" r="3"></circle></svg></button>
+            </div>
+            <div style="display:flex;gap:6px;margin-top:11px">
+              <sc-for list="{{ sSegs }}" as="seg" hint-placeholder-count="4"><div style="flex:1;height:5px;border-radius:3px;transition:background .2s;background:{{ seg }}"></div></sc-for>
+            </div>
+            <div style="display:flex;justify-content:space-between;margin-top:7px;min-height:16px">
+              <span style="font-size:12px;color:var(--ink-2)">Só pra você ter noção — sem regras chatas.</span>
+              <span style="font-size:12px;font-weight:600;color:{{ sColor }}">{{ sLabel }}</span>
+            </div>
+            <button onClick="{{ go2fa }}" style="width:100%;height:52px;margin-top:20px;border:none;border-radius:999px;background:var(--primary);color:#fff;font-family:Inter,sans-serif;font-weight:600;font-size:15px;cursor:pointer;transition:background .18s,transform .18s" style-hover="background:var(--primary-hover)" style-active="transform:scale(.98)" style-focus="box-shadow:var(--ring);outline:none">Criar conta</button>
+            <p style="text-align:center;margin:22px 0 0;font-size:14px;color:var(--ink-2)">Já tem conta? <a onClick="{{ goLogin }}" style="color:var(--primary);font-weight:600;cursor:pointer">Entrar</a></p>
+          </div>
+          </sc-if>
+
+          <!-- ===== 2FA VERIFICAR ===== -->
+          <sc-if value="{{ is2fa }}" hint-placeholder-val="{{ false }}">
+          <div>
+            <h1 style="margin:0;font-family:Manrope,sans-serif;font-weight:700;font-size:28px;letter-spacing:-.015em;color:var(--ink)">Verificação em 2 fatores</h1>
+            <p style="margin:8px 0 28px;font-size:15px;line-height:1.5;color:var(--ink-2)">Digite o código de 6 dígitos do seu app autenticador.</p>
+            <div ref="{{ setCodeGroupRef }}" style="display:flex;gap:10px;justify-content:space-between">
+              <sc-for list="{{ codeInputs }}" as="c" hint-placeholder-count="6">
+                <input value="{{ c.value }}" onInput="{{ c.onInput }}" onKeyDown="{{ c.onKeyDown }}" onPaste="{{ c.onPaste }}" ref="{{ c.ref }}" inputmode="numeric" maxlength="6" style="width:100%;aspect-ratio:1/1.15;min-width:0;text-align:center;border-radius:14px;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);font-family:Manrope,sans-serif;font-weight:700;font-size:26px;outline:none;transition:border-color .15s,box-shadow .15s" style-focus="border-color:var(--primary);box-shadow:var(--ring)">
+              </sc-for>
+            </div>
+            <sc-if value="{{ codeExpired }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;align-items:center;gap:7px;margin-top:16px;padding:11px 14px;border-radius:12px;background:rgba(245,165,36,.1);color:var(--warn);font-size:13px;font-weight:500"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><circle cx="12" cy="12" r="10"></circle><path d="M12 7v5l3 2"></path></svg>O código expirou. Peça um novo.</div>
+            </sc-if>
+            <button style="width:100%;height:52px;margin-top:22px;border:none;border-radius:999px;background:var(--primary);color:#fff;font-family:Inter,sans-serif;font-weight:600;font-size:15px;cursor:pointer;transition:background .18s,transform .18s" style-hover="background:var(--primary-hover)" style-active="transform:scale(.98)" style-focus="box-shadow:var(--ring);outline:none">Verificar</button>
+            <p style="text-align:center;margin:20px 0 0;font-size:14px;color:var(--ink-2)">Não recebeu? <a onClick="{{ resendCode }}" style="color:var(--primary);font-weight:600;cursor:pointer">Reenviar código</a></p>
+            <p style="text-align:center;margin:12px 0 0;font-size:14px"><a onClick="{{ goLogin }}" style="color:var(--ink-2);font-weight:500;cursor:pointer">Voltar para entrar</a></p>
+          </div>
+          </sc-if>
+
+          <!-- ===== CONFIG 2FA ===== -->
+          <sc-if value="{{ isSetup }}" hint-placeholder-val="{{ false }}">
+          <div>
+            <h1 style="margin:0;font-family:Manrope,sans-serif;font-weight:700;font-size:28px;letter-spacing:-.015em;color:var(--ink)">Configurar 2 fatores</h1>
+            <p style="margin:8px 0 24px;font-size:15px;line-height:1.5;color:var(--ink-2)">Escaneie o QR no seu app autenticador.</p>
+            <div style="display:flex;gap:20px;align-items:center">
+              <div style="width:150px;height:150px;flex:none;background:#fff;border:1px solid var(--line);border-radius:16px;position:relative;padding:12px">
+                <div style="position:absolute;inset:12px;background-image:radial-gradient(#1A1523 1.05px, transparent 1.35px);background-size:9px 9px;border-radius:3px"></div>
+                <div style="position:absolute;top:12px;left:12px;width:38px;height:38px;border:6px solid #1A1523;border-radius:9px;background:#fff"></div>
+                <div style="position:absolute;top:12px;right:12px;width:38px;height:38px;border:6px solid #1A1523;border-radius:9px;background:#fff"></div>
+                <div style="position:absolute;bottom:12px;left:12px;width:38px;height:38px;border:6px solid #1A1523;border-radius:9px;background:#fff"></div>
+                <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:34px;height:34px;border-radius:9px;background:var(--primary);display:flex;align-items:center;justify-content:center;border:3px solid #fff"><span style="font-family:Manrope,sans-serif;font-weight:800;color:#fff;font-size:18px">$</span></div>
+              </div>
+              <div style="flex:1;min-width:0">
+                <div style="font-size:13px;color:var(--ink-2);margin-bottom:8px">Não consegue escanear? Use o código:</div>
+                <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:12px;background:var(--surface-2);border:1px solid var(--line)">
+                  <span style="flex:1;font-family:Manrope,sans-serif;font-weight:600;font-size:14px;letter-spacing:.06em;color:var(--ink);overflow:hidden;text-overflow:ellipsis">K5J2 9QR7 M3XP 8ZT4</span>
+                  <button onClick="{{ copyManual }}" style="border:none;background:transparent;color:var(--primary);cursor:pointer;padding:4px;display:flex;border-radius:7px" style-hover="background:var(--primary-soft)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"></rect><path d="M5 15V5a2 2 0 0 1 2-2h10"></path></svg></button>
+                </div>
+                <sc-if value="{{ copied }}" hint-placeholder-val="{{ false }}"><div style="font-size:12px;color:var(--positive);font-weight:600;margin-top:8px">Copiado.</div></sc-if>
+              </div>
+            </div>
+
+            <div style="margin-top:24px;padding:18px 20px;border-radius:16px;border:1px solid var(--line);background:var(--surface-2)">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+                <span style="font-family:Manrope,sans-serif;font-weight:700;font-size:15px;color:var(--ink)">Códigos de recuperação</span>
+                <button onClick="{{ downloadCodes }}" style="display:inline-flex;align-items:center;gap:7px;height:34px;padding:0 14px;border:none;border-radius:999px;background:var(--primary-soft);color:var(--primary);font-family:Inter,sans-serif;font-weight:600;font-size:13px;cursor:pointer;transition:filter .18s" style-hover="filter:brightness(.97)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"></path></svg>Baixar códigos</button>
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 18px;font-family:Manrope,sans-serif;font-weight:600;font-size:14px;letter-spacing:.05em;color:var(--ink)">
+                <span>4F9K-2QX7</span><span>7YH3-BC2V</span><span>8ZT4-M3XP</span><span>A5NR-6KQ8</span><span>K5J2-9QR7</span><span>3JX9-P4M2</span><span>1WP6-D0LN</span><span>QZ7T-08WF</span>
+              </div>
+              <div style="margin-top:14px;font-size:12.5px;line-height:1.5;color:var(--ink-2)">Guarde num lugar seguro. Cada código funciona uma vez — são sua saída se perder o celular.</div>
+            </div>
+            <button onClick="{{ goLogin }}" style="width:100%;height:52px;margin-top:22px;border:none;border-radius:999px;background:var(--primary);color:#fff;font-family:Inter,sans-serif;font-weight:600;font-size:15px;cursor:pointer;transition:background .18s,transform .18s" style-hover="background:var(--primary-hover)" style-active="transform:scale(.98)" style-focus="box-shadow:var(--ring);outline:none">Ativar 2 fatores</button>
+          </div>
+          </sc-if>
+
+          <!-- ===== RECUPERAR: pedir e-mail ===== -->
+          <sc-if value="{{ isForgot }}" hint-placeholder-val="{{ false }}">
+          <div>
+            <h1 style="margin:0;font-family:Manrope,sans-serif;font-weight:700;font-size:28px;letter-spacing:-.015em;color:var(--ink)">Recuperar senha</h1>
+            <p style="margin:8px 0 26px;font-size:15px;line-height:1.5;color:var(--ink-2)">Diga seu e-mail e enviamos um link pra redefinir.</p>
+            <label style="display:block;font-size:13px;font-weight:500;color:var(--ink-2);margin-bottom:7px">E-mail</label>
+            <input type="email" placeholder="voce@email.com" style="width:100%;height:50px;padding:0 16px;border-radius:14px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-family:Inter,sans-serif;font-size:15px;outline:none;transition:border-color .18s,box-shadow .18s" style-focus="border-color:var(--primary);box-shadow:var(--ring)">
+            <button onClick="{{ goSent }}" style="width:100%;height:52px;margin-top:20px;border:none;border-radius:999px;background:var(--primary);color:#fff;font-family:Inter,sans-serif;font-weight:600;font-size:15px;cursor:pointer;transition:background .18s,transform .18s" style-hover="background:var(--primary-hover)" style-active="transform:scale(.98)" style-focus="box-shadow:var(--ring);outline:none">Enviar link</button>
+            <p style="text-align:center;margin:22px 0 0;font-size:14px"><a onClick="{{ goLogin }}" style="color:var(--ink-2);font-weight:500;cursor:pointer">Voltar para entrar</a></p>
+          </div>
+          </sc-if>
+
+          <!-- ===== RECUPERAR: enviado ===== -->
+          <sc-if value="{{ isSent }}" hint-placeholder-val="{{ false }}">
+          <div style="text-align:center">
+            <div style="width:76px;height:76px;border-radius:50%;background:var(--primary-soft);display:flex;align-items:center;justify-content:center;margin:0 auto 22px">
+              <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"></rect><path d="m3 7 9 6 9-6"></path></svg>
+            </div>
+            <h1 style="margin:0;font-family:Manrope,sans-serif;font-weight:700;font-size:28px;letter-spacing:-.015em;color:var(--ink)">Link enviado</h1>
+            <p style="margin:10px auto 0;font-size:15px;line-height:1.55;color:var(--ink-2);max-width:32ch">Se existir uma conta pra esse e-mail, o link de redefinição chega em instantes. Confira o spam.</p>
+            <button onClick="{{ goReset }}" style="width:100%;height:52px;margin-top:26px;border:none;border-radius:999px;background:var(--primary);color:#fff;font-family:Inter,sans-serif;font-weight:600;font-size:15px;cursor:pointer;transition:background .18s,transform .18s" style-hover="background:var(--primary-hover)" style-active="transform:scale(.98)">Abrir o link</button>
+            <p style="text-align:center;margin:20px 0 0;font-size:14px;color:var(--ink-2)">Não chegou? <a onClick="{{ goSent }}" style="color:var(--primary);font-weight:600;cursor:pointer">Reenviar</a> · <a onClick="{{ goLogin }}" style="color:var(--ink-2);font-weight:500;cursor:pointer">Voltar</a></p>
+          </div>
+          </sc-if>
+
+          <!-- ===== RECUPERAR: nova senha ===== -->
+          <sc-if value="{{ isReset }}" hint-placeholder-val="{{ false }}">
+          <div>
+            <h1 style="margin:0;font-family:Manrope,sans-serif;font-weight:700;font-size:28px;letter-spacing:-.015em;color:var(--ink)">Nova senha</h1>
+            <p style="margin:8px 0 26px;font-size:15px;color:var(--ink-2)">Escolha uma senha nova pra sua conta.</p>
+            <label style="display:block;font-size:13px;font-weight:500;color:var(--ink-2);margin-bottom:7px">Nova senha</label>
+            <div style="position:relative">
+              <input type="{{ resetPwType }}" value="{{ resetPw }}" onInput="{{ onResetPw }}" placeholder="Nova senha" style="width:100%;height:50px;padding:0 46px 0 16px;border-radius:14px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-family:Inter,sans-serif;font-size:15px;outline:none;transition:border-color .18s,box-shadow .18s" style-focus="border-color:var(--primary);box-shadow:var(--ring)">
+              <button onClick="{{ toggleResetPw }}" tabindex="-1" style="position:absolute;right:8px;top:8px;width:34px;height:34px;border:none;background:transparent;color:var(--ink-2);display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:9px" style-hover="background:var(--surface-2)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"></path><circle cx="12" cy="12" r="3"></circle></svg></button>
+            </div>
+            <div style="display:flex;gap:6px;margin-top:11px">
+              <sc-for list="{{ rSegs }}" as="seg" hint-placeholder-count="4"><div style="flex:1;height:5px;border-radius:3px;transition:background .2s;background:{{ seg }}"></div></sc-for>
+            </div>
+            <div style="display:flex;justify-content:flex-end;margin-top:7px;min-height:16px"><span style="font-size:12px;font-weight:600;color:{{ rColor }}">{{ rLabel }}</span></div>
+            <label style="display:block;font-size:13px;font-weight:500;color:var(--ink-2);margin:14px 0 7px">Confirmar senha</label>
+            <input type="password" placeholder="Repita a senha" style="width:100%;height:50px;padding:0 16px;border-radius:14px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-family:Inter,sans-serif;font-size:15px;outline:none;transition:border-color .18s,box-shadow .18s" style-focus="border-color:var(--primary);box-shadow:var(--ring)">
+            <button onClick="{{ goLogin }}" style="width:100%;height:52px;margin-top:22px;border:none;border-radius:999px;background:var(--primary);color:#fff;font-family:Inter,sans-serif;font-weight:600;font-size:15px;cursor:pointer;transition:background .18s,transform .18s" style-hover="background:var(--primary-hover)" style-active="transform:scale(.98)" style-focus="box-shadow:var(--ring);outline:none">Redefinir senha</button>
+          </div>
+          </sc-if>
+
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{
+  &quot;defaultScreen&quot;: { &quot;editor&quot;: &quot;enum&quot;, &quot;options&quot;: [&quot;Entrar&quot;, &quot;Criar conta&quot;, &quot;2 fatores&quot;, &quot;Configurar 2FA&quot;, &quot;Recuperar&quot;, &quot;Nova senha&quot;], &quot;default&quot;: &quot;Entrar&quot;, &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Protótipo&quot; },
+  &quot;device&quot;: { &quot;editor&quot;: &quot;enum&quot;, &quot;options&quot;: [&quot;Desktop&quot;, &quot;Mobile&quot;], &quot;default&quot;: &quot;Desktop&quot;, &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Protótipo&quot; },
+  &quot;theme&quot;: { &quot;editor&quot;: &quot;enum&quot;, &quot;options&quot;: [&quot;Claro&quot;, &quot;Escuro&quot;], &quot;default&quot;: &quot;Claro&quot;, &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Aparência&quot; }
+}">
+class Component extends DCLogic {
+  constructor(props){
+    super(props);
+    this.codeRefs = [];
+    this.state = {
+      screen: this.mapScreen(props.defaultScreen) || 'login',
+      device: props.device === 'Mobile' ? 'mobile' : 'desktop',
+      theme: props.theme === 'Escuro' ? 'dark' : 'light',
+      signupPw: '', resetPw: '',
+      showLoginPw: false, showSignupPw: false, showResetPw: false,
+      code: ['','','','','',''],
+      loginError: false, codeExpired: false, copied: false
+    };
+    this._prevScreen = this.state.screen;
+    this._prevExpired = this.state.codeExpired;
+  }
+  mapScreen(s){
+    const m = { 'Entrar':'login','Criar conta':'signup','2 fatores':'2fa','Configurar 2FA':'setup','Recuperar':'forgot','Nova senha':'reset' };
+    return m[s];
+  }
+  componentDidMount(){
+    const mq = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)');
+    this.reduced = mq && mq.matches;
+    if(this.props.device == null && window.innerWidth < 820) this.setState({ device: 'mobile' });
+  }
+  componentDidUpdate(prev){
+    prev = prev || {};
+    if(prev.theme !== this.props.theme) this.setState({ theme: this.props.theme === 'Escuro' ? 'dark' : 'light' });
+    if(prev.device !== this.props.device) this.setState({ device: this.props.device === 'Mobile' ? 'mobile' : 'desktop' });
+    if(prev.defaultScreen !== this.props.defaultScreen){ const s = this.mapScreen(this.props.defaultScreen); if(s) this.setState({ screen: s }); }
+    if(this._prevScreen !== this.state.screen){
+      this._prevScreen = this.state.screen;
+      if(this.formRef && !this.reduced){
+        this.formRef.animate(
+          [{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'translateY(0)' }],
+          { duration: 180, easing: 'ease-out', fill: 'both' }
+        );
+      }
+      if(this.state.screen === '2fa') setTimeout(() => this.focus(0), 60);
+    }
+    if(this._prevExpired !== this.state.codeExpired){
+      const became = !this._prevExpired && this.state.codeExpired;
+      this._prevExpired = this.state.codeExpired;
+      if(became && this.codeGroupRef && !this.reduced){
+        this.codeGroupRef.animate(
+          [{transform:'translateX(0)'},{transform:'translateX(-6px)'},{transform:'translateX(6px)'},{transform:'translateX(-4px)'},{transform:'translateX(4px)'},{transform:'translateX(0)'}],
+          { duration: 320, easing: 'ease-in-out' }
+        );
+      }
+    }
+  }
+  go(s){ this.setState({ screen: s, loginError: false, codeExpired: false }); }
+  focus(i){ const el = this.codeRefs[i]; if(el){ el.focus(); if(el.select) el.select(); } }
+  onDigit(i, e){
+    let v = (e.target.value || '').replace(/\D/g, '');
+    const code = this.state.code.slice();
+    if(!v){ code[i] = ''; this.setState({ code }); return; }
+    if(v.length === 1){ code[i] = v; this.setState({ code }); if(i < 5) this.focus(i + 1); }
+    else { for(let k = 0; k < v.length && i + k < 6; k++) code[i + k] = v[k]; this.setState({ code }); this.focus(Math.min(5, i + v.length)); }
+  }
+  onDigitKey(i, e){
+    if(e.key === 'Backspace' && !this.state.code[i] && i > 0){ e.preventDefault(); const code = this.state.code.slice(); code[i-1] = ''; this.setState({ code }); this.focus(i-1); }
+    else if(e.key === 'ArrowLeft' && i > 0) this.focus(i-1);
+    else if(e.key === 'ArrowRight' && i < 5) this.focus(i+1);
+  }
+  onPaste(e){
+    e.preventDefault();
+    const t = ((e.clipboardData || window.clipboardData).getData('text') || '').replace(/\D/g, '').slice(0, 6);
+    if(!t) return;
+    const code = ['','','','','',''];
+    for(let k = 0; k < t.length; k++) code[k] = t[k];
+    this.setState({ code, codeExpired: false });
+    this.focus(Math.min(5, Math.max(0, t.length - 1)));
+  }
+  strength(pw){
+    if(!pw) return { segArr: ['var(--track)','var(--track)','var(--track)','var(--track)'], label: '', color: 'var(--ink-2)' };
+    let s = 0;
+    if(pw.length >= 6) s++;
+    if(pw.length >= 10) s++;
+    if(/[0-9]/.test(pw) && /[a-zA-Z]/.test(pw)) s++;
+    if(/[^a-zA-Z0-9]/.test(pw)) s++;
+    s = Math.max(1, Math.min(4, s));
+    const colors = ['', 'var(--negative)', 'var(--warn)', 'var(--invest)', 'var(--positive)'];
+    const labels = ['', 'Curta', 'Média', 'Boa', 'Forte'];
+    const segArr = [0,1,2,3].map(i => i < s ? colors[s] : 'var(--track)');
+    return { segArr, label: labels[s], color: colors[s] };
+  }
+  downloadCodes(){
+    const codes = ['4F9K-2QX7','7YH3-BC2V','8ZT4-M3XP','A5NR-6KQ8','K5J2-9QR7','3JX9-P4M2','1WP6-D0LN','QZ7T-08WF'];
+    const body = 'Cifrão — códigos de recuperação\n\n' + codes.join('\n') + '\n\nGuarde num lugar seguro. Cada código funciona uma vez.';
+    try {
+      const blob = new Blob([body], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'cifrao-codigos-recuperacao.txt';
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch(e){}
+  }
+  copyManual(){
+    try { navigator.clipboard && navigator.clipboard.writeText('K5J2 9QR7 M3XP 8ZT4'); } catch(e){}
+    this.setState({ copied: true });
+    clearTimeout(this._ct);
+    this._ct = setTimeout(() => this.setState({ copied: false }), 1600);
+  }
+  renderVals(){
+    const scr = this.state.screen, dev = this.state.device;
+    const s1 = this.strength(this.state.signupPw), s2 = this.strength(this.state.resetPw);
+    const active = 'var(--primary)', activeC = '#fff', idleC = 'var(--ink-2)';
+    const chip = (id, label) => ({ label, onClick: () => this.go(id), bg: scr === id ? active : 'transparent', color: scr === id ? activeC : idleC });
+    return {
+      theme: this.state.theme,
+      themeIsDark: this.state.theme === 'dark',
+      themeIsLight: this.state.theme !== 'dark',
+      isDesktop: dev === 'desktop', isMobile: dev === 'mobile',
+      stageStyle: dev === 'mobile'
+        ? 'width:392px;max-width:100%;background:var(--surface);border:1px solid var(--line);border-radius:34px;box-shadow:0 24px 60px rgba(26,21,35,.14);padding:30px 24px 34px'
+        : 'width:100%;max-width:384px',
+      isLogin: scr === 'login', isSignup: scr === 'signup', is2fa: scr === '2fa', isSetup: scr === 'setup', isForgot: scr === 'forgot', isSent: scr === 'sent', isReset: scr === 'reset',
+      loginError: this.state.loginError, codeExpired: this.state.codeExpired, copied: this.state.copied,
+      loginPwType: this.state.showLoginPw ? 'text' : 'password',
+      signupPwType: this.state.showSignupPw ? 'text' : 'password',
+      resetPwType: this.state.showResetPw ? 'text' : 'password',
+      signupPw: this.state.signupPw, resetPw: this.state.resetPw,
+      onSignupPw: (e) => this.setState({ signupPw: e.target.value }),
+      onResetPw: (e) => this.setState({ resetPw: e.target.value }),
+      sSegs: s1.segArr, sLabel: s1.label, sColor: s1.color,
+      rSegs: s2.segArr, rLabel: s2.label, rColor: s2.color,
+      codeInputs: this.state.code.map((v, i) => ({
+        value: v,
+        onInput: (e) => this.onDigit(i, e),
+        onKeyDown: (e) => this.onDigitKey(i, e),
+        onPaste: (e) => this.onPaste(e),
+        ref: (el) => { this.codeRefs[i] = el; }
+      })),
+      chips: [ chip('login','Entrar'), chip('signup','Criar conta'), chip('2fa','2 fatores'), chip('setup','Configurar 2FA'), chip('forgot','Recuperar'), chip('sent','Enviado'), chip('reset','Nova senha') ],
+      deskBg: dev === 'desktop' ? 'var(--surface)' : 'transparent', deskColor: dev === 'desktop' ? 'var(--ink)' : 'var(--ink-2)',
+      mobBg: dev === 'mobile' ? 'var(--surface)' : 'transparent', mobColor: dev === 'mobile' ? 'var(--ink)' : 'var(--ink-2)',
+      goLogin: () => this.go('login'), goSignup: () => this.go('signup'), go2fa: () => this.go('2fa'),
+      goSetup: () => this.go('setup'), goForgot: () => this.go('forgot'), goSent: () => this.go('sent'), goReset: () => this.go('reset'),
+      goCred: () => this.setState({ screen: 'login', loginError: true, codeExpired: false }),
+      goExpired: () => this.setState({ screen: '2fa', codeExpired: true, loginError: false }),
+      resendCode: () => { this.setState({ codeExpired: false, code: ['','','','','',''] }); setTimeout(() => this.focus(0), 50); },
+      setDesktop: () => this.setState({ device: 'desktop' }), setMobile: () => this.setState({ device: 'mobile' }),
+      toggleTheme: () => this.setState(s => ({ theme: s.theme === 'dark' ? 'light' : 'dark' })),
+      toggleLoginPw: () => this.setState(s => ({ showLoginPw: !s.showLoginPw })),
+      toggleSignupPw: () => this.setState(s => ({ showSignupPw: !s.showSignupPw })),
+      toggleResetPw: () => this.setState(s => ({ showResetPw: !s.showResetPw })),
+      copyManual: () => this.copyManual(),
+      downloadCodes: () => this.downloadCodes(),
+      setFormRef: (el) => { this.formRef = el; },
+      setCodeGroupRef: (el) => { this.codeGroupRef = el; }
+    };
+  }
+}
+</script>
+</body>
+</html>

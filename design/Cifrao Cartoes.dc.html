@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Manrope:wght@500;600;700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{background:#FAFAFC}
+  :root{
+    --primary:#820AD1;--primary-hover:#6B08AD;--primary-soft:#F3E8FF;
+    --bg:#FAFAFC;--surface:#FFFFFF;--surface-2:#F3F1F7;--line:#E8E4EF;
+    --ink:#1A1523;--ink-2:#6B6577;
+    --positive:#00A868;--negative:#E5484D;--warn:#F5A524;--invest:#0F9B8E;
+    --card-shadow:0 1px 3px rgba(26,21,35,.06);--card-border:transparent;
+    --ring:0 0 0 4px rgba(130,10,209,.22);--fab-shadow:0 12px 30px rgba(130,10,209,.34);
+    --track:#E8E4EF;--overlay:rgba(26,21,35,.04);--scrim:rgba(26,21,35,.32);
+    --pos-soft:rgba(0,168,104,.12);--warn-soft:rgba(245,165,36,.14);
+  }
+  [data-theme="dark"]{
+    --primary:#A855F7;--primary-hover:#9333EA;--primary-soft:#2A1140;
+    --bg:#0E0B12;--surface:#171320;--surface-2:#211B2E;--line:#2E2740;
+    --ink:#F5F3F8;--ink-2:#A79FB8;
+    --positive:#3DD68C;--negative:#FF6369;--warn:#F7B955;--invest:#22C3B0;
+    --card-shadow:none;--card-border:#2E2740;
+    --ring:0 0 0 4px rgba(168,85,247,.32);--fab-shadow:0 12px 32px rgba(168,85,247,.28);
+    --track:#2E2740;--overlay:rgba(255,255,255,.05);--scrim:rgba(0,0,0,.55);
+    --pos-soft:rgba(61,214,140,.14);--warn-soft:rgba(247,185,85,.16);
+  }
+  a{color:var(--primary);text-decoration:none}
+  a:hover{color:var(--primary-hover)}
+  input::placeholder{color:var(--ink-2);opacity:.6}
+  .cf-scroll::-webkit-scrollbar{height:7px;width:7px}
+  .cf-scroll::-webkit-scrollbar-thumb{background:var(--line);border-radius:99px}
+  .cf-scroll::-webkit-scrollbar-track{background:transparent}
+  @keyframes cf-fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+  @keyframes cf-modal{from{opacity:0;transform:translateY(10px) scale(.98)}to{opacity:1;transform:translateY(0) scale(1)}}
+  @keyframes cf-scrim{from{opacity:0}to{opacity:1}}
+  @keyframes cf-band{from{opacity:0;max-height:0}to{opacity:1;max-height:200px}}
+  @keyframes cf-grow{from{transform:scaleY(0)}to{transform:scaleY(1)}}
+  @media (prefers-reduced-motion: reduce){*{animation-duration:.001ms !important;transition-duration:.001ms !important}}
+</style>
+</helmet>
+
+<div data-theme="{{ theme }}" style="min-height:100dvh;background:var(--bg);color:var(--ink);font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased">
+
+  <!-- ===== reviewer toolbar ===== -->
+  <div style="height:57px;display:flex;align-items:center;gap:12px;padding:0 18px;border-bottom:1px solid var(--line);background:var(--surface);position:sticky;top:0;z-index:60;overflow-x:auto;white-space:nowrap">
+    <span style="display:inline-flex;align-items:center;gap:8px;flex:none;margin-right:2px">
+      <span style="width:26px;height:26px;border-radius:8px;background:var(--primary);display:flex;align-items:center;justify-content:center"><span style="font-family:Manrope,sans-serif;font-weight:800;font-size:15px;color:#fff">$</span></span>
+      <span style="font-family:Manrope,sans-serif;font-weight:700;font-size:13px;color:var(--ink)">Cifrão</span>
+      <span style="font-size:11px;color:var(--ink-2);letter-spacing:.06em;text-transform:uppercase">Cartões</span>
+    </span>
+    <span style="width:1px;height:22px;background:var(--line);flex:none"></span>
+    <div style="display:flex;gap:6px;flex:none">
+      <sc-for list="{{ navChips }}" as="c" hint-placeholder-count="4">
+        <button onClick="{{ c.onClick }}" style="height:32px;padding:0 13px;border:1px solid var(--line);border-radius:999px;font-family:Inter,sans-serif;font-weight:600;font-size:12.5px;cursor:pointer;transition:background .15s,color .15s;background:{{ c.bg }};color:{{ c.color }}">{{ c.label }}</button>
+      </sc-for>
+    </div>
+    <div style="margin-left:auto;display:flex;gap:8px;align-items:center;flex:none;padding-left:12px">
+      <div style="display:flex;background:var(--surface-2);border-radius:10px;padding:3px">
+        <button onClick="{{ setDesktop }}" style="height:26px;padding:0 12px;border:none;border-radius:8px;font-family:Inter,sans-serif;font-weight:600;font-size:12px;cursor:pointer;background:{{ deskBg }};color:{{ deskColor }}">Desktop</button>
+        <button onClick="{{ setMobile }}" style="height:26px;padding:0 12px;border:none;border-radius:8px;font-family:Inter,sans-serif;font-weight:600;font-size:12px;cursor:pointer;background:{{ mobBg }};color:{{ mobColor }}">Mobile</button>
+      </div>
+      <button onClick="{{ toggleTheme }}" title="Tema" style="width:34px;height:34px;border-radius:10px;background:var(--surface);border:1px solid var(--line);color:var(--ink);display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="background:var(--surface-2)">
+        <sc-if value="{{ themeIsDark }}" hint-placeholder-val="{{ false }}"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg></sc-if>
+        <sc-if value="{{ themeIsLight }}" hint-placeholder-val="{{ true }}"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6.4 6.4 0 0 0 9 9 9 9 0 1 1-9-9Z"></path></svg></sc-if>
+      </button>
+    </div>
+  </div>
+
+  <div style="display:flex;justify-content:center;padding:{{ stagePad }}">
+    <div style="{{ stageStyle }}">
+
+      <!-- ===================== LIST ===================== -->
+      <sc-if value="{{ isList }}" hint-placeholder-val="{{ true }}">
+      <div style="animation:cf-fade .2s ease-out">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:4px 2px 0">
+          <div>
+            <h1 style="margin:0;font-family:Manrope,sans-serif;font-weight:700;font-size:26px;letter-spacing:-.015em;color:var(--ink)">Cartões</h1>
+            <p style="margin:6px 0 0;font-size:14px;color:var(--ink-2)">3 cartões · fatura total aberta <span style="font-family:Manrope,sans-serif;font-weight:600;color:var(--ink)">R$ 5.055,35</span></p>
+          </div>
+          <button onClick="{{ goNew }}" style="height:44px;padding:0 18px 0 15px;border:none;border-radius:999px;background:var(--primary);color:#fff;font-family:Inter,sans-serif;font-weight:600;font-size:14px;cursor:pointer;display:inline-flex;align-items:center;gap:7px;flex:none;transition:background .18s" style-hover="background:var(--primary-hover)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"></path></svg>Novo cartão</button>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:14px;margin-top:22px">
+          <sc-for list="{{ cards }}" as="c" hint-placeholder-count="3">
+            <button onClick="{{ c.onOpen }}" style="text-align:left;border:none;background:transparent;padding:0;cursor:pointer;display:block;transition:transform .16s" style-hover="transform:translateY(-3px)">
+              <div style="border-radius:16px;background:{{ c.grad }};padding:20px 22px;color:#fff;box-shadow:0 10px 26px {{ c.shadow }};position:relative;overflow:hidden">
+                <span style="position:absolute;right:-30px;top:-40px;width:150px;height:150px;border-radius:50%;background:rgba(255,255,255,.08)"></span>
+                <span style="position:absolute;right:22px;bottom:80px;width:96px;height:96px;border-radius:50%;background:rgba(255,255,255,.06)"></span>
+                <div style="display:flex;align-items:flex-start;justify-content:space-between;position:relative">
+                  <div>
+                    <div style="font-family:Manrope,sans-serif;font-weight:700;font-size:17px">{{ c.nick }}</div>
+                    <div style="font-family:'JetBrains Mono',monospace;font-size:13px;color:rgba(255,255,255,.82);margin-top:5px">···· {{ c.last4 }}</div>
+                  </div>
+                  <span style="font-family:Manrope,sans-serif;font-weight:800;font-size:14px;letter-spacing:.02em;color:rgba(255,255,255,.9)">{{ c.brand }}</span>
+                </div>
+                <div style="display:flex;align-items:flex-end;justify-content:space-between;margin-top:26px;position:relative">
+                  <div>
+                    <div style="font-size:11.5px;color:rgba(255,255,255,.72)">Fatura atual</div>
+                    <div style="font-family:Manrope,sans-serif;font-weight:700;font-variant-numeric:tabular-nums;font-size:22px;margin-top:2px">{{ c.invoice }}</div>
+                  </div>
+                  <div style="text-align:right">
+                    <div style="font-size:11.5px;color:rgba(255,255,255,.72)">Limite disponível</div>
+                    <div style="font-family:Manrope,sans-serif;font-weight:600;font-variant-numeric:tabular-nums;font-size:15px;margin-top:3px">{{ c.avail }}</div>
+                  </div>
+                </div>
+              </div>
+            </button>
+          </sc-for>
+        </div>
+      </div>
+      </sc-if>
+
+      <!-- ===================== DETAIL ===================== -->
+      <sc-if value="{{ isDetail }}" hint-placeholder-val="{{ false }}">
+      <div style="animation:cf-fade .2s ease-out">
+        <button onClick="{{ goList }}" style="display:inline-flex;align-items:center;gap:7px;height:36px;padding:0 6px;border:none;background:transparent;color:var(--ink-2);font-family:Inter,sans-serif;font-weight:600;font-size:13.5px;cursor:pointer;margin-bottom:4px" style-hover="color:var(--ink)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"></path></svg>Cartões</button>
+
+        <!-- visual + limit -->
+        <div style="display:grid;grid-template-columns:{{ detailTopCols }};gap:16px;align-items:start">
+          <div style="border-radius:16px;background:linear-gradient(135deg,#820AD1,#5B08A0);padding:20px 22px;color:#fff;box-shadow:0 10px 26px rgba(130,10,209,.3);position:relative;overflow:hidden">
+            <span style="position:absolute;right:-30px;top:-40px;width:150px;height:150px;border-radius:50%;background:rgba(255,255,255,.08)"></span>
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;position:relative">
+              <div>
+                <div style="font-family:Manrope,sans-serif;font-weight:700;font-size:17px">Nubank Roxinho</div>
+                <div style="font-family:'JetBrains Mono',monospace;font-size:13px;color:rgba(255,255,255,.82);margin-top:5px">···· 3921</div>
+              </div>
+              <div style="display:flex;gap:8px;align-items:center">
+                <button onClick="{{ goEdit }}" title="Editar" style="width:32px;height:32px;border-radius:9px;border:none;background:rgba(255,255,255,.16);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="background:rgba(255,255,255,.28)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"></path></svg></button>
+                <span style="font-family:Manrope,sans-serif;font-weight:800;font-size:14px;color:rgba(255,255,255,.9)">VISA</span>
+              </div>
+            </div>
+            <div style="margin-top:34px;position:relative">
+              <div style="font-size:11.5px;color:rgba(255,255,255,.72)">Fatura de agosto (aberta)</div>
+              <div style="font-family:Manrope,sans-serif;font-weight:700;font-variant-numeric:tabular-nums;font-size:26px;margin-top:2px">R$ 3.210,45</div>
+            </div>
+          </div>
+
+          <div style="background:var(--surface);border-radius:20px;box-shadow:var(--card-shadow);border:1px solid var(--card-border);padding:22px 24px">
+            <div style="display:flex;align-items:baseline;justify-content:space-between">
+              <span style="font-size:13px;color:var(--ink-2)">Limite</span>
+              <span style="font-family:Manrope,sans-serif;font-variant-numeric:tabular-nums;font-size:13px;color:var(--ink-2)">R$ 8.000,00</span>
+            </div>
+            <!-- stacked bar: used (invoice) + committed (future installments) + available -->
+            <div style="display:flex;height:12px;border-radius:99px;overflow:hidden;margin-top:12px;background:var(--track)">
+              <div style="width:40.1%;background:var(--primary)"></div>
+              <div style="width:23.2%;background:repeating-linear-gradient(135deg,var(--warn),var(--warn) 5px,color-mix(in oklab,var(--warn),#fff 26%) 5px,color-mix(in oklab,var(--warn),#fff 26%) 10px)"></div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:11px;margin-top:18px">
+              <div style="display:flex;align-items:center;justify-content:space-between">
+                <span style="display:inline-flex;align-items:center;gap:8px;font-size:13.5px;color:var(--ink)"><span style="width:10px;height:10px;border-radius:3px;background:var(--primary)"></span>Fatura atual (usado)</span>
+                <span style="font-family:Manrope,sans-serif;font-weight:600;font-variant-numeric:tabular-nums;font-size:14px;color:var(--ink)">R$ 3.210,45</span>
+              </div>
+              <div style="display:flex;align-items:center;justify-content:space-between">
+                <span style="display:inline-flex;align-items:center;gap:8px;font-size:13.5px;color:var(--ink)"><span style="width:10px;height:10px;border-radius:3px;background:repeating-linear-gradient(135deg,var(--warn),var(--warn) 3px,#fff 3px,#fff 6px)"></span>Comprometido em parcelas</span>
+                <span style="font-family:Manrope,sans-serif;font-weight:600;font-variant-numeric:tabular-nums;font-size:14px;color:var(--warn)">R$ 1.844,90</span>
+              </div>
+              <div style="display:flex;align-items:center;justify-content:space-between;padding-top:11px;border-top:1px solid var(--line)">
+                <span style="display:inline-flex;align-items:center;gap:8px;font-size:13.5px;color:var(--ink)"><span style="width:10px;height:10px;border-radius:3px;background:var(--track)"></span>Disponível de verdade</span>
+                <span style="font-family:Manrope,sans-serif;font-weight:700;font-variant-numeric:tabular-nums;font-size:15px;color:var(--positive)">R$ 2.944,65</span>
+              </div>
+            </div>
+            <p style="margin:14px 0 0;font-size:12px;line-height:1.45;color:var(--ink-2)">Parcela futura já consumiu limite, mesmo sem ter virado fatura. Por isso "disponível de verdade" desconta as duas.</p>
+          </div>
+        </div>
+
+        <!-- tabs -->
+        <div style="display:flex;gap:6px;margin-top:20px;background:var(--surface-2);border-radius:12px;padding:4px;width:fit-content">
+          <button onClick="{{ setTabInvoice }}" style="height:38px;padding:0 18px;border:none;border-radius:9px;font-family:Inter,sans-serif;font-weight:600;font-size:13.5px;cursor:pointer;background:{{ tabInvBg }};color:{{ tabInvColor }};box-shadow:{{ tabInvShadow }};transition:all .15s">Fatura</button>
+          <button onClick="{{ setTabFuture }}" style="height:38px;padding:0 18px;border:none;border-radius:9px;font-family:Inter,sans-serif;font-weight:600;font-size:13.5px;cursor:pointer;background:{{ tabFutBg }};color:{{ tabFutColor }};box-shadow:{{ tabFutShadow }};transition:all .15s">Parcelas futuras</button>
+        </div>
+
+        <!-- ===== TAB: INVOICE ===== -->
+        <sc-if value="{{ tabInvoice }}" hint-placeholder-val="{{ true }}">
+        <div style="margin-top:16px">
+          <!-- invoice navigation -->
+          <div style="display:flex;align-items:center;gap:8px">
+            <button onClick="{{ prevInvoice }}" style="width:36px;height:36px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--ink-2);display:flex;align-items:center;justify-content:center;cursor:pointer;flex:none" style-hover="background:var(--surface-2);color:var(--ink)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"></path></svg></button>
+            <div class="cf-scroll" style="flex:1;display:flex;gap:8px;overflow-x:auto;padding:2px">
+              <sc-for list="{{ invoiceTabs }}" as="iv" hint-placeholder-count="3">
+                <button onClick="{{ iv.onClick }}" style="flex:1;min-width:120px;padding:11px 14px;border-radius:13px;border:1.5px solid {{ iv.border }};background:{{ iv.bg }};cursor:pointer;text-align:left;transition:all .15s">
+                  <div style="display:flex;align-items:center;gap:7px"><span style="width:8px;height:8px;border-radius:50%;background:{{ iv.dot }}"></span><span style="font-family:Manrope,sans-serif;font-weight:700;font-size:14px;color:var(--ink)">{{ iv.month }}</span></div>
+                  <div style="font-size:11.5px;font-weight:600;color:{{ iv.dot }};margin-top:5px">{{ iv.state }}</div>
+                  <div style="font-family:Manrope,sans-serif;font-variant-numeric:tabular-nums;font-size:12.5px;color:var(--ink-2);margin-top:2px">{{ iv.amount }}</div>
+                </button>
+              </sc-for>
+            </div>
+            <button onClick="{{ nextInvoice }}" style="width:36px;height:36px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--ink-2);display:flex;align-items:center;justify-content:center;cursor:pointer;flex:none" style-hover="background:var(--surface-2);color:var(--ink)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"></path></svg></button>
+          </div>
+
+          <!-- invoice header -->
+          <div style="background:var(--surface);border-radius:20px;box-shadow:var(--card-shadow);border:1px solid var(--card-border);padding:22px 24px;margin-top:14px">
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap">
+              <div>
+                <div style="display:inline-flex;align-items:center;gap:8px;padding:5px 11px;border-radius:999px;background:{{ curStateBg }};color:{{ curStateColor }};font-size:12px;font-weight:600;margin-bottom:10px"><span style="width:7px;height:7px;border-radius:50%;background:{{ curStateColor }}"></span>{{ curStateLabel }}</div>
+                <div style="font-family:Manrope,sans-serif;font-weight:700;font-variant-numeric:tabular-nums;font-size:34px;letter-spacing:-.02em;color:var(--ink);line-height:1">{{ curAmount }}</div>
+                <div style="display:flex;gap:16px;margin-top:12px;font-size:13px;color:var(--ink-2)">
+                  <span>Fecha em <span style="color:var(--ink);font-weight:600">{{ curClose }}</span></span>
+                  <span>Vence em <span style="color:var(--ink);font-weight:600">{{ curDue }}</span></span>
+                </div>
+              </div>
+              <sc-if value="{{ curPayable }}" hint-placeholder-val="{{ true }}">
+                <button onClick="{{ openPay }}" style="height:50px;padding:0 26px;border:none;border-radius:999px;background:var(--primary);color:#fff;font-family:Inter,sans-serif;font-weight:600;font-size:15px;cursor:pointer;transition:background .18s,transform .15s;flex:none" style-hover="background:var(--primary-hover)" style-active="transform:scale(.98)">Pagar fatura</button>
+              </sc-if>
+              <sc-if value="{{ curPaid }}" hint-placeholder-val="{{ false }}">
+                <div style="display:inline-flex;align-items:center;gap:8px;height:50px;padding:0 22px;border-radius:999px;background:var(--pos-soft);color:var(--positive);font-family:Inter,sans-serif;font-weight:600;font-size:14.5px;flex:none"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>Paga em 04/07</div>
+              </sc-if>
+            </div>
+          </div>
+
+          <!-- transactions by day -->
+          <div style="display:flex;flex-direction:column;gap:18px;margin-top:18px">
+            <sc-for list="{{ dayGroups }}" as="g" hint-placeholder-count="2">
+              <div>
+                <div style="display:flex;align-items:baseline;justify-content:space-between;padding:0 4px 9px">
+                  <span style="font-family:Manrope,sans-serif;font-weight:700;font-size:13px;color:var(--ink)">{{ g.label }}</span>
+                  <span style="font-family:Manrope,sans-serif;font-variant-numeric:tabular-nums;font-size:13px;color:var(--ink-2)">{{ g.total }}</span>
+                </div>
+                <div style="background:var(--surface);border-radius:18px;box-shadow:var(--card-shadow);border:1px solid var(--card-border);overflow:hidden">
+                  <sc-for list="{{ g.rows }}" as="r" hint-placeholder-count="2">
+                    <div style="border-bottom:1px solid var(--line)">
+                      <div style="display:flex;align-items:center;gap:13px;padding:14px 16px">
+                        <span style="width:38px;height:38px;border-radius:50%;background:{{ r.soft }};display:flex;align-items:center;justify-content:center;color:{{ r.color }};flex:none">{{ r.icon }}</span>
+                        <div style="flex:1;min-width:0">
+                          <div style="display:flex;align-items:center;gap:8px">
+                            <span style="font-size:15px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.name }}</span>
+                            <sc-if value="{{ r.hasInst }}" hint-placeholder-val="{{ false }}"><button onClick="{{ r.onToggle }}" style="display:inline-flex;align-items:center;gap:5px;border:none;background:var(--surface-2);border-radius:6px;padding:2px 7px;cursor:pointer;flex:none" style-hover="background:var(--line)"><span style="font-family:Manrope,sans-serif;font-weight:600;font-size:11px;color:var(--ink-2)">{{ r.instLabel }}</span><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--ink-2)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="transform:{{ r.chev }};transition:transform .18s"><path d="m6 9 6 6 6-6"></path></svg></button></sc-if>
+                          </div>
+                          <div style="font-size:12px;color:var(--ink-2);margin-top:3px">{{ r.cat }}</div>
+                        </div>
+                        <span style="font-family:Manrope,sans-serif;font-weight:600;font-variant-numeric:tabular-nums;font-size:15px;color:var(--ink);flex:none;white-space:nowrap">{{ r.amount }}</span>
+                      </div>
+                      <sc-if value="{{ r.open }}" hint-placeholder-val="{{ false }}">
+                        <div style="padding:0 16px 14px 67px;animation:cf-band .2s ease-out">
+                          <div style="border-left:2px solid var(--line);padding-left:14px;display:flex;flex-direction:column;gap:9px">
+                            <sc-for list="{{ r.schedule }}" as="s" hint-placeholder-count="6">
+                              <div style="display:flex;align-items:center;justify-content:space-between">
+                                <span style="display:inline-flex;align-items:center;gap:9px;font-size:12.5px;color:{{ s.color }}"><span style="font-family:Manrope,sans-serif;font-weight:700;font-size:11px;width:26px">{{ s.n }}</span>{{ s.month }}<sc-if value="{{ s.isCurrent }}" hint-placeholder-val="{{ false }}"><span style="font-size:10px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;color:var(--primary);background:var(--primary-soft);border-radius:5px;padding:1px 6px">esta fatura</span></sc-if></span>
+                                <span style="font-family:Manrope,sans-serif;font-weight:600;font-variant-numeric:tabular-nums;font-size:12.5px;color:{{ s.color }}">{{ s.amount }}</span>
+                              </div>
+                            </sc-for>
+                          </div>
+                        </div>
+                      </sc-if>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+        </sc-if>
+
+        <!-- ===== TAB: FUTURE INSTALLMENTS ===== -->
+        <sc-if value="{{ tabFuture }}" hint-placeholder-val="{{ false }}">
+        <div style="margin-top:16px;animation:cf-fade .2s ease-out">
+          <div style="background:var(--surface);border-radius:20px;box-shadow:var(--card-shadow);border:1px solid var(--card-border);padding:22px 24px">
+            <h3 style="margin:0;font-family:Manrope,sans-serif;font-weight:700;font-size:16px;color:var(--ink)">Comprometido nos próximos 12 meses</h3>
+            <p style="margin:6px 0 0;font-size:13px;line-height:1.45;color:var(--ink-2);max-width:52ch">Quanto de cada mês já está tomado por parcelas antes de o mês começar. Barras cheias são meses mais pesados.</p>
+            <div class="cf-scroll" style="overflow-x:auto;margin-top:22px">
+              <div style="display:flex;align-items:flex-end;gap:10px;height:180px;min-width:540px">
+                <sc-for list="{{ futureBars }}" as="b" hint-placeholder-count="12">
+                  <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:8px;height:100%;justify-content:flex-end">
+                    <span style="font-family:Manrope,sans-serif;font-variant-numeric:tabular-nums;font-size:10.5px;font-weight:600;color:{{ b.labelColor }}">{{ b.value }}</span>
+                    <div style="width:100%;max-width:34px;height:{{ b.h }}px;border-radius:8px 8px 0 0;background:{{ b.fill }};transform-origin:bottom;animation:cf-grow .5s cubic-bezier(.22,1,.36,1) both;animation-delay:{{ b.delay }}"></div>
+                    <span style="font-size:11px;color:var(--ink-2)">{{ b.month }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+            <div style="display:flex;gap:16px;margin-top:16px;padding-top:16px;border-top:1px solid var(--line);flex-wrap:wrap;font-size:12.5px;color:var(--ink-2)">
+              <span style="display:inline-flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:3px;background:var(--warn)"></span>mês pesado (acima de R$ 1.000)</span>
+              <span style="display:inline-flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:3px;background:var(--primary)"></span>parcelas comprometidas</span>
+            </div>
+          </div>
+        </div>
+        </sc-if>
+      </div>
+      </sc-if>
+
+      <!-- ===================== FORM (new/edit) ===================== -->
+      <sc-if value="{{ isForm }}" hint-placeholder-val="{{ false }}">
+      <div style="animation:cf-fade .2s ease-out;max-width:520px;margin:0 auto">
+        <button onClick="{{ goBackFromForm }}" style="display:inline-flex;align-items:center;gap:7px;height:36px;padding:0 6px;border:none;background:transparent;color:var(--ink-2);font-family:Inter,sans-serif;font-weight:600;font-size:13.5px;cursor:pointer;margin-bottom:4px" style-hover="color:var(--ink)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"></path></svg>Voltar</button>
+        <h1 style="margin:0 0 4px;font-family:Manrope,sans-serif;font-weight:700;font-size:24px;letter-spacing:-.015em;color:var(--ink)">{{ formTitle }}</h1>
+
+        <!-- live preview card -->
+        <div style="border-radius:16px;background:{{ formGrad }};padding:20px 22px;color:#fff;box-shadow:0 10px 26px rgba(26,21,35,.18);margin-top:16px;position:relative;overflow:hidden">
+          <span style="position:absolute;right:-30px;top:-40px;width:140px;height:140px;border-radius:50%;background:rgba(255,255,255,.08)"></span>
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;position:relative">
+            <div><div style="font-family:Manrope,sans-serif;font-weight:700;font-size:16px">{{ formNick }}</div><div style="font-family:'JetBrains Mono',monospace;font-size:13px;color:rgba(255,255,255,.82);margin-top:5px">···· {{ formLast4 }}</div></div>
+            <span style="font-family:Manrope,sans-serif;font-weight:800;font-size:13px;color:rgba(255,255,255,.9)">{{ formBrand }}</span>
+          </div>
+        </div>
+
+        <div style="background:var(--surface);border-radius:20px;box-shadow:var(--card-shadow);border:1px solid var(--card-border);padding:22px 24px;margin-top:16px;display:flex;flex-direction:column;gap:16px">
+          <div>
+            <label style="display:block;font-size:13px;font-weight:500;color:var(--ink-2);margin-bottom:7px">Apelido</label>
+            <input value="{{ formNick }}" onInput="{{ onNick }}" style="width:100%;height:48px;padding:0 15px;border-radius:14px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-family:Inter,sans-serif;font-size:15px;outline:none;transition:border-color .15s" style-focus="border-color:var(--primary);box-shadow:var(--ring)">
+          </div>
+          <div style="display:flex;gap:12px">
+            <div style="flex:1.4"><label style="display:block;font-size:13px;font-weight:500;color:var(--ink-2);margin-bottom:7px">Bandeira</label>
+              <div style="display:flex;align-items:center;justify-content:space-between;height:48px;padding:0 15px;border-radius:14px;border:1px solid var(--line);color:var(--ink);font-size:15px">{{ formBrand }}<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg></div>
+            </div>
+            <div style="flex:1"><label style="display:block;font-size:13px;font-weight:500;color:var(--ink-2);margin-bottom:7px">Últimos 4</label>
+              <input value="{{ formLast4 }}" onInput="{{ onLast4 }}" inputmode="numeric" maxlength="4" style="width:100%;height:48px;padding:0 15px;border-radius:14px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-family:'JetBrains Mono',monospace;font-size:15px;outline:none;transition:border-color .15s" style-focus="border-color:var(--primary);box-shadow:var(--ring)">
+            </div>
+          </div>
+          <div>
+            <label style="display:block;font-size:13px;font-weight:500;color:var(--ink-2);margin-bottom:7px">Limite</label>
+            <div style="display:flex;align-items:center;gap:8px;height:48px;padding:0 15px;border-radius:14px;border:1px solid var(--line)"><span style="font-family:Manrope,sans-serif;font-weight:600;color:var(--ink-2)">R$</span><span style="font-family:Manrope,sans-serif;font-weight:700;font-variant-numeric:tabular-nums;font-size:15px;color:var(--ink)">8.000,00</span></div>
+          </div>
+          <div style="display:flex;gap:12px">
+            <div style="flex:1">
+              <label style="display:block;font-size:13px;font-weight:500;color:var(--ink-2);margin-bottom:7px">Dia de fechamento</label>
+              <div style="display:flex;align-items:center;gap:8px">
+                <button onClick="{{ closeMinus }}" style="width:44px;height:48px;border-radius:12px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-family:Manrope,sans-serif;font-size:18px;cursor:pointer;flex:none" style-hover="background:var(--surface-2)">−</button>
+                <div style="flex:1;height:48px;display:flex;align-items:center;justify-content:center;border-radius:12px;background:var(--surface-2);font-family:Manrope,sans-serif;font-weight:700;font-variant-numeric:tabular-nums;font-size:18px;color:var(--ink)">{{ closeDay }}</div>
+                <button onClick="{{ closePlus }}" style="width:44px;height:48px;border-radius:12px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-family:Manrope,sans-serif;font-size:18px;cursor:pointer;flex:none" style-hover="background:var(--surface-2)">+</button>
+              </div>
+            </div>
+            <div style="flex:1">
+              <label style="display:block;font-size:13px;font-weight:500;color:var(--ink-2);margin-bottom:7px">Dia de vencimento</label>
+              <div style="display:flex;align-items:center;gap:8px">
+                <button onClick="{{ dueMinus }}" style="width:44px;height:48px;border-radius:12px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-family:Manrope,sans-serif;font-size:18px;cursor:pointer;flex:none" style-hover="background:var(--surface-2)">−</button>
+                <div style="flex:1;height:48px;display:flex;align-items:center;justify-content:center;border-radius:12px;background:var(--surface-2);font-family:Manrope,sans-serif;font-weight:700;font-variant-numeric:tabular-nums;font-size:18px;color:var(--ink)">{{ dueDay }}</div>
+                <button onClick="{{ duePlus }}" style="width:44px;height:48px;border-radius:12px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-family:Manrope,sans-serif;font-size:18px;cursor:pointer;flex:none" style-hover="background:var(--surface-2)">+</button>
+              </div>
+            </div>
+          </div>
+          <!-- dynamic closing example (the trust detail) -->
+          <div style="display:flex;align-items:flex-start;gap:10px;padding:14px 16px;border-radius:14px;background:var(--primary-soft)">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round" style="flex:none;margin-top:1px"><circle cx="12" cy="12" r="10"></circle><path d="M12 8v5M12 16h.01"></path></svg>
+            <span style="font-size:13.5px;line-height:1.45;color:var(--ink)">{{ formExample }}</span>
+          </div>
+          <div>
+            <label style="display:block;font-size:13px;font-weight:500;color:var(--ink-2);margin-bottom:7px">Conta padrão de pagamento</label>
+            <div style="display:flex;align-items:center;gap:11px;height:50px;padding:0 15px;border-radius:14px;border:1px solid var(--line)"><span style="width:28px;height:28px;border-radius:8px;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-family:Manrope,sans-serif;font-weight:700;font-size:12px">N</span><span style="flex:1;font-size:15px;color:var(--ink)">Nubank · Conta</span><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg></div>
+          </div>
+          <div>
+            <label style="display:block;font-size:13px;font-weight:500;color:var(--ink-2);margin-bottom:9px">Cor</label>
+            <div style="display:flex;gap:10px;flex-wrap:wrap">
+              <sc-for list="{{ colorOptions }}" as="c" hint-placeholder-count="6">
+                <button onClick="{{ c.onClick }}" style="width:40px;height:40px;border-radius:12px;background:{{ c.color }};border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:{{ c.ring }};transition:box-shadow .15s">
+                  <sc-if value="{{ c.selected }}" hint-placeholder-val="{{ false }}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg></sc-if>
+                </button>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+        <div style="display:flex;gap:10px;margin-top:18px">
+          <button onClick="{{ goBackFromForm }}" style="height:52px;padding:0 22px;border:1px solid var(--line);border-radius:999px;background:transparent;color:var(--ink);font-family:Inter,sans-serif;font-weight:600;font-size:15px;cursor:pointer" style-hover="background:var(--surface-2)">Cancelar</button>
+          <button onClick="{{ saveCard }}" style="flex:1;height:52px;border:none;border-radius:999px;background:var(--primary);color:#fff;font-family:Inter,sans-serif;font-weight:600;font-size:16px;cursor:pointer;transition:background .18s,transform .15s" style-hover="background:var(--primary-hover)" style-active="transform:scale(.99)">{{ formSave }}</button>
+        </div>
+      </div>
+      </sc-if>
+
+      <div style="height:40px"></div>
+    </div>
+  </div>
+
+  <!-- ===== PAY MODAL ===== -->
+  <sc-if value="{{ payOpen }}" hint-placeholder-val="{{ false }}">
+  <div style="position:fixed;inset:0;z-index:80;display:flex;justify-content:center;{{ payAlign }};background:var(--scrim);animation:cf-scrim .18s ease-out" onClick="{{ closePay }}">
+    <div onClick="{{ stop }}" style="{{ payPanel }}">
+      <sc-if value="{{ isMobile }}" hint-placeholder-val="{{ false }}"><div style="display:flex;justify-content:center;padding:10px 0 2px"><span style="width:38px;height:5px;border-radius:99px;background:var(--line)"></span></div></sc-if>
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 22px 6px">
+        <h2 style="margin:0;font-family:Manrope,sans-serif;font-weight:700;font-size:19px;color:var(--ink)">Pagar fatura</h2>
+        <button onClick="{{ closePay }}" style="width:34px;height:34px;border:none;border-radius:10px;background:var(--surface-2);color:var(--ink-2);display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="color:var(--ink)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"></path></svg></button>
+      </div>
+      <div style="padding:6px 22px 0">
+        <div style="text-align:center;padding:8px 0 4px">
+          <div style="font-size:13px;color:var(--ink-2)">{{ payInvoiceLabel }}</div>
+          <div style="font-family:Manrope,sans-serif;font-weight:700;font-variant-numeric:tabular-nums;font-size:34px;letter-spacing:-.02em;color:var(--ink);margin-top:4px">{{ payAmountStr }}</div>
+        </div>
+        <!-- transfer, not new expense -->
+        <div style="display:flex;align-items:center;gap:9px;margin-top:14px;padding:11px 14px;border-radius:12px;background:var(--surface-2);font-size:12.5px;line-height:1.4;color:var(--ink-2)">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--ink-2)" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M7 4 3 8l4 4M3 8h14M17 20l4-4-4-4M21 16H7"></path></svg>
+          <span>Isto é uma <b style="color:var(--ink)">transferência</b> da sua conta pro cartão — não uma despesa nova. Os gastos já foram contados quando lançados.</span>
+        </div>
+        <div style="font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-2);margin:20px 0 9px">Pagar de</div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <sc-for list="{{ payAccounts }}" as="a" hint-placeholder-count="2">
+            <button onClick="{{ a.onClick }}" style="display:flex;align-items:center;gap:12px;padding:13px 14px;border-radius:14px;border:1.5px solid {{ a.border }};background:{{ a.bg }};cursor:pointer;text-align:left;transition:all .15s">
+              <span style="width:34px;height:34px;border-radius:9px;background:{{ a.color }};color:#fff;display:flex;align-items:center;justify-content:center;font-family:Manrope,sans-serif;font-weight:700;font-size:13px;flex:none">{{ a.initial }}</span>
+              <div style="flex:1"><div style="font-family:Manrope,sans-serif;font-weight:600;font-size:14.5px;color:var(--ink)">{{ a.name }}</div><div style="font-size:12px;color:var(--ink-2)">saldo {{ a.balance }}</div></div>
+              <sc-if value="{{ a.selected }}" hint-placeholder-val="{{ true }}"><span style="width:22px;height:22px;border-radius:50%;background:var(--primary);display:flex;align-items:center;justify-content:center;flex:none"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg></span></sc-if>
+            </button>
+          </sc-for>
+        </div>
+        <div style="font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-2);margin:20px 0 9px">Valor</div>
+        <div style="display:flex;gap:8px">
+          <button onClick="{{ payTotal }}" style="flex:1;height:46px;border-radius:12px;border:1.5px solid {{ totalBorder }};background:{{ totalBg }};color:{{ totalColor }};font-family:Inter,sans-serif;font-weight:600;font-size:14px;cursor:pointer;transition:all .15s">Total · {{ payTotalStr }}</button>
+          <button onClick="{{ payPartial }}" style="flex:1;height:46px;border-radius:12px;border:1.5px solid {{ partialBorder }};background:{{ partialBg }};color:{{ partialColor }};font-family:Inter,sans-serif;font-weight:600;font-size:14px;cursor:pointer;transition:all .15s">Parcial</button>
+        </div>
+      </div>
+      <div style="position:sticky;bottom:0;background:var(--surface);padding:16px 22px calc(16px + env(safe-area-inset-bottom));margin-top:18px;border-top:1px solid var(--line)">
+        <button onClick="{{ confirmPay }}" style="width:100%;height:52px;border:none;border-radius:999px;background:var(--primary);color:#fff;font-family:Inter,sans-serif;font-weight:600;font-size:16px;cursor:pointer;transition:background .18s,transform .15s" style-hover="background:var(--primary-hover)" style-active="transform:scale(.99)">Transferir {{ payAmountStr }}</button>
+      </div>
+    </div>
+  </div>
+  </sc-if>
+
+  <!-- ===== toast ===== -->
+  <sc-if value="{{ toastOpen }}" hint-placeholder-val="{{ false }}">
+  <div style="position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:90;display:flex;align-items:center;gap:14px;padding:13px 14px 13px 18px;border-radius:14px;background:var(--ink);color:#fff;box-shadow:0 16px 40px rgba(26,21,35,.32);animation:cf-modal .22s ease-out;max-width:calc(100vw - 32px)">
+    <span style="width:26px;height:26px;border-radius:50%;background:var(--positive);display:flex;align-items:center;justify-content:center;flex:none"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg></span>
+    <span style="font-size:14px;font-weight:500;white-space:nowrap">{{ toastMsg }}</span>
+    <button onClick="{{ dismissToast }}" style="height:34px;padding:0 14px;border:none;border-radius:999px;background:rgba(255,255,255,.14);color:#fff;font-family:Inter,sans-serif;font-weight:600;font-size:13.5px;cursor:pointer;flex:none" style-hover="background:rgba(255,255,255,.24)">Desfazer</button>
+  </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{
+  &quot;defaultView&quot;: { &quot;editor&quot;: &quot;enum&quot;, &quot;options&quot;: [&quot;Lista&quot;, &quot;Detalhe&quot;, &quot;Novo cartão&quot;], &quot;default&quot;: &quot;Lista&quot;, &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Protótipo&quot; },
+  &quot;device&quot;: { &quot;editor&quot;: &quot;enum&quot;, &quot;options&quot;: [&quot;Desktop&quot;, &quot;Mobile&quot;], &quot;default&quot;: &quot;Desktop&quot;, &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Protótipo&quot; },
+  &quot;theme&quot;: { &quot;editor&quot;: &quot;enum&quot;, &quot;options&quot;: [&quot;Claro&quot;, &quot;Escuro&quot;], &quot;default&quot;: &quot;Claro&quot;, &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Aparência&quot; }
+}">
+class Component extends DCLogic {
+  constructor(props){
+    super(props);
+    this.monthsFull = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+    this.monthsShort = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+    this.state = {
+      theme: props.theme === 'Escuro' ? 'dark' : 'light',
+      device: props.device === 'Mobile' ? 'mobile' : 'desktop',
+      view: this.mapView(props.defaultView) || 'list',
+      tab: 'invoice',
+      invoiceIdx: 2,        // 0=Jun paga, 1=Jul fechada, 2=Ago aberta
+      openInst: null,       // transaction id with schedule open
+      payOpen: false, payMode: 'total',
+      payAccount: 'nubank',
+      closeDay: 28, dueDay: 5,
+      formNick: 'Nubank Roxinho', formLast4: '3921', formColor: '#820AD1',
+      toastOpen: false, toastMsg: ''
+    };
+    this._toastT = null;
+  }
+  mapView(v){ return ({ 'Lista':'list','Detalhe':'detail','Novo cartão':'form' })[v]; }
+  componentDidUpdate(prev){
+    prev = prev || {};
+    if(prev.theme !== this.props.theme) this.setState({ theme: this.props.theme === 'Escuro' ? 'dark' : 'light' });
+    if(prev.device !== this.props.device) this.setState({ device: this.props.device === 'Mobile' ? 'mobile' : 'desktop' });
+    if(prev.defaultView !== this.props.defaultView){ const v = this.mapView(this.props.defaultView); if(v) this.setState({ view: v }); }
+  }
+  componentWillUnmount(){ if(this._toastT) clearTimeout(this._toastT); }
+  fireToast(msg){ if(this._toastT) clearTimeout(this._toastT); this.setState({ toastOpen:true, toastMsg:msg }); this._toastT = setTimeout(() => this.setState({ toastOpen:false }), 4200); }
+  brl(n){ return 'R$ ' + Number(n).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+  brl0(n){ return 'R$ ' + Number(n).toLocaleString('pt-BR', { maximumFractionDigits: 0 }); }
+  icon(name){
+    const m = {
+      food:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M4 3v7a3 3 0 0 0 6 0V3M7 3v18M21 3c-2 0-3 2-3 6s1 4 1 6-1 6-1 6"></path></svg>',
+      chip:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="6" width="12" height="12" rx="2"></rect><path d="M9 2v3M15 2v3M9 19v3M15 19v3M2 9h3M2 15h3M19 9h3M19 15h3"></path></svg>',
+      cart:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="20" r="1"></circle><circle cx="18" cy="20" r="1"></circle><path d="M2 3h3l2.5 13h11L21 7H6.5"></path></svg>',
+      play:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="3"></rect><path d="m10 9 5 3-5 3Z"></path></svg>',
+      shirt:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7 8 4l4 3 4-3 4 3-2 3-2-1v9H8v-9L6 10Z"></path></svg>'
+    };
+    return React.createElement('span', { style:{display:'inline-flex'}, dangerouslySetInnerHTML:{ __html: m[name] } });
+  }
+  // closing logic: purchase day d (this month) → which invoice month
+  invoiceForPurchase(d){
+    // if purchase strictly after closing day, it lands in the invoice that closes NEXT cycle → +2 months of due; else +1
+    const base = 6; // reference month = julho (index 6) for the example "29/07"
+    const afterClose = d > this.state.closeDay;
+    const invMonth = afterClose ? base + 2 : base + 1;
+    const im = ((invMonth % 12) + 12) % 12;
+    const dueMonthIdx = im; // fatura de X vence em X
+    return { invName: this.monthsFull[im], dueMonthShort: this.monthsShort[dueMonthIdx] };
+  }
+  renderVals(){
+    const st = this.state, isD = st.device === 'desktop';
+    const view = st.view;
+    const navChips = [['list','Lista'],['detail','Detalhe'],['form','Cadastro']].map(([v,label]) => ({
+      label, onClick: () => this.setState({ view: v }),
+      bg: (view===v || (v==='form'&&view==='form')) ? 'var(--primary)' : 'transparent',
+      color: (view===v) ? '#fff' : 'var(--ink-2)'
+    }));
+    // list cards
+    const cards = [
+      { nick:'Nubank Roxinho', last4:'3921', brand:'VISA', grad:'linear-gradient(135deg,#820AD1,#5B08A0)', shadow:'rgba(130,10,209,.3)', invoice:this.brl(3210.45), avail:this.brl(2944.65), onOpen:()=>this.setState({view:'detail',tab:'invoice',invoiceIdx:2}) },
+      { nick:'Inter Gold', last4:'7788', brand:'MASTERCARD', grad:'linear-gradient(135deg,#FF7A00,#C95E00)', shadow:'rgba(255,122,0,.28)', invoice:this.brl(1204.00), avail:this.brl(3796.00), onOpen:()=>this.setState({view:'detail',tab:'invoice',invoiceIdx:2}) },
+      { nick:'C6 Carbon', last4:'1043', brand:'MASTERCARD', grad:'linear-gradient(135deg,#2B2B2B,#0E0E0E)', shadow:'rgba(20,20,20,.34)', invoice:this.brl(640.90), avail:this.brl(11359.10), onOpen:()=>this.setState({view:'detail',tab:'invoice',invoiceIdx:2}) }
+    ];
+    // invoice tabs
+    const invoiceDefs = [
+      { month:'Jun', state:'Paga', dot:'var(--positive)', amount:this.brl(2870.10), st:'paid' },
+      { month:'Jul', state:'Fechada · aguardando', dot:'var(--warn)', amount:this.brl(3980.20), st:'closed' },
+      { month:'Ago', state:'Aberta', dot:'var(--primary)', amount:this.brl(3210.45), st:'open' }
+    ];
+    const invoiceTabs = invoiceDefs.map((iv, i) => {
+      const on = st.invoiceIdx === i;
+      return { month:iv.month, state:iv.state, dot:iv.dot, amount:iv.amount, onClick:()=>this.setState({invoiceIdx:i}),
+        bg: on ? 'color-mix(in oklab,'+iv.dot+', transparent 90%)' : 'var(--surface)', border: on ? iv.dot : 'var(--line)' };
+    });
+    const cur = invoiceDefs[st.invoiceIdx];
+    const stateMap = {
+      paid:{ label:'Paga', color:'var(--positive)', bg:'var(--pos-soft)', close:'28/06', due:'05/07' },
+      closed:{ label:'Fechada · aguardando pagamento', color:'var(--warn)', bg:'var(--warn-soft)', close:'28/07', due:'05/08' },
+      open:{ label:'Aberta · fecha em breve', color:'var(--primary)', bg:'var(--primary-soft)', close:'28/08', due:'05/09' }
+    };
+    const cs = stateMap[cur.st];
+    // transactions (for open invoice)
+    const mk = (name, cat, icon, color, soft, amount, inst) => ({
+      name, cat, icon:this.icon(icon), color, soft, amount,
+      hasInst: !!inst, instLabel: inst ? inst.label : '', open: inst ? (st.openInst === inst.id) : false,
+      onToggle: inst ? (()=>this.setState(s=>({openInst: s.openInst===inst.id?null:inst.id}))) : null,
+      chev: (inst && st.openInst===inst.id) ? 'rotate(180deg)':'rotate(0deg)',
+      schedule: inst ? inst.schedule : []
+    });
+    const notebookSchedule = [1,2,3,4,5,6].map(n => {
+      const isCur = n === 3;
+      return { n: n+'/6', month: this.monthsFull[(5+n)%12]+'/'+(n<=7?'26':'27'), amount:this.brl(416.58),
+        color: isCur ? 'var(--ink)' : 'var(--ink-2)', isCurrent: isCur };
+    });
+    const iphoneSchedule = [1,2,3,4,5,6,7,8,9,10,11,12].map(n => {
+      const isCur = n === 5;
+      return { n: n+'/12', month: this.monthsFull[(2+n)%12]+'/'+(n<=9?'26':'27'), amount:this.brl(708.32),
+        color: isCur ? 'var(--ink)' : 'var(--ink-2)', isCurrent: isCur };
+    });
+    const dayGroups = [
+      { label:'Sáb, 09 ago', total:'− R$ 1.174,80', rows:[
+        mk('iFood','Delivery','food','#EC4899','rgba(236,72,153,.12)','− R$ 48,90', null),
+        mk('Notebook Dell','Eletrônicos','chip','#0EA5E9','rgba(14,165,233,.14)','− R$ 416,58', { id:'nb', label:'3/6', schedule:notebookSchedule }),
+        mk('iPhone 16','Eletrônicos','chip','#0EA5E9','rgba(14,165,233,.14)','− R$ 708,32', { id:'ip', label:'5/12', schedule:iphoneSchedule })
+      ]},
+      { label:'Qui, 07 ago', total:'− R$ 235,80', rows:[
+        mk('Zara','Vestuário','shirt','#8B5CF6','rgba(139,92,246,.14)','− R$ 213,90', null),
+        mk('Spotify','Assinaturas','play','#8B5CF6','rgba(139,92,246,.14)','− R$ 21,90', null)
+      ]}
+    ];
+    // future installments bars (next 12 months)
+    const rawFuture = [1844,1420,980,1130,640,410,708,708,300,0,0,0];
+    const maxF = Math.max.apply(null, rawFuture) || 1;
+    const startM = 7; // agosto
+    const futureBars = rawFuture.map((v, i) => {
+      const heavy = v > 1000;
+      const h = v === 0 ? 3 : Math.round((v / maxF) * 150);
+      return { value: v === 0 ? '—' : this.brl0(v), month: this.monthsShort[(startM+i)%12],
+        h, fill: v === 0 ? 'var(--track)' : (heavy ? 'var(--warn)' : 'var(--primary)'),
+        labelColor: heavy ? 'var(--warn)' : 'var(--ink-2)', delay: (i*45)+'ms' };
+    });
+    // form
+    const colors = ['#820AD1','#0F9B8E','#0EA5E9','#EC4899','#F5A524','#242424'];
+    const colorOptions = colors.map(c => ({ color:c, selected: st.formColor===c, onClick:()=>this.setState({formColor:c}),
+      ring: st.formColor===c ? '0 0 0 3px var(--surface),0 0 0 5px '+c : 'inset 0 0 0 1px rgba(0,0,0,.08)' }));
+    const ex = this.invoiceForPurchase(29);
+    const formExample = 'Compra em 29/'+String(this.monthsShort.indexOf('jul')+1).padStart(2,'0').replace('07','07')+' cai na fatura de '+ex.invName+', que vence em 05/'+String((this.monthsShort.indexOf(ex.dueMonthShort)+1)).padStart(2,'0')+'.';
+    // pay accounts
+    const payAccounts = [
+      { key:'nubank', initial:'N', name:'Nubank · Conta', color:'#820AD1', balance:this.brl(12480.90) },
+      { key:'inter', initial:'I', name:'Inter · Conta', color:'#FF7A00', balance:this.brl(3210.00) }
+    ].map(a => ({ ...a, onClick:()=>this.setState({payAccount:a.key}), selected: st.payAccount===a.key,
+      bg: st.payAccount===a.key ? 'var(--primary-soft)' : 'var(--surface)', border: st.payAccount===a.key ? 'var(--primary)' : 'var(--line)' }));
+    const payTotalVal = parseFloat(cur.amount.replace(/[^\d,]/g,'').replace('.','').replace(',','.')) || 3980.20;
+    const payInvoiceLabel = 'Fatura de ' + ({ 'Jun':'junho','Jul':'julho','Ago':'agosto' }[cur.month] || cur.month.toLowerCase());
+    const tglTab = (on) => ({ bg: on?'var(--surface)':'transparent', color: on?'var(--ink)':'var(--ink-2)', shadow: on?'0 1px 3px rgba(26,21,35,.12)':'none' });
+    const ti = tglTab(st.tab==='invoice'), tf = tglTab(st.tab==='future');
+    return {
+      theme: st.theme, themeIsDark: st.theme==='dark', themeIsLight: st.theme!=='dark',
+      isDesktop:isD, isMobile:!isD,
+      stagePad: isD?'0':'16px 14px 40px',
+      stageStyle: isD ? 'width:100%;max-width:'+((view==='detail')?'820px':'560px')+';padding:22px 24px 0'
+        : 'width:412px;max-width:100%;background:var(--surface);border:1px solid var(--line);border-radius:32px;box-shadow:0 24px 60px rgba(26,21,35,.12);padding:16px 15px 0',
+      detailTopCols: isD ? '1.05fr 1fr' : '1fr',
+      deskBg:isD?'var(--surface)':'transparent', deskColor:isD?'var(--ink)':'var(--ink-2)',
+      mobBg:!isD?'var(--surface)':'transparent', mobColor:!isD?'var(--ink)':'var(--ink-2)',
+      setDesktop:()=>this.setState({device:'desktop'}), setMobile:()=>this.setState({device:'mobile'}),
+      toggleTheme:()=>this.setState(s=>({theme:s.theme==='dark'?'light':'dark'})),
+      navChips,
+      isList: view==='list', isDetail: view==='detail', isForm: view==='form',
+      goList:()=>this.setState({view:'list'}), goNew:()=>this.setState({view:'form',formNick:'Novo cartão',formLast4:'0000',formColor:'#0F9B8E'}),
+      goEdit:()=>this.setState({view:'form',formNick:'Nubank Roxinho',formLast4:'3921',formColor:'#820AD1'}),
+      goBackFromForm:()=>this.setState({view: 'detail'}),
+      cards,
+      // tabs
+      setTabInvoice:()=>this.setState({tab:'invoice'}), setTabFuture:()=>this.setState({tab:'future'}),
+      tabInvoice: st.tab==='invoice', tabFuture: st.tab==='future',
+      tabInvBg:ti.bg, tabInvColor:ti.color, tabInvShadow:ti.shadow,
+      tabFutBg:tf.bg, tabFutColor:tf.color, tabFutShadow:tf.shadow,
+      // invoice nav
+      invoiceTabs,
+      prevInvoice:()=>this.setState(s=>({invoiceIdx:Math.max(0,s.invoiceIdx-1)})),
+      nextInvoice:()=>this.setState(s=>({invoiceIdx:Math.min(2,s.invoiceIdx+1)})),
+      curStateLabel:cs.label, curStateColor:cs.color, curStateBg:cs.bg,
+      curAmount:cur.amount, curClose:cs.close, curDue:cs.due,
+      curPayable: cur.st!=='paid', curPaid: cur.st==='paid',
+      dayGroups,
+      // future
+      futureBars,
+      // form
+      formTitle: st.formNick==='Novo cartão' ? 'Novo cartão' : 'Editar cartão',
+      formSave: st.formNick==='Novo cartão' ? 'Adicionar cartão' : 'Salvar cartão',
+      formNick: st.formNick, formLast4: st.formLast4, formBrand:'VISA',
+      formGrad: 'linear-gradient(135deg,'+st.formColor+', color-mix(in oklab,'+st.formColor+',#000 26%))',
+      onNick:(e)=>this.setState({formNick:e.target.value}), onLast4:(e)=>this.setState({formLast4:e.target.value.replace(/\D/g,'').slice(0,4)}),
+      closeDay: st.closeDay, dueDay: st.dueDay,
+      closeMinus:()=>this.setState(s=>({closeDay:s.closeDay>1?s.closeDay-1:28})), closePlus:()=>this.setState(s=>({closeDay:s.closeDay<28?s.closeDay+1:1})),
+      dueMinus:()=>this.setState(s=>({dueDay:s.dueDay>1?s.dueDay-1:28})), duePlus:()=>this.setState(s=>({dueDay:s.dueDay<28?s.dueDay+1:1})),
+      formExample,
+      colorOptions,
+      saveCard:()=>{ this.setState({view:'detail'}); this.fireToast('Cartão salvo'); },
+      // pay modal
+      payOpen: st.payOpen,
+      openPay:()=>this.setState({payOpen:true, payMode:'total'}), closePay:()=>this.setState({payOpen:false}), stop:(e)=>e.stopPropagation(),
+      payAlign: isD?'align-items:center':'align-items:flex-end',
+      payPanel: (isD ? 'width:440px;max-width:calc(100vw - 32px);max-height:calc(100dvh - 48px);border-radius:24px;animation:cf-modal .2s ease-out;'
+        : 'width:100%;max-width:520px;max-height:94dvh;border-radius:26px 26px 0 0;animation:cf-modal .24s ease-out;')
+        + 'background:var(--surface);border:1px solid var(--card-border);box-shadow:0 24px 70px rgba(26,21,35,.32);overflow-y:auto;display:flex;flex-direction:column;position:relative',
+      payAccounts,
+      payInvoiceLabel,
+      payAmountStr: st.payMode==='total' ? this.brl(payTotalVal) : this.brl(Math.round(payTotalVal*0.5)),
+      payTotalStr: this.brl0(payTotalVal),
+      payTotal:()=>this.setState({payMode:'total'}), payPartial:()=>this.setState({payMode:'partial'}),
+      totalBg: st.payMode==='total'?'var(--primary-soft)':'var(--surface)', totalColor: st.payMode==='total'?'var(--primary)':'var(--ink)', totalBorder: st.payMode==='total'?'var(--primary)':'var(--line)',
+      partialBg: st.payMode==='partial'?'var(--primary-soft)':'var(--surface)', partialColor: st.payMode==='partial'?'var(--primary)':'var(--ink)', partialBorder: st.payMode==='partial'?'var(--primary)':'var(--line)',
+      confirmPay:()=>{ this.setState({payOpen:false}); this.fireToast('Transferência de pagamento registrada'); },
+      // toast
+      toastOpen: st.toastOpen, toastMsg: st.toastMsg, dismissToast:()=>this.setState({toastOpen:false})
+    };
+  }
+}
+</script>
+</body>
+</html>

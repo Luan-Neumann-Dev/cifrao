@@ -1,0 +1,56 @@
+/*
+ * Tokens do design system do CLAUDE.md (Seção 4). Na Fase 0 ficam como CSS
+ * variables puras; quando o Tailwind v4 entrar, migram para o @theme.
+ */
+:root {
+  --primary: #820ad1;
+  --primary-hover: #6b08ad;
+  --primary-soft: #f3e8ff;
+  --bg: #fafafc;
+  --surface: #ffffff;
+  --surface-2: #f3f1f7;
+  --line: #e8e4ef;
+  --ink: #1a1523;
+  --ink-2: #6b6577;
+  --positive: #00a868;
+  --negative: #e5484d;
+  --card-shadow: 0 1px 3px rgba(26, 21, 35, 0.06);
+}
+
+:root[data-theme='dark'] {
+  --primary: #a855f7;
+  --primary-hover: #9333ea;
+  --primary-soft: #2a1140;
+  --bg: #0e0b12;
+  --surface: #171320;
+  --surface-2: #211b2e;
+  --line: #2e2740;
+  --ink: #f5f3f8;
+  --ink-2: #a79fb8;
+  --positive: #3dd68c;
+  --negative: #ff6369;
+  --card-shadow: none;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family:
+    Inter,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+}

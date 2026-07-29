@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Manrope:wght@500;600;700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{background:#FAFAFC}
+  :root{
+    --primary:#820AD1;--primary-hover:#6B08AD;--primary-soft:#F3E8FF;
+    --bg:#FAFAFC;--surface:#FFFFFF;--surface-2:#F3F1F7;--line:#E8E4EF;
+    --ink:#1A1523;--ink-2:#6B6577;
+    --positive:#00A868;--negative:#E5484D;--warn:#F5A524;--invest:#0F9B8E;
+    --invest-soft:rgba(15,155,142,.12);
+    --card-shadow:0 1px 3px rgba(26,21,35,.06);--card-border:transparent;
+    --ring:0 0 0 4px rgba(15,155,142,.22);--fab-shadow:0 12px 30px rgba(15,155,142,.32);
+    --track:#E8E4EF;--overlay:rgba(26,21,35,.04);--scrim:rgba(26,21,35,.32);
+  }
+  [data-theme="dark"]{
+    --primary:#A855F7;--primary-hover:#9333EA;--primary-soft:#2A1140;
+    --bg:#0E0B12;--surface:#171320;--surface-2:#211B2E;--line:#2E2740;
+    --ink:#F5F3F8;--ink-2:#A79FB8;
+    --positive:#3DD68C;--negative:#FF6369;--warn:#F7B955;--invest:#22C3B0;
+    --invest-soft:rgba(34,195,176,.15);
+    --card-shadow:none;--card-border:#2E2740;
+    --ring:0 0 0 4px rgba(34,195,176,.3);--fab-shadow:0 12px 32px rgba(34,195,176,.26);
+    --track:#2E2740;--overlay:rgba(255,255,255,.05);--scrim:rgba(0,0,0,.55);
+  }
+  a{color:var(--primary);text-decoration:none}
+  a:hover{color:var(--primary-hover)}
+  input::placeholder{color:var(--ink-2);opacity:.6}
+  .cf-scroll::-webkit-scrollbar{height:7px;width:7px}
+  .cf-scroll::-webkit-scrollbar-thumb{background:var(--line);border-radius:99px}
+  .cf-scroll::-webkit-scrollbar-track{background:transparent}
+  @keyframes cf-fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+  @keyframes cf-modal{from{opacity:0;transform:translateY(10px) scale(.98)}to{opacity:1;transform:translateY(0) scale(1)}}
+  @keyframes cf-scrim{from{opacity:0}to{opacity:1}}
+  @keyframes cf-draw{from{stroke-dashoffset:var(--len)}to{stroke-dashoffset:0}}
+  @media (prefers-reduced-motion: reduce){*{animation-duration:.001ms !important;transition-duration:.001ms !important}}
+</style>
+</helmet>
+
+<div data-theme="{{ theme }}" style="min-height:100dvh;background:var(--bg);color:var(--ink);font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased">
+
+  <!-- ===== reviewer toolbar ===== -->
+  <div style="height:57px;display:flex;align-items:center;gap:12px;padding:0 18px;border-bottom:1px solid var(--line);background:var(--surface);position:sticky;top:0;z-index:60;overflow-x:auto;white-space:nowrap">
+    <span style="display:inline-flex;align-items:center;gap:8px;flex:none;margin-right:2px">
+      <span style="width:26px;height:26px;border-radius:8px;background:var(--primary);display:flex;align-items:center;justify-content:center"><span style="font-family:Manrope,sans-serif;font-weight:800;font-size:15px;color:#fff">$</span></span>
+      <span style="font-family:Manrope,sans-serif;font-weight:700;font-size:13px;color:var(--ink)">Cifrão</span>
+      <span style="font-size:11px;color:var(--ink-2);letter-spacing:.06em;text-transform:uppercase">Investimentos</span>
+    </span>
+    <span style="width:1px;height:22px;background:var(--line);flex:none"></span>
+    <div style="display:flex;gap:6px;flex:none">
+      <button onClick="{{ openAportar }}" style="height:32px;padding:0 13px;border:1px solid var(--line);border-radius:999px;font-family:Inter,sans-serif;font-weight:600;font-size:12.5px;cursor:pointer;background:transparent;color:var(--invest)" style-hover="background:var(--invest-soft)">Aportar</button>
+      <button onClick="{{ openResgatar }}" style="height:32px;padding:0 13px;border:1px solid var(--line);border-radius:999px;font-family:Inter,sans-serif;font-weight:600;font-size:12.5px;cursor:pointer;background:transparent;color:var(--ink-2)" style-hover="background:var(--surface-2)">Resgatar</button>
+    </div>
+    <div style="margin-left:auto;display:flex;gap:8px;align-items:center;flex:none;padding-left:12px">
+      <div style="display:flex;background:var(--surface-2);border-radius:10px;padding:3px">
+        <button onClick="{{ setDesktop }}" style="height:26px;padding:0 12px;border:none;border-radius:8px;font-family:Inter,sans-serif;font-weight:600;font-size:12px;cursor:pointer;background:{{ deskBg }};color:{{ deskColor }}">Desktop</button>
+        <button onClick="{{ setMobile }}" style="height:26px;padding:0 12px;border:none;border-radius:8px;font-family:Inter,sans-serif;font-weight:600;font-size:12px;cursor:pointer;background:{{ mobBg }};color:{{ mobColor }}">Mobile</button>
+      </div>
+      <button onClick="{{ toggleTheme }}" title="Tema" style="width:34px;height:34px;border-radius:10px;background:var(--surface);border:1px solid var(--line);color:var(--ink);display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="background:var(--surface-2)">
+        <sc-if value="{{ themeIsDark }}" hint-placeholder-val="{{ false }}"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg></sc-if>
+        <sc-if value="{{ themeIsLight }}" hint-placeholder-val="{{ true }}"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6.4 6.4 0 0 0 9 9 9 9 0 1 1-9-9Z"></path></svg></sc-if>
+      </button>
+    </div>
+  </div>
+
+  <div style="display:flex;justify-content:center;padding:{{ stagePad }}">
+    <div style="{{ stageStyle }}">
+      <div style="animation:cf-fade .2s ease-out">
+
+      <!-- header -->
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:4px 2px 0">
+        <div style="display:flex;align-items:center;gap:9px">
+          <span style="width:9px;height:9px;border-radius:3px;background:var(--invest)"></span>
+          <h1 style="margin:0;font-family:Manrope,sans-serif;font-weight:700;font-size:24px;letter-spacing:-.015em;color:var(--ink)">Investimentos</h1>
+        </div>
+        <button onClick="{{ openAportar }}" style="height:44px;padding:0 20px 0 16px;border:none;border-radius:999px;background:var(--invest);color:#fff;font-family:Inter,sans-serif;font-weight:600;font-size:14px;cursor:pointer;display:inline-flex;align-items:center;gap:7px;flex:none;box-shadow:0 6px 16px var(--invest-soft);transition:filter .18s" style-hover="filter:brightness(.95)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"></path></svg>Aportar</button>
+      </div>
+
+      <!-- overview hero -->
+      <div style="display:grid;grid-template-columns:{{ heroCols }};gap:14px;margin-top:18px">
+        <div style="background:var(--surface);border-radius:20px;box-shadow:var(--card-shadow);border:1px solid var(--card-border);padding:24px 26px">
+          <div style="font-size:13px;color:var(--ink-2)">Patrimônio investido</div>
+          <div style="display:flex;align-items:baseline;margin-top:6px;font-family:Manrope,sans-serif;font-weight:700;letter-spacing:-.02em;color:var(--ink);line-height:1">
+            <span style="font-size:19px;font-weight:600;color:var(--ink-2);margin-right:7px">R$</span>
+            <span style="font-size:40px">64.210</span><span style="font-size:22px;opacity:.6">,90</span>
+          </div>
+          <div style="display:flex;gap:20px;margin-top:18px;flex-wrap:wrap">
+            <div><div style="font-size:12px;color:var(--ink-2)">Rentabilidade acumulada</div><div style="display:inline-flex;align-items:center;gap:6px;font-family:Manrope,sans-serif;font-weight:700;font-variant-numeric:tabular-nums;font-size:17px;color:var(--positive);margin-top:3px"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M9 7h8v8"></path></svg>+ R$ 8.740,20</div></div>
+            <div><div style="font-size:12px;color:var(--ink-2)">%</div><div style="font-family:Manrope,sans-serif;font-weight:700;font-variant-numeric:tabular-nums;font-size:17px;color:var(--positive);margin-top:3px">+ 15,74%</div></div>
+            <div><div style="font-size:12px;color:var(--ink-2)">Aportes do mês</div><div style="font-family:Manrope,sans-serif;font-weight:700;font-variant-numeric:tabular-nums;font-size:17px;color:var(--ink);margin-top:3px">R$ 2.000</div></div>
+          </div>
+        </div>
+
+        <!-- Open Finance sync card -->
+        <div style="background:var(--surface);border-radius:20px;box-shadow:var(--card-shadow);border:1px solid var(--card-border);padding:20px 22px">
+          <div style="display:flex;align-items:center;gap:9px;margin-bottom:14px"><span style="width:32px;height:32px;border-radius:9px;background:var(--invest-soft);color:var(--invest);display:flex;align-items:center;justify-content:center"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M12 18v4M2 12h4M18 12h4M5 5l2.5 2.5M16.5 16.5 19 19M19 5l-2.5 2.5M7.5 16.5 5 19"></path></svg></span><div style="font-family:Manrope,sans-serif;font-weight:700;font-size:14.5px;color:var(--ink)">Open Finance</div></div>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <div style="display:flex;align-items:center;justify-content:space-between">
+              <span style="display:inline-flex;align-items:center;gap:7px;font-size:13px;color:var(--ink)"><span style="width:8px;height:8px;border-radius:50%;background:var(--invest)"></span>Sincronizado</span>
+              <span style="font-family:Manrope,sans-serif;font-weight:600;font-variant-numeric:tabular-nums;font-size:13px;color:var(--ink)">9 ativos</span>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between">
+              <span style="display:inline-flex;align-items:center;gap:7px;font-size:13px;color:var(--ink)"><span style="width:8px;height:8px;border-radius:50%;background:var(--ink-2)"></span>Manual</span>
+              <span style="font-family:Manrope,sans-serif;font-weight:600;font-variant-numeric:tabular-nums;font-size:13px;color:var(--ink)">3 ativos</span>
+            </div>
+            <div style="font-size:11.5px;color:var(--ink-2);padding-top:8px;border-top:1px solid var(--line)">NuInvest e XP conectadas · há 2h</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- evolution chart -->
+      <div style="background:var(--surface);border-radius:20px;box-shadow:var(--card-shadow);border:1px solid var(--card-border);padding:22px 24px;margin-top:14px">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:6px">
+          <h3 style="margin:0;font-family:Manrope,sans-serif;font-weight:700;font-size:16px;color:var(--ink)">Evolução patrimonial</h3>
+          <div style="display:flex;background:var(--surface-2);border-radius:10px;padding:3px">
+            <button onClick="{{ setModeValor }}" style="height:32px;padding:0 14px;border:none;border-radius:8px;font-family:Inter,sans-serif;font-weight:600;font-size:12.5px;cursor:pointer;background:{{ valorBg }};color:{{ valorColor }};box-shadow:{{ valorShadow }};transition:all .15s">Valor</button>
+            <button onClick="{{ setModeRentab }}" style="height:32px;padding:0 14px;border:none;border-radius:8px;font-family:Inter,sans-serif;font-weight:600;font-size:12.5px;cursor:pointer;background:{{ rentabBg }};color:{{ rentabColor }};box-shadow:{{ rentabShadow }};transition:all .15s">Rentabilidade</button>
+          </div>
+        </div>
+        <div style="position:relative;height:170px;margin-top:8px">
+          <svg ref="{{ setChartRef }}" viewBox="0 0 600 170" preserveAspectRatio="none" style="width:100%;height:100%;overflow:visible">
+            <defs><linearGradient id="cfInvArea" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="var(--invest)" stop-opacity="0.24"></stop><stop offset="100%" stop-color="var(--invest)" stop-opacity="0"></stop></linearGradient></defs>
+            <path d="{{ chartArea }}" fill="url(#cfInvArea)"></path>
+            <path data-chart-line d="{{ chartLine }}" fill="none" stroke="var(--invest)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"></path>
+            <sc-for list="{{ chartDots }}" as="d" hint-placeholder-count="7"><circle cx="{{ d.x }}" cy="{{ d.y }}" r="3.5" fill="var(--surface)" stroke="var(--invest)" stroke-width="2.5"></circle></sc-for>
+          </svg>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-top:8px;font-family:Manrope,sans-serif;font-size:11px;color:var(--ink-2)">
+          <sc-for list="{{ chartMonths }}" as="m" hint-placeholder-count="7"><span>{{ m }}</span></sc-for>
+        </div>
+      </div>
+
+      <!-- allocation donut + target deviation -->
+      <div style="background:var(--surface);border-radius:20px;box-shadow:var(--card-shadow);border:1px solid var(--card-border);padding:22px 24px;margin-top:14px">
+        <h3 style="margin:0 0 18px;font-family:Manrope,sans-serif;font-weight:700;font-size:16px;color:var(--ink)">Alocação por classe</h3>
+        <div style="display:grid;grid-template-columns:{{ allocCols }};gap:24px;align-items:center">
+          <div style="display:flex;align-items:center;gap:22px">
+            <div style="position:relative;width:168px;height:168px;flex:none">
+              <svg width="168" height="168" viewBox="0 0 168 168" style="transform:rotate(-90deg)">
+                <sc-for list="{{ donut }}" as="d" hint-placeholder-count="7"><circle cx="84" cy="84" r="60" fill="none" stroke="{{ d.color }}" stroke-width="17" stroke-dasharray="{{ d.dash }}" stroke-dashoffset="{{ d.offset }}"></circle></sc-for>
+              </svg>
+              <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;pointer-events:none">
+                <span style="font-size:11px;color:var(--ink-2)">classes</span>
+                <span style="font-family:Manrope,sans-serif;font-weight:700;font-size:22px;color:var(--ink)">7</span>
+              </div>
+            </div>
+          </div>
+          <!-- deviation table -->
+          <div style="display:flex;flex-direction:column;gap:2px;min-width:0">
+            <div style="display:grid;grid-template-columns:1fr 52px 52px 58px;gap:8px;padding:0 8px 8px;font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-2);font-weight:600">
+              <span>Classe</span><span style="text-align:right">Atual</span><span style="text-align:right">Alvo</span><span style="text-align:right">Desvio</span>
+            </div>
+            <sc-for list="{{ alloc }}" as="a" hint-placeholder-count="7">
+              <div style="display:grid;grid-template-columns:1fr 52px 52px 58px;gap:8px;align-items:center;padding:8px;border-radius:9px" style-hover="background:var(--overlay)">
+                <span style="display:inline-flex;align-items:center;gap:8px;font-size:13px;color:var(--ink);min-width:0"><span style="width:9px;height:9px;border-radius:3px;background:{{ a.color }};flex:none"></span><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ a.label }}</span></span>
+                <span style="font-family:Manrope,sans-serif;font-variant-numeric:tabular-nums;font-size:13px;color:var(--ink);text-align:right">{{ a.pct }}%</span>
+                <span style="font-family:Manrope,sans-serif;font-variant-numeric:tabular-nums;font-size:13px;color:var(--ink-2);text-align:right">{{ a.target }}%</span>
+                <span style="font-family:Manrope,sans-serif;font-weight:600;font-variant-numeric:tabular-nums;font-size:12.5px;color:{{ a.devColor }};text-align:right">{{ a.dev }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+
+      <!-- positions -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-top:22px;margin-bottom:12px">
+        <h3 style="margin:0;font-family:Manrope,sans-serif;font-weight:700;font-size:16px;color:var(--ink)">Posições</h3>
+        <span style="font-size:13px;color:var(--ink-2)">12 ativos</span>
+      </div>
+      <div class="cf-scroll" style="overflow-x:auto;background:var(--surface);border-radius:18px;box-shadow:var(--card-shadow);border:1px solid var(--card-border)">
+        <div style="min-width:720px">
+          <div style="display:grid;grid-template-columns:1.6fr 68px 92px 92px 104px 96px 60px;gap:10px;padding:13px 18px;border-bottom:1px solid var(--line);font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-2);font-weight:600">
+            <span>Ativo</span><span style="text-align:right">Qtd</span><span style="text-align:right">Preço médio</span><span style="text-align:right">Cotação</span><span style="text-align:right">Valor atual</span><span style="text-align:right">Variação</span><span style="text-align:right">% cart.</span>
+          </div>
+          <sc-for list="{{ posClasses }}" as="cl" hint-placeholder-count="3">
+            <div>
+              <div style="display:flex;align-items:center;gap:9px;padding:11px 18px;background:var(--surface-2)">
+                <span style="width:8px;height:8px;border-radius:3px;background:{{ cl.color }}"></span>
+                <span style="font-family:Manrope,sans-serif;font-weight:700;font-size:12.5px;color:var(--ink)">{{ cl.label }}</span>
+                <span style="font-family:Manrope,sans-serif;font-variant-numeric:tabular-nums;font-size:12px;color:var(--ink-2);margin-left:auto">{{ cl.total }}</span>
+              </div>
+              <sc-for list="{{ cl.rows }}" as="r" hint-placeholder-count="3">
+                <div style="display:grid;grid-template-columns:1.6fr 68px 92px 92px 104px 96px 60px;gap:10px;padding:13px 18px;border-bottom:1px solid var(--line);align-items:center">
+                  <div style="min-width:0">
+                    <div style="display:flex;align-items:center;gap:8px"><span style="font-family:Manrope,sans-serif;font-weight:700;font-size:14px;color:var(--ink)">{{ r.ticker }}</span><span style="font-size:10px;font-weight:600;letter-spacing:.02em;color:{{ r.srcColor }};background:{{ r.srcBg }};border-radius:5px;padding:2px 6px;white-space:nowrap">{{ r.srcBadge }}</span></div>
+                    <div style="font-size:11.5px;color:var(--ink-2);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.updated }}<sc-if value="{{ r.manual }}" hint-placeholder-val="{{ false }}"> · <span onClick="{{ r.onUpdate }}" style="color:var(--invest);font-weight:600;cursor:pointer">atualizar valor</span></sc-if></div>
+                  </div>
+                  <span style="font-family:Manrope,sans-serif;font-variant-numeric:tabular-nums;font-size:13px;color:var(--ink);text-align:right">{{ r.qty }}</span>
+                  <span style="font-family:Manrope,sans-serif;font-variant-numeric:tabular-nums;font-size:13px;color:var(--ink-2);text-align:right">{{ r.avg }}</span>
+                  <span style="font-family:Manrope,sans-serif;font-variant-numeric:tabular-nums;font-size:13px;color:var(--ink);text-align:right">{{ r.price }}</span>
+                  <span style="font-family:Manrope,sans-serif;font-weight:600;font-variant-numeric:tabular-nums;font-size:13.5px;color:var(--ink);text-align:right">{{ r.value }}</span>
+                  <span style="text-align:right"><span style="font-family:Manrope,sans-serif;font-weight:600;font-variant-numeric:tabular-nums;font-size:13px;color:{{ r.varColor }};display:block">{{ r.varAbs }}</span><span style="font-family:Manrope,sans-serif;font-variant-numeric:tabular-nums;font-size:11px;color:{{ r.varColor }}">{{ r.varPct }}</span></span>
+                  <span style="font-family:Manrope,sans-serif;font-variant-numeric:tabular-nums;font-size:13px;color:var(--ink-2);text-align:right">{{ r.weight }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+
+      </div>
+      <div style="height:40px"></div>
+    </div>
+  </div>
+
+  <!-- ===== APORTAR / RESGATAR MODAL ===== -->
+  <sc-if value="{{ flowOpen }}" hint-placeholder-val="{{ false }}">
+  <div style="position:fixed;inset:0;z-index:80;display:flex;justify-content:center;{{ flowAlign }};background:var(--scrim);animation:cf-scrim .18s ease-out" onClick="{{ closeFlow }}">
+    <div onClick="{{ stop }}" style="{{ flowPanel }}">
+      <sc-if value="{{ isMobile }}" hint-placeholder-val="{{ false }}"><div style="display:flex;justify-content:center;padding:10px 0 2px"><span style="width:38px;height:5px;border-radius:99px;background:var(--line)"></span></div></sc-if>
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 22px 6px">
+        <h2 style="margin:0;font-family:Manrope,sans-serif;font-weight:700;font-size:19px;color:var(--ink)">{{ flowTitle }}</h2>
+        <button onClick="{{ closeFlow }}" style="width:34px;height:34px;border:none;border-radius:10px;background:var(--surface-2);color:var(--ink-2);display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="color:var(--ink)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"></path></svg></button>
+      </div>
+      <div style="padding:6px 22px 0">
+        <div style="text-align:center;padding:4px 0">
+          <div style="font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-2)">Valor</div>
+          <div style="display:flex;align-items:baseline;justify-content:center;gap:8px;margin-top:6px">
+            <span style="font-family:Manrope,sans-serif;font-weight:600;font-size:20px;color:var(--ink-2)">R$</span>
+            <span style="font-family:Manrope,sans-serif;font-weight:700;font-variant-numeric:tabular-nums;font-size:38px;letter-spacing:-.02em;color:var(--invest)">500,00</span>
+          </div>
+          <div style="font-size:12.5px;color:var(--ink-2);margin-top:4px">≈ 47 cotas · R$ 10,64 cada</div>
+        </div>
+
+        <!-- origin/destination -->
+        <div style="position:relative;margin-top:16px">
+          <div style="background:var(--surface-2);border-radius:14px;padding:14px 16px">
+            <div style="font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-2);margin-bottom:9px">{{ srcLabel }}</div>
+            <div style="display:flex;align-items:center;gap:11px">
+              <span style="width:34px;height:34px;border-radius:9px;background:{{ srcColor }};color:#fff;display:flex;align-items:center;justify-content:center;font-family:Manrope,sans-serif;font-weight:800;font-size:13px;flex:none">{{ srcMark }}</span>
+              <div style="flex:1;min-width:0"><div style="font-family:Manrope,sans-serif;font-weight:600;font-size:14.5px;color:var(--ink)">{{ srcName }}</div><div style="font-size:12px;color:var(--ink-2)">{{ srcSub }}</div></div>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg>
+            </div>
+          </div>
+          <div style="display:flex;justify-content:center;margin:-11px 0;position:relative;z-index:2"><span style="width:40px;height:40px;border-radius:50%;border:3px solid var(--surface);background:var(--invest);color:#fff;display:flex;align-items:center;justify-content:center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M19 12l-7 7-7-7"></path></svg></span></div>
+          <div style="background:var(--surface-2);border-radius:14px;padding:14px 16px">
+            <div style="font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-2);margin-bottom:9px">{{ dstLabel }}</div>
+            <div style="display:flex;align-items:center;gap:11px">
+              <span style="width:34px;height:34px;border-radius:9px;background:var(--invest);color:#fff;display:flex;align-items:center;justify-content:center;font-family:Manrope,sans-serif;font-weight:700;font-size:12px;flex:none">{{ dstMark }}</span>
+              <div style="flex:1;min-width:0"><div style="font-family:Manrope,sans-serif;font-weight:600;font-size:14.5px;color:var(--ink)">{{ dstName }}</div><div style="font-size:12px;color:var(--ink-2)">{{ dstSub }}</div></div>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg>
+            </div>
+          </div>
+        </div>
+
+        <!-- explicit transfer explanation -->
+        <div style="display:flex;align-items:center;gap:10px;margin-top:16px;padding:13px 15px;border-radius:13px;background:var(--invest-soft)">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--invest)" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M7 4 3 8l4 4M3 8h14M17 20l4-4-4-4M21 16H7"></path></svg>
+          <span style="font-size:13px;line-height:1.4;color:var(--ink)">{{ flowExplain }}</span>
+        </div>
+      </div>
+      <div style="position:sticky;bottom:0;background:var(--surface);padding:16px 22px calc(16px + env(safe-area-inset-bottom));margin-top:18px;border-top:1px solid var(--line)">
+        <button onClick="{{ confirmFlow }}" style="width:100%;height:52px;border:none;border-radius:999px;background:var(--invest);color:#fff;font-family:Inter,sans-serif;font-weight:600;font-size:16px;cursor:pointer;transition:filter .18s,transform .15s" style-hover="filter:brightness(.95)" style-active="transform:scale(.99)">{{ flowCta }}</button>
+      </div>
+    </div>
+  </div>
+  </sc-if>
+
+  <!-- ===== toast ===== -->
+  <sc-if value="{{ toastOpen }}" hint-placeholder-val="{{ false }}">
+  <div style="position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:90;display:flex;align-items:center;gap:14px;padding:13px 14px 13px 18px;border-radius:14px;background:var(--ink);color:#fff;box-shadow:0 16px 40px rgba(26,21,35,.32);animation:cf-modal .22s ease-out;max-width:calc(100vw - 32px)">
+    <span style="width:26px;height:26px;border-radius:50%;background:var(--invest);display:flex;align-items:center;justify-content:center;flex:none"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg></span>
+    <span style="font-size:14px;font-weight:500;white-space:nowrap">{{ toastMsg }}</span>
+    <button onClick="{{ dismissToast }}" style="height:34px;padding:0 14px;border:none;border-radius:999px;background:rgba(255,255,255,.14);color:#fff;font-family:Inter,sans-serif;font-weight:600;font-size:13.5px;cursor:pointer;flex:none" style-hover="background:rgba(255,255,255,.24)">Desfazer</button>
+  </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{
+  &quot;device&quot;: { &quot;editor&quot;: &quot;enum&quot;, &quot;options&quot;: [&quot;Desktop&quot;, &quot;Mobile&quot;], &quot;default&quot;: &quot;Desktop&quot;, &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Protótipo&quot; },
+  &quot;theme&quot;: { &quot;editor&quot;: &quot;enum&quot;, &quot;options&quot;: [&quot;Claro&quot;, &quot;Escuro&quot;], &quot;default&quot;: &quot;Claro&quot;, &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Aparência&quot; }
+}">
+class Component extends DCLogic {
+  constructor(props){
+    super(props);
+    this.C = 2 * Math.PI * 60;
+    this.state = {
+      theme: props.theme === 'Escuro' ? 'dark' : 'light',
+      device: props.device === 'Mobile' ? 'mobile' : 'desktop',
+      chartMode: 'valor',
+      flow: null,   // 'aportar' | 'resgatar'
+      toastOpen: false, toastMsg: ''
+    };
+    this._toastT = null;
+  }
+  componentDidMount(){ this.drawChart(); }
+  componentDidUpdate(prev){
+    prev = prev || {};
+    if(prev.theme !== this.props.theme) this.setState({ theme: this.props.theme === 'Escuro' ? 'dark' : 'light' });
+    if(prev.device !== this.props.device) this.setState({ device: this.props.device === 'Mobile' ? 'mobile' : 'desktop' });
+    this.drawChart();
+  }
+  componentWillUnmount(){ if(this._toastT) clearTimeout(this._toastT); }
+  drawChart(){
+    const mq = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)');
+    if(mq && mq.matches) return;
+    const el = this.chartRef; if(!el) return;
+    const line = el.querySelector('[data-chart-line]');
+    if(!line) return;
+    if(line._mode === this.state.chartMode) return;
+    const len = line.getTotalLength ? line.getTotalLength() : 600;
+    line.style.setProperty('--len', len);
+    line.style.strokeDasharray = len;
+    line.style.animation = 'none';
+    void line.getBoundingClientRect();
+    line.style.animation = 'cf-draw .9s cubic-bezier(.22,1,.36,1) forwards';
+    line._mode = this.state.chartMode;
+  }
+  fireToast(msg){ if(this._toastT) clearTimeout(this._toastT); this.setState({ toastOpen:true, toastMsg:msg }); this._toastT = setTimeout(() => this.setState({ toastOpen:false }), 4200); }
+  brl(n){ return 'R$ ' + Number(Math.abs(n)).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+  renderVals(){
+    const st = this.state, isD = st.device === 'desktop';
+    // chart data
+    const valorSeries = [55470, 57200, 56100, 59300, 61200, 62800, 64210];
+    const rentabSeries = [2.1, 4.8, 3.2, 7.5, 10.9, 13.1, 15.74];
+    const series = st.chartMode === 'valor' ? valorSeries : rentabSeries;
+    const months = ['dez','jan','fev','mar','abr','mai','jun'];
+    const min = Math.min.apply(null, series), max = Math.max.apply(null, series);
+    const W = 600, H = 170, pad = 12, span = (max - min) || 1;
+    const pts = series.map((v, i) => ({
+      x: +((i/(series.length-1))*(W-pad*2)+pad).toFixed(1),
+      y: +(H - pad - ((v-min)/span)*(H-pad*2)).toFixed(1)
+    }));
+    const chartLine = pts.map((p,i)=>(i?'L':'M')+p.x+' '+p.y).join(' ');
+    const chartArea = 'M'+pts[0].x+' '+H+' '+pts.map(p=>'L'+p.x+' '+p.y).join(' ')+' L'+pts[pts.length-1].x+' '+H+' Z';
+    // allocation
+    const allocDefs = [
+      ['Renda Fixa', 24, 25, '#0F9B8E'],
+      ['Tesouro', 18, 20, '#2563EB'],
+      ['Ações', 34, 30, '#820AD1'],
+      ['FIIs', 12, 12, '#F5A524'],
+      ['Fundos', 6, 8, '#EC4899'],
+      ['Cripto', 3, 2, '#F97316'],
+      ['Internacional', 3, 3, '#0EA5E9']
+    ];
+    let acc = 0;
+    const donut = allocDefs.map(([,pct,,color]) => {
+      const len = (pct/100)*this.C;
+      const seg = { color, dash: (Math.max(0,len-1.5)).toFixed(2)+' '+(this.C-Math.max(0,len-1.5)).toFixed(2), offset: (-acc).toFixed(2) };
+      acc += len; return seg;
+    });
+    const alloc = allocDefs.map(([label,pct,target,color]) => {
+      const dev = pct - target;
+      const near = Math.abs(dev) <= 1;
+      return { label, pct, target, color,
+        dev: (dev>0?'+':'')+dev+'pp',
+        devColor: near ? 'var(--ink-2)' : (dev>0 ? 'var(--warn)' : 'var(--invest)') };
+    });
+    // positions
+    const src = (auto) => auto
+      ? { srcBadge:'auto', srcColor:'var(--invest)', srcBg:'var(--invest-soft)' }
+      : { srcBadge:'manual', srcColor:'var(--ink-2)', srcBg:'var(--surface-2)' };
+    const mkPos = (o) => {
+      const up = o.varAbs >= 0;
+      return { ticker:o.ticker, qty:o.qty, avg:this.brl(o.avg), price:o.price!=null?this.brl(o.price):'—',
+        value:this.brl(o.value), varAbs:(up?'+ ':'− ')+this.brl(o.varAbs), varPct:(up?'+':'')+o.varPct+'%',
+        varColor: up?'var(--positive)':'var(--negative)', weight:o.weight+'%',
+        manual: !o.auto, updated: o.auto ? ('cotação '+o.time) : ('informado '+o.time),
+        onUpdate: () => this.fireToast('Valor de '+o.ticker+' atualizado'),
+        ...src(o.auto) };
+    };
+    const posClasses = [
+      { label:'Ações', color:'#820AD1', total:this.brl(21830),
+        rows:[ mkPos({ticker:'ITSA4',qty:'1.200',avg:9.10,price:10.64,value:12768,varAbs:1848,varPct:16.9,weight:19.9,auto:true,time:'17:32'}),
+               mkPos({ticker:'BBAS3',qty:'340',avg:24.80,price:26.62,value:9050.80,varAbs:618.80,varPct:7.3,weight:14.1,auto:true,time:'17:32'}) ] },
+      { label:'FIIs', color:'#F5A524', total:this.brl(7700),
+        rows:[ mkPos({ticker:'HGLG11',qty:'48',avg:158.20,price:160.40,value:7699.20,varAbs:105.60,varPct:1.4,weight:12.0,auto:true,time:'17:32'}) ] },
+      { label:'Renda Fixa', color:'#0F9B8E', total:this.brl(15420),
+        rows:[ mkPos({ticker:'CDB Banco Inter 118%',qty:'—',avg:10000,price:null,value:10480,varAbs:480,varPct:4.8,weight:16.3,auto:false,time:'30/06'}),
+               mkPos({ticker:'LCI XP 96%',qty:'—',avg:4800,price:null,value:4940,varAbs:140,varPct:2.9,weight:7.7,auto:false,time:'30/06'}) ] }
+    ];
+    // hero/layout
+    const modeVal = st.chartMode === 'valor';
+    // flow modal
+    const flow = st.flow;
+    const isAportar = flow === 'aportar';
+    const flowVals = flow ? {
+      flowTitle: isAportar ? 'Aportar' : 'Resgatar',
+      flowCta: isAportar ? 'Aportar R$ 500,00' : 'Resgatar R$ 500,00',
+      srcLabel: isAportar ? 'De (conta)' : 'De (investimento)',
+      dstLabel: isAportar ? 'Para (investimento)' : 'Para (conta)',
+      srcMark: isAportar ? 'N' : 'IT', srcColor: isAportar ? '#820AD1' : 'var(--invest)',
+      srcName: isAportar ? 'Conta Nubank' : 'ITSA4', srcSub: isAportar ? 'saldo R$ 12.480,90' : '1.200 cotas · R$ 12.768',
+      dstMark: isAportar ? 'IT' : 'N', dstName: isAportar ? 'ITSA4' : 'Conta Nubank',
+      dstSub: isAportar ? 'Itaúsa · Ações' : 'saldo R$ 12.480,90',
+      flowExplain: isAportar ? 'R$ 500 sairão da Conta Nubank e entrarão em ITSA4. É uma transferência — não gera despesa.'
+        : 'R$ 500 sairão de ITSA4 e entrarão na Conta Nubank. É uma transferência — não gera receita.'
+    } : {};
+    return {
+      theme: st.theme, themeIsDark: st.theme==='dark', themeIsLight: st.theme!=='dark',
+      isDesktop:isD, isMobile:!isD,
+      stagePad: isD?'0':'16px 14px 40px',
+      stageStyle: isD ? 'width:100%;max-width:860px;padding:22px 24px 0'
+        : 'width:412px;max-width:100%;background:var(--surface);border:1px solid var(--line);border-radius:32px;box-shadow:0 24px 60px rgba(26,21,35,.12);padding:16px 15px 0',
+      heroCols: isD ? '1.7fr 1fr' : '1fr',
+      allocCols: isD ? 'auto 1fr' : '1fr',
+      deskBg:isD?'var(--surface)':'transparent', deskColor:isD?'var(--ink)':'var(--ink-2)',
+      mobBg:!isD?'var(--surface)':'transparent', mobColor:!isD?'var(--ink)':'var(--ink-2)',
+      setDesktop:()=>this.setState({device:'desktop'}), setMobile:()=>this.setState({device:'mobile'}),
+      toggleTheme:()=>this.setState(s=>({theme:s.theme==='dark'?'light':'dark'})),
+      // chart
+      setChartRef:(el)=>{ this.chartRef = el; },
+      chartLine, chartArea, chartDots: pts, chartMonths: months,
+      setModeValor:()=>this.setState({chartMode:'valor'}), setModeRentab:()=>this.setState({chartMode:'rentab'}),
+      valorBg: modeVal?'var(--surface)':'transparent', valorColor: modeVal?'var(--ink)':'var(--ink-2)', valorShadow: modeVal?'0 1px 3px rgba(26,21,35,.12)':'none',
+      rentabBg: !modeVal?'var(--surface)':'transparent', rentabColor: !modeVal?'var(--ink)':'var(--ink-2)', rentabShadow: !modeVal?'0 1px 3px rgba(26,21,35,.12)':'none',
+      // alloc
+      donut, alloc,
+      // positions
+      posClasses,
+      // flow
+      flowOpen: !!flow,
+      openAportar:()=>this.setState({flow:'aportar'}), openResgatar:()=>this.setState({flow:'resgatar'}),
+      closeFlow:()=>this.setState({flow:null}), stop:(e)=>e.stopPropagation(),
+      flowAlign: isD?'align-items:center':'align-items:flex-end',
+      flowPanel: (isD ? 'width:440px;max-width:calc(100vw - 32px);max-height:calc(100dvh - 48px);border-radius:24px;animation:cf-modal .2s ease-out;'
+        : 'width:100%;max-width:520px;max-height:94dvh;border-radius:26px 26px 0 0;animation:cf-modal .24s ease-out;')
+        + 'background:var(--surface);border:1px solid var(--card-border);box-shadow:0 24px 70px rgba(26,21,35,.32);overflow-y:auto;display:flex;flex-direction:column;position:relative',
+      ...flowVals,
+      confirmFlow:()=>{ const a = isAportar; this.setState({flow:null}); this.fireToast(a?'Aporte registrado como transferência':'Resgate registrado como transferência'); },
+      // toast
+      toastOpen: st.toastOpen, toastMsg: st.toastMsg, dismissToast:()=>this.setState({toastOpen:false})
+    };
+  }
+}
+</script>
+</body>
+</html>

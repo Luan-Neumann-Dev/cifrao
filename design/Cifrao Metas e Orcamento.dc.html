@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Manrope:wght@500;600;700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{background:#FAFAFC}
+  :root{
+    --primary:#820AD1;--primary-hover:#6B08AD;--primary-soft:#F3E8FF;
+    --bg:#FAFAFC;--surface:#FFFFFF;--surface-2:#F3F1F7;--line:#E8E4EF;
+    --ink:#1A1523;--ink-2:#6B6577;
+    --positive:#00A868;--negative:#E5484D;--warn:#F5A524;--invest:#0F9B8E;
+    --card-shadow:0 1px 3px rgba(26,21,35,.06);--card-border:transparent;
+    --ring:0 0 0 4px rgba(130,10,209,.22);--fab-shadow:0 12px 30px rgba(130,10,209,.34);
+    --track:#E8E4EF;--overlay:rgba(26,21,35,.04);--scrim:rgba(26,21,35,.32);
+    --pos-soft:rgba(0,168,104,.12);--warn-soft:rgba(245,165,36,.14);--neg-soft:rgba(229,72,77,.1);
+  }
+  [data-theme="dark"]{
+    --primary:#A855F7;--primary-hover:#9333EA;--primary-soft:#2A1140;
+    --bg:#0E0B12;--surface:#171320;--surface-2:#211B2E;--line:#2E2740;
+    --ink:#F5F3F8;--ink-2:#A79FB8;
+    --positive:#3DD68C;--negative:#FF6369;--warn:#F7B955;--invest:#22C3B0;
+    --card-shadow:none;--card-border:#2E2740;
+    --ring:0 0 0 4px rgba(168,85,247,.32);--fab-shadow:0 12px 32px rgba(168,85,247,.28);
+    --track:#2E2740;--overlay:rgba(255,255,255,.05);--scrim:rgba(0,0,0,.55);
+    --pos-soft:rgba(61,214,140,.14);--warn-soft:rgba(247,185,85,.16);--neg-soft:rgba(255,99,105,.16);
+  }
+  a{color:var(--primary);text-decoration:none}
+  a:hover{color:var(--primary-hover)}
+  input::placeholder{color:var(--ink-2);opacity:.6}
+  .cf-scroll::-webkit-scrollbar{height:7px;width:7px}
+  .cf-scroll::-webkit-scrollbar-thumb{background:var(--line);border-radius:99px}
+  .cf-scroll::-webkit-scrollbar-track{background:transparent}
+  @keyframes cf-fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+  @keyframes cf-modal{from{opacity:0;transform:translateY(10px) scale(.98)}to{opacity:1;transform:translateY(0) scale(1)}}
+  @keyframes cf-scrim{from{opacity:0}to{opacity:1}}
+  @keyframes cf-bar{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+  @media (prefers-reduced-motion: reduce){*{animation-duration:.001ms !important;transition-duration:.001ms !important}}
+</style>
+</helmet>
+
+<div data-theme="{{ theme }}" style="min-height:100dvh;background:var(--bg);color:var(--ink);font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased">
+
+  <!-- ===== reviewer toolbar ===== -->
+  <div style="height:57px;display:flex;align-items:center;gap:12px;padding:0 18px;border-bottom:1px solid var(--line);background:var(--surface);position:sticky;top:0;z-index:60;overflow-x:auto;white-space:nowrap">
+    <span style="display:inline-flex;align-items:center;gap:8px;flex:none;margin-right:2px">
+      <span style="width:26px;height:26px;border-radius:8px;background:var(--primary);display:flex;align-items:center;justify-content:center"><span style="font-family:Manrope,sans-serif;font-weight:800;font-size:15px;color:#fff">$</span></span>
+      <span style="font-family:Manrope,sans-serif;font-weight:700;font-size:13px;color:var(--ink)">Cifrão</span>
+      <span style="font-size:11px;color:var(--ink-2);letter-spacing:.06em;text-transform:uppercase">{{ crumbLabel }}</span>
+    </span>
+    <div style="margin-left:auto;display:flex;gap:8px;align-items:center;flex:none;padding-left:12px">
+      <div style="display:flex;background:var(--surface-2);border-radius:10px;padding:3px">
+        <button onClick="{{ setDesktop }}" style="height:26px;padding:0 12px;border:none;border-radius:8px;font-family:Inter,sans-serif;font-weight:600;font-size:12px;cursor:pointer;background:{{ deskBg }};color:{{ deskColor }}">Desktop</button>
+        <button onClick="{{ setMobile }}" style="height:26px;padding:0 12px;border:none;border-radius:8px;font-family:Inter,sans-serif;font-weight:600;font-size:12px;cursor:pointer;background:{{ mobBg }};color:{{ mobColor }}">Mobile</button>
+      </div>
+      <button onClick="{{ toggleTheme }}" title="Tema" style="width:34px;height:34px;border-radius:10px;background:var(--surface);border:1px solid var(--line);color:var(--ink);display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="background:var(--surface-2)">
+        <sc-if value="{{ themeIsDark }}" hint-placeholder-val="{{ false }}"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg></sc-if>
+        <sc-if value="{{ themeIsLight }}" hint-placeholder-val="{{ true }}"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6.4 6.4 0 0 0 9 9 9 9 0 1 1-9-9Z"></path></svg></sc-if>
+      </button>
+    </div>
+  </div>
+
+  <div style="display:flex;justify-content:center;padding:{{ stagePad }}">
+    <div style="{{ stageStyle }}">
+
+      <!-- segmented switcher -->
+      <div style="display:flex;background:var(--surface-2);border-radius:13px;padding:4px;margin:4px 0 20px;width:fit-content">
+        <button onClick="{{ setMetas }}" style="height:40px;padding:0 22px;border:none;border-radius:9px;font-family:Inter,sans-serif;font-weight:600;font-size:14px;cursor:pointer;background:{{ metasBg }};color:{{ metasColor }};box-shadow:{{ metasShadow }};transition:all .15s">Metas</button>
+        <button onClick="{{ setOrcamento }}" style="height:40px;padding:0 22px;border:none;border-radius:9px;font-family:Inter,sans-serif;font-weight:600;font-size:14px;cursor:pointer;background:{{ orcBg }};color:{{ orcColor }};box-shadow:{{ orcShadow }};transition:all .15s">Orçamento</button>
+      </div>
+
+      <!-- ==================== METAS ==================== -->
+      <sc-if value="{{ isMetas }}" hint-placeholder-val="{{ true }}">
+      <div style="animation:cf-fade .2s ease-out">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:16px">
+          <div>
+            <h1 style="margin:0;font-family:Manrope,sans-serif;font-weight:700;font-size:24px;letter-spacing:-.015em;color:var(--ink)">Metas</h1>
+            <p style="margin:6px 0 0;font-size:13.5px;line-height:1.45;color:var(--ink-2);max-width:52ch">Cada meta aponta pra um saldo que já existe — nada é guardado à parte, então nenhum real é contado duas vezes.</p>
+          </div>
+          <button onClick="{{ openNewGoal }}" style="height:44px;padding:0 18px 0 15px;border:none;border-radius:999px;background:var(--primary);color:#fff;font-family:Inter,sans-serif;font-weight:600;font-size:14px;cursor:pointer;display:inline-flex;align-items:center;gap:7px;flex:none;transition:background .18s" style-hover="background:var(--primary-hover)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"></path></svg>Nova meta</button>
+        </div>
+
+        <div style="display:grid;grid-template-columns:{{ goalCols }};gap:14px">
+          <sc-for list="{{ goals }}" as="g" hint-placeholder-count="4">
+            <div style="background:var(--surface);border-radius:20px;box-shadow:var(--card-shadow);border:1px solid var(--card-border);padding:20px 22px">
+              <div style="display:flex;align-items:flex-start;gap:13px">
+                <span style="width:46px;height:46px;border-radius:13px;background:{{ g.soft }};color:{{ g.color }};display:flex;align-items:center;justify-content:center;flex:none">{{ g.icon }}</span>
+                <div style="flex:1;min-width:0">
+                  <div style="font-family:Manrope,sans-serif;font-weight:700;font-size:16px;color:var(--ink)">{{ g.name }}</div>
+                  <div style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--ink-2);margin-top:3px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10h18M6 3v3M18 3v3M4 6h16v14H4z"></path></svg>{{ g.linked }}</div>
+                </div>
+                <span style="font-family:Manrope,sans-serif;font-weight:700;font-variant-numeric:tabular-nums;font-size:15px;color:{{ g.color }};flex:none">{{ g.pctLabel }}</span>
+              </div>
+              <div style="display:flex;align-items:baseline;justify-content:space-between;margin-top:18px">
+                <span style="font-family:Manrope,sans-serif;font-weight:700;font-variant-numeric:tabular-nums;font-size:20px;color:var(--ink)">{{ g.current }}</span>
+                <span style="font-family:Manrope,sans-serif;font-variant-numeric:tabular-nums;font-size:13px;color:var(--ink-2)">de {{ g.target }}</span>
+              </div>
+              <div style="height:9px;border-radius:99px;background:var(--track);overflow:hidden;margin-top:10px"><div style="height:100%;border-radius:99px;background:{{ g.color }};width:{{ g.pct }}%;transform-origin:left;animation:cf-bar .7s cubic-bezier(.22,1,.36,1) both"></div></div>
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:14px;flex-wrap:wrap">
+                <span style="font-size:13px;color:var(--ink)">Faltam <b style="font-family:Manrope,sans-serif;font-weight:700">{{ g.remaining }}</b></span>
+                <sc-if value="{{ g.hasProjection }}" hint-placeholder-val="{{ true }}"><span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--invest);background:var(--invest-soft, rgba(15,155,142,.12));border-radius:999px;padding:5px 11px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8M21 7v5h-5"></path></svg>no ritmo, chega em {{ g.eta }}</span></sc-if>
+                <sc-if value="{{ g.noProjection }}" hint-placeholder-val="{{ false }}"><span style="font-size:12px;color:var(--ink-2)">sem prazo definido</span></sc-if>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+      </sc-if>
+
+      <!-- ==================== ORÇAMENTO ==================== -->
+      <sc-if value="{{ isOrcamento }}" hint-placeholder-val="{{ false }}">
+      <div style="animation:cf-fade .2s ease-out">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:16px">
+          <div>
+            <h1 style="margin:0;font-family:Manrope,sans-serif;font-weight:700;font-size:24px;letter-spacing:-.015em;color:var(--ink)">Orçamento</h1>
+            <p style="margin:6px 0 0;font-size:13.5px;color:var(--ink-2)">Julho · faltam <b style="color:var(--ink)">14 dias</b> pra fechar o mês</p>
+          </div>
+          <button onClick="{{ suggestLimits }}" style="height:44px;padding:0 18px 0 15px;border:1px solid var(--primary);border-radius:999px;background:var(--primary-soft);color:var(--primary);font-family:Inter,sans-serif;font-weight:600;font-size:13.5px;cursor:pointer;display:inline-flex;align-items:center;gap:8px;flex:none;transition:filter .18s" style-hover="filter:brightness(.97)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.3 1 2.3h6c0-1 .4-1.8 1-2.3A7 7 0 0 0 12 2ZM9 21h6"></path></svg>Sugerir limites (3 meses)</button>
+        </div>
+
+        <!-- summary -->
+        <div style="background:var(--surface);border-radius:20px;box-shadow:var(--card-shadow);border:1px solid var(--card-border);padding:20px 24px;margin-bottom:14px">
+          <div style="display:flex;align-items:baseline;justify-content:space-between">
+            <span style="font-size:13px;color:var(--ink-2)">Gasto no mês</span>
+            <span style="font-family:Manrope,sans-serif;font-variant-numeric:tabular-nums;font-size:13px;color:var(--ink-2)">de {{ budgetTotalLimit }}</span>
+          </div>
+          <div style="display:flex;align-items:baseline;gap:10px;margin-top:4px">
+            <span style="font-family:Manrope,sans-serif;font-weight:700;font-variant-numeric:tabular-nums;font-size:28px;color:var(--ink)">{{ budgetTotalSpent }}</span>
+            <span style="font-size:13px;color:var(--positive);font-weight:600">{{ budgetLeftLabel }}</span>
+          </div>
+          <div style="height:10px;border-radius:99px;background:var(--track);overflow:hidden;margin-top:12px;display:flex"><div style="height:100%;background:var(--positive);width:{{ budgetPct }}%"></div></div>
+        </div>
+
+        <!-- categories with limit -->
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <sc-for list="{{ budgets }}" as="b" hint-placeholder-count="5">
+            <div style="background:var(--surface);border-radius:16px;box-shadow:var(--card-shadow);border:1px solid var(--card-border);padding:16px 18px">
+              <div style="display:flex;align-items:center;gap:12px">
+                <span style="width:38px;height:38px;border-radius:11px;background:{{ b.soft }};color:{{ b.iconColor }};display:flex;align-items:center;justify-content:center;flex:none">{{ b.icon }}</span>
+                <div style="flex:1;min-width:0">
+                  <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px">
+                    <span style="font-family:Manrope,sans-serif;font-weight:600;font-size:14.5px;color:var(--ink)">{{ b.label }}</span>
+                    <span style="font-family:Manrope,sans-serif;font-variant-numeric:tabular-nums;font-size:13px;color:var(--ink-2);white-space:nowrap"><b style="color:{{ b.barColor }}">{{ b.spent }}</b> / {{ b.limit }}</span>
+                  </div>
+                  <div style="height:8px;border-radius:99px;background:var(--track);overflow:hidden;margin-top:9px"><div style="height:100%;border-radius:99px;background:{{ b.barColor }};width:{{ b.pct }}%;transform-origin:left;animation:cf-bar .6s cubic-bezier(.22,1,.36,1) both"></div></div>
+                </div>
+              </div>
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-top:11px;padding-left:50px">
+                <span style="font-size:12.5px;color:{{ b.msgColor }}">{{ b.message }}</span>
+                <span style="font-family:Manrope,sans-serif;font-variant-numeric:tabular-nums;font-size:12px;font-weight:600;color:{{ b.perDayColor }}">{{ b.perDay }}</span>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+
+        <!-- no-limit section -->
+        <div style="margin-top:22px">
+          <div style="font-size:12px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-2);margin-bottom:10px">Sem limite definido</div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <sc-for list="{{ noLimit }}" as="n" hint-placeholder-count="3">
+              <div style="display:flex;align-items:center;gap:12px;padding:13px 16px;border-radius:14px;border:1px dashed var(--line);background:var(--surface)">
+                <span style="width:34px;height:34px;border-radius:10px;background:var(--surface-2);color:var(--ink-2);display:flex;align-items:center;justify-content:center;flex:none">{{ n.icon }}</span>
+                <div style="flex:1;min-width:0"><div style="font-size:14.5px;color:var(--ink)">{{ n.label }}</div><div style="font-size:12px;color:var(--ink-2)">gasto no mês {{ n.spent }}</div></div>
+                <button onClick="{{ n.onDefine }}" style="height:36px;padding:0 14px;border:none;border-radius:999px;background:var(--primary-soft);color:var(--primary);font-family:Inter,sans-serif;font-weight:600;font-size:13px;cursor:pointer;flex:none;transition:filter .18s" style-hover="filter:brightness(.97)">Definir limite</button>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+      </sc-if>
+
+      <div style="height:40px"></div>
+    </div>
+  </div>
+
+  <!-- ===== NEW GOAL MODAL ===== -->
+  <sc-if value="{{ goalOpen }}" hint-placeholder-val="{{ false }}">
+  <div style="position:fixed;inset:0;z-index:80;display:flex;justify-content:center;{{ goalAlign }};background:var(--scrim);animation:cf-scrim .18s ease-out" onClick="{{ closeGoal }}">
+    <div onClick="{{ stop }}" style="{{ goalPanel }}">
+      <sc-if value="{{ isMobile }}" hint-placeholder-val="{{ false }}"><div style="display:flex;justify-content:center;padding:10px 0 2px"><span style="width:38px;height:5px;border-radius:99px;background:var(--line)"></span></div></sc-if>
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 22px 6px">
+        <h2 style="margin:0;font-family:Manrope,sans-serif;font-weight:700;font-size:19px;color:var(--ink)">Nova meta</h2>
+        <button onClick="{{ closeGoal }}" style="width:34px;height:34px;border:none;border-radius:10px;background:var(--surface-2);color:var(--ink-2);display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="color:var(--ink)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"></path></svg></button>
+      </div>
+      <div style="padding:6px 22px 0;display:flex;flex-direction:column;gap:15px">
+        <div>
+          <label style="display:block;font-size:13px;font-weight:500;color:var(--ink-2);margin-bottom:7px">Nome</label>
+          <input value="Reserva de emergência" readonly style="width:100%;height:48px;padding:0 15px;border-radius:14px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-family:Inter,sans-serif;font-size:15px;outline:none" style-focus="border-color:var(--primary);box-shadow:var(--ring)">
+        </div>
+        <div style="display:flex;gap:12px">
+          <div style="flex:1"><label style="display:block;font-size:13px;font-weight:500;color:var(--ink-2);margin-bottom:7px">Valor-alvo</label>
+            <div style="display:flex;align-items:center;gap:7px;height:48px;padding:0 15px;border-radius:14px;border:1px solid var(--line)"><span style="font-family:Manrope,sans-serif;font-weight:600;color:var(--ink-2)">R$</span><span style="font-family:Manrope,sans-serif;font-weight:700;font-variant-numeric:tabular-nums;font-size:15px;color:var(--ink)">30.000</span></div>
+          </div>
+          <div style="flex:1"><label style="display:block;font-size:13px;font-weight:500;color:var(--ink-2);margin-bottom:7px">Prazo <span style="opacity:.7">· opcional</span></label>
+            <div style="display:flex;align-items:center;justify-content:space-between;height:48px;padding:0 15px;border-radius:14px;border:1px solid var(--line);color:var(--ink);font-size:14px">mar/2027<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg></div>
+          </div>
+        </div>
+        <div>
+          <label style="display:block;font-size:13px;font-weight:500;color:var(--ink-2);margin-bottom:7px">Vincular a</label>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <sc-for list="{{ linkOptions }}" as="o" hint-placeholder-count="3">
+              <button onClick="{{ o.onClick }}" style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:13px;border:1.5px solid {{ o.border }};background:{{ o.bg }};cursor:pointer;text-align:left;transition:all .15s">
+                <span style="width:32px;height:32px;border-radius:9px;background:{{ o.color }};color:#fff;display:flex;align-items:center;justify-content:center;font-family:Manrope,sans-serif;font-weight:700;font-size:12px;flex:none">{{ o.mark }}</span>
+                <div style="flex:1;min-width:0"><div style="font-family:Manrope,sans-serif;font-weight:600;font-size:14px;color:var(--ink)">{{ o.name }}</div><div style="font-size:12px;color:var(--ink-2)">saldo atual {{ o.balance }}</div></div>
+                <sc-if value="{{ o.selected }}" hint-placeholder-val="{{ true }}"><span style="width:22px;height:22px;border-radius:50%;background:var(--primary);display:flex;align-items:center;justify-content:center;flex:none"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg></span></sc-if>
+              </button>
+            </sc-for>
+          </div>
+        </div>
+        <div>
+          <label style="display:block;font-size:13px;font-weight:500;color:var(--ink-2);margin-bottom:7px">Aporte mensal planejado <span style="opacity:.7">· opcional</span></label>
+          <div style="display:flex;align-items:center;gap:10px">
+            <div style="flex:1;display:flex;align-items:center;gap:7px;height:48px;padding:0 15px;border-radius:14px;border:1px solid var(--line)"><span style="font-family:Manrope,sans-serif;font-weight:600;color:var(--ink-2)">R$</span><span style="font-family:Manrope,sans-serif;font-weight:700;font-variant-numeric:tabular-nums;font-size:15px;color:var(--ink)">1.200</span></div>
+            <label style="display:inline-flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink-2);cursor:pointer"><button onClick="{{ toggleRecur }}" style="width:44px;height:26px;border-radius:99px;border:none;background:{{ recurBg }};cursor:pointer;position:relative;transition:background .18s"><span style="position:absolute;top:3px;left:{{ recurKnob }};width:20px;height:20px;border-radius:50%;background:#fff;transition:left .18s"></span></button>virar recorrência</label>
+          </div>
+        </div>
+        <!-- the one-liner: goal tracks real balance -->
+        <div style="display:flex;align-items:center;gap:10px;padding:12px 15px;border-radius:13px;background:var(--surface-2);font-size:12.5px;line-height:1.4;color:var(--ink-2)">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--ink-2)" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4M12 8h.01"></path></svg>
+          <span>A meta <b style="color:var(--ink)">acompanha um saldo que já existe</b> — não cria um dinheiro novo nem move nada da sua conta.</span>
+        </div>
+      </div>
+      <div style="position:sticky;bottom:0;background:var(--surface);padding:16px 22px calc(16px + env(safe-area-inset-bottom));margin-top:16px;border-top:1px solid var(--line)">
+        <button onClick="{{ saveGoal }}" style="width:100%;height:52px;border:none;border-radius:999px;background:var(--primary);color:#fff;font-family:Inter,sans-serif;font-weight:600;font-size:16px;cursor:pointer;transition:background .18s,transform .15s" style-hover="background:var(--primary-hover)" style-active="transform:scale(.99)">Criar meta</button>
+      </div>
+    </div>
+  </div>
+  </sc-if>
+
+  <!-- ===== toast ===== -->
+  <sc-if value="{{ toastOpen }}" hint-placeholder-val="{{ false }}">
+  <div style="position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:90;display:flex;align-items:center;gap:14px;padding:13px 14px 13px 18px;border-radius:14px;background:var(--ink);color:#fff;box-shadow:0 16px 40px rgba(26,21,35,.32);animation:cf-modal .22s ease-out;max-width:calc(100vw - 32px)">
+    <span style="width:26px;height:26px;border-radius:50%;background:var(--positive);display:flex;align-items:center;justify-content:center;flex:none"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg></span>
+    <span style="font-size:14px;font-weight:500;white-space:nowrap">{{ toastMsg }}</span>
+    <button onClick="{{ dismissToast }}" style="height:34px;padding:0 14px;border:none;border-radius:999px;background:rgba(255,255,255,.14);color:#fff;font-family:Inter,sans-serif;font-weight:600;font-size:13.5px;cursor:pointer;flex:none" style-hover="background:rgba(255,255,255,.24)">Desfazer</button>
+  </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{
+  &quot;defaultTab&quot;: { &quot;editor&quot;: &quot;enum&quot;, &quot;options&quot;: [&quot;Metas&quot;, &quot;Orçamento&quot;], &quot;default&quot;: &quot;Metas&quot;, &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Protótipo&quot; },
+  &quot;device&quot;: { &quot;editor&quot;: &quot;enum&quot;, &quot;options&quot;: [&quot;Desktop&quot;, &quot;Mobile&quot;], &quot;default&quot;: &quot;Desktop&quot;, &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Protótipo&quot; },
+  &quot;theme&quot;: { &quot;editor&quot;: &quot;enum&quot;, &quot;options&quot;: [&quot;Claro&quot;, &quot;Escuro&quot;], &quot;default&quot;: &quot;Claro&quot;, &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Aparência&quot; }
+}">
+class Component extends DCLogic {
+  constructor(props){
+    super(props);
+    this.state = {
+      theme: props.theme === 'Escuro' ? 'dark' : 'light',
+      device: props.device === 'Mobile' ? 'mobile' : 'desktop',
+      tab: props.defaultTab === 'Orçamento' ? 'orcamento' : 'metas',
+      goalOpen: false, recur: true,
+      suggested: false,
+      toastOpen: false, toastMsg: ''
+    };
+    this._toastT = null;
+  }
+  componentDidUpdate(prev){
+    prev = prev || {};
+    if(prev.theme !== this.props.theme) this.setState({ theme: this.props.theme === 'Escuro' ? 'dark' : 'light' });
+    if(prev.device !== this.props.device) this.setState({ device: this.props.device === 'Mobile' ? 'mobile' : 'desktop' });
+    if(prev.defaultTab !== this.props.defaultTab) this.setState({ tab: this.props.defaultTab === 'Orçamento' ? 'orcamento' : 'metas' });
+  }
+  componentWillUnmount(){ if(this._toastT) clearTimeout(this._toastT); }
+  fireToast(msg){ if(this._toastT) clearTimeout(this._toastT); this.setState({ toastOpen:true, toastMsg:msg }); this._toastT = setTimeout(() => this.setState({ toastOpen:false }), 4200); }
+  brl(n){ return 'R$ ' + Number(Math.abs(n)).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+  brl0(n){ return 'R$ ' + Number(Math.abs(n)).toLocaleString('pt-BR', { maximumFractionDigits: 0 }); }
+  icon(name){
+    const m = {
+      shield:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 5 6v6c0 4 3 6.5 7 9 4-2.5 7-5 7-9V6Z"></path></svg>',
+      plane:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17.8 19.2 16 11l3.5-3.5a2.1 2.1 0 0 0-3-3L13 8 4.8 6.2a1 1 0 0 0-.9 1.7L9 11l-2 3-2.5-.5a.8.8 0 0 0-.7 1.3L6 18l1.2 2.2a.8.8 0 0 0 1.3-.1L10 17l3 4.9a1 1 0 0 0 1.7-.9Z"></path></svg>',
+      laptop:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="11" rx="2"></rect><path d="M2 20h20"></path></svg>',
+      home:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11 12 4l8 7M6 10v9h12v-9"></path></svg>',
+      food:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M4 3v7a3 3 0 0 0 6 0V3M7 3v18M21 3c-2 0-3 2-3 6s1 4 1 6-1 6-1 6"></path></svg>',
+      cart:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="20" r="1"></circle><circle cx="18" cy="20" r="1"></circle><path d="M2 3h3l2.5 13h11L21 7H6.5"></path></svg>',
+      car:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l1.5-4.5A2 2 0 0 1 8.4 7h7.2a2 2 0 0 1 1.9 1.5L19 13M5 13h14v4H5zM7 17v2M17 17v2"></path></svg>',
+      play:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="3"></rect><path d="m10 9 5 3-5 3Z"></path></svg>',
+      health:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2-5 4 10 2-5h6"></path></svg>',
+      pet:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="9" r="1.6"></circle><circle cx="17" cy="9" r="1.6"></circle><circle cx="9.5" cy="5.5" r="1.4"></circle><circle cx="14.5" cy="5.5" r="1.4"></circle><path d="M12 12c-2.5 0-4 2-4 4s1.5 3 4 3 4-1.5 4-3-1.5-4-4-4Z"></path></svg>'
+    };
+    return React.createElement('span', { style:{display:'inline-flex'}, dangerouslySetInnerHTML:{ __html: m[name] } });
+  }
+  renderVals(){
+    const st = this.state, isD = st.device === 'desktop';
+    // GOALS
+    const goalDefs = [
+      { name:'Reserva de emergência', icon:'shield', color:'var(--invest)', soft:'rgba(15,155,142,.12)', current:24800, target:30000, linked:'NuInvest · Tesouro Selic', eta:'mar/2027', hasPrazo:true },
+      { name:'Viagem Japão', icon:'plane', color:'#0EA5E9', soft:'rgba(14,165,233,.14)', current:6400, target:18000, linked:'Conta Inter', eta:'dez/2027', hasPrazo:true },
+      { name:'Notebook novo', icon:'laptop', color:'#820AD1', soft:'var(--primary-soft)', current:3200, target:9000, linked:'Conta Nubank', eta:'', hasPrazo:false },
+      { name:'Entrada do apê', icon:'home', color:'#F5A524', soft:'rgba(245,165,36,.14)', current:41000, target:120000, linked:'NuInvest · Renda Fixa', eta:'jan/2029', hasPrazo:true }
+    ];
+    const goals = goalDefs.map(g => {
+      const pct = Math.round(g.current / g.target * 100);
+      return { name:g.name, icon:this.icon(g.icon), color:g.color, soft:g.soft, linked:g.linked,
+        current:this.brl0(g.current), target:this.brl0(g.target), remaining:this.brl0(g.target - g.current),
+        pct, pctLabel: pct + '%',
+        hasProjection: g.hasPrazo, noProjection: !g.hasPrazo, eta: g.eta };
+    });
+    // BUDGET
+    const daysLeft = 14;
+    const base = st.suggested
+      ? [['Alimentação','food','#F5A524',780,1100],['Transporte','car','var(--invest)',210,400],['Delivery','play','#EC4899',412,450],['Mercado','cart','#0EA5E9',640,900],['Lazer','play','#8B5CF6',300,500]]
+      : [['Alimentação','food','#F5A524',780,1100],['Transporte','car','var(--invest)',210,400],['Delivery','play','#EC4899',412,450],['Mercado','cart','#0EA5E9',640,900]];
+    const budgets = base.map(([label,icon,color,spent,limit]) => {
+      const ratio = spent / limit, pct = Math.min(100, Math.round(ratio*100));
+      const barColor = ratio > 0.9 ? 'var(--negative)' : ratio > 0.7 ? 'var(--warn)' : 'var(--positive)';
+      const left = limit - spent, perDay = left > 0 ? Math.floor(left / daysLeft) : 0;
+      const over = left < 0;
+      return { label, icon:this.icon(icon), iconColor:color, soft:'color-mix(in oklab,'+color+', transparent 86%)',
+        spent:this.brl0(spent), limit:this.brl0(limit), pct, barColor,
+        message: over ? ('estourou ' + this.brl0(left)) : ('sobram ' + this.brl0(left)),
+        msgColor: over ? 'var(--negative)' : 'var(--ink)',
+        perDay: over ? 'acima do limite' : (this.brl0(perDay) + '/dia'),
+        perDayColor: barColor };
+    });
+    const totalSpent = base.reduce((a,x)=>a+x[3],0), totalLimit = base.reduce((a,x)=>a+x[4],0);
+    const noLimit = [
+      { label:'Saúde', icon:'health', spent:this.brl0(180) },
+      { label:'Assinaturas', icon:'play', spent:this.brl0(98) },
+      { label:'Pet', icon:'pet', spent:this.brl0(120) }
+    ].map(n => ({ ...n, icon:this.icon(n.icon), onDefine:()=>this.fireToast('Limite de '+n.label+' definido') }));
+    // link options (goal modal)
+    const linkOptions = [
+      { mark:'NU', name:'NuInvest · Tesouro Selic', color:'#0F9B8E', balance:this.brl0(24800), selected:true, border:'var(--primary)', bg:'var(--primary-soft)' },
+      { mark:'N', name:'Conta Nubank', color:'#820AD1', balance:this.brl0(12480), selected:false, border:'var(--line)', bg:'var(--surface)' },
+      { mark:'I', name:'Conta Inter', color:'#FF7A00', balance:this.brl0(3210), selected:false, border:'var(--line)', bg:'var(--surface)' }
+    ];
+    const tglTab = (on) => ({ bg: on?'var(--surface)':'transparent', color: on?'var(--ink)':'var(--ink-2)', shadow: on?'0 1px 3px rgba(26,21,35,.12)':'none' });
+    const tm = tglTab(st.tab==='metas'), to = tglTab(st.tab==='orcamento');
+    return {
+      theme: st.theme, themeIsDark: st.theme==='dark', themeIsLight: st.theme!=='dark',
+      isDesktop:isD, isMobile:!isD,
+      crumbLabel: st.tab==='metas' ? 'Metas' : 'Orçamento',
+      stagePad: isD?'0':'16px 14px 40px',
+      stageStyle: isD ? 'width:100%;max-width:760px;padding:22px 24px 0'
+        : 'width:412px;max-width:100%;background:var(--surface);border:1px solid var(--line);border-radius:32px;box-shadow:0 24px 60px rgba(26,21,35,.12);padding:16px 15px 0',
+      goalCols: isD ? '1fr 1fr' : '1fr',
+      deskBg:isD?'var(--surface)':'transparent', deskColor:isD?'var(--ink)':'var(--ink-2)',
+      mobBg:!isD?'var(--surface)':'transparent', mobColor:!isD?'var(--ink)':'var(--ink-2)',
+      setDesktop:()=>this.setState({device:'desktop'}), setMobile:()=>this.setState({device:'mobile'}),
+      toggleTheme:()=>this.setState(s=>({theme:s.theme==='dark'?'light':'dark'})),
+      setMetas:()=>this.setState({tab:'metas'}), setOrcamento:()=>this.setState({tab:'orcamento'}),
+      isMetas: st.tab==='metas', isOrcamento: st.tab==='orcamento',
+      metasBg:tm.bg, metasColor:tm.color, metasShadow:tm.shadow,
+      orcBg:to.bg, orcColor:to.color, orcShadow:to.shadow,
+      goals,
+      budgets, noLimit,
+      budgetTotalSpent:this.brl0(totalSpent), budgetTotalLimit:this.brl0(totalLimit),
+      budgetLeftLabel:'sobram '+this.brl0(totalLimit-totalSpent), budgetPct:Math.round(totalSpent/totalLimit*100),
+      suggestLimits:()=>{ this.setState({suggested:true}); this.fireToast('Limites sugeridos pelos últimos 3 meses'); },
+      // goal modal
+      goalOpen: st.goalOpen,
+      openNewGoal:()=>this.setState({goalOpen:true}), closeGoal:()=>this.setState({goalOpen:false}), stop:(e)=>e.stopPropagation(),
+      goalAlign: isD?'align-items:center':'align-items:flex-end',
+      goalPanel: (isD ? 'width:460px;max-width:calc(100vw - 32px);max-height:calc(100dvh - 48px);border-radius:24px;animation:cf-modal .2s ease-out;'
+        : 'width:100%;max-width:520px;max-height:94dvh;border-radius:26px 26px 0 0;animation:cf-modal .24s ease-out;')
+        + 'background:var(--surface);border:1px solid var(--card-border);box-shadow:0 24px 70px rgba(26,21,35,.32);overflow-y:auto;display:flex;flex-direction:column;position:relative',
+      linkOptions,
+      recurBg: st.recur ? 'var(--primary)' : 'var(--track)', recurKnob: st.recur ? '21px' : '3px',
+      toggleRecur:()=>this.setState(s=>({recur:!s.recur})),
+      saveGoal:()=>{ this.setState({goalOpen:false}); this.fireToast('Meta criada · acompanha o saldo vinculado'); },
+      // toast
+      toastOpen: st.toastOpen, toastMsg: st.toastMsg, dismissToast:()=>this.setState({toastOpen:false})
+    };
+  }
+}
+</script>
+</body>
+</html>
