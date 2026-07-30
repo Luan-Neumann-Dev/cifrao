@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils';
 const LINKS = [
   { href: '/painel', label: 'Visão geral' },
   { href: '/painel/contas', label: 'Contas' },
+  { href: '/painel/cartoes', label: 'Cartões' },
   { href: '/painel/lancamentos', label: 'Lançamentos' },
 ];
 

@@ -106,6 +106,37 @@ Registro do que foi feito, decisões tomadas e pendências. Uma seção por fase
 
 ---
 
+## Fase 3 — Cartões e faturas ✅
+
+### O que foi feito
+
+- **Schema** (Prisma): `CreditCard`, `Invoice` (com `@@unique([creditCardId, referenceMonth])`), `Purchase` (compra pai de parcelamento) + enum `InvoiceStatus`; campos de cartão em `Transaction` (`creditCardId`, `invoiceId`, `purchaseId`, `installmentNumber`, `installmentTotal`) e índice `@@index([invoiceId])`. Migração `cartoes_faturas`.
+- **Lógica pura** (`packages/shared/card-logic.ts`), toda testada: `invoiceWindowForPurchase`/`resolveClosingMonth` (roteamento 5.3), `installmentWindows`/`installmentDateParts`/`splitInstallments` (parcelamento 5.4), `classifyInvoicesForAvailability` (disponível de verdade 5.5) e `deriveInvoiceStatus`.
+- **API**: `CreditCardsModule` — CRUD de cartão; `POST /credit-cards/:id/purchases` (gera 1 `Purchase` + N `Transaction` roteadas p/ N faturas); `GET /credit-cards/:id` com disponível de verdade e faturas; `GET /credit-cards/:id/commitment` (12 meses, `groupBy` no banco); `GET /invoices/:id` e `POST /invoices/:id/pay` (pagamento total/parcial).
+- **Frontend**: aba "Cartões"; lista com disponível de verdade; detalhe com os 3 números do disponível + explicação (5.5), gráfico de comprometimento 12 meses (Recharts), faturas com status, expandir lançamentos, pagar fatura e nova compra parcelada com **prévia** "entra na fatura de …".
+
+### Decisões tomadas (Fase 3) — confirmadas com o dono
+
+1. **Corte da fatura inclusivo** (5.3): compra no dia do fechamento entra na fatura que fecha naquele dia; a partir do dia seguinte, na próxima. `referenceMonth` = mês do **vencimento** ("fatura de agosto fecha 28/07"). Dias > nº de dias do mês são fixados no último dia.
+2. **Disponível de verdade** (5.5): `limite − fatura aberta − faturas fechadas não quitadas − parcelas futuras`. Faturas fechadas e não pagas também consomem limite; os três números são exibidos separadamente.
+3. **Pagamento de fatura** (5.6): `Transaction type=TRANSFER` com `fromAccountId` + `invoiceId` (sem `toAccountId`). Debita a conta, soma `paidCents`, atualiza status (PARTIAL/PAID) e **nunca** conta como despesa (reaproveita a exclusão de TRANSFER de 5.7).
+4. **Compra de cartão é EXPENSE** sem `accountId`: conta como gasto (5.7 continua valendo) mas **não** move saldo de conta — o saldo só se mexe quando a fatura é paga (a transferência de 5.6).
+5. **Total da fatura é derivado** (soma das compras EXPENSE não-FORECAST); `paidCents`/`status` são persistidos. `OPEN↔CLOSED` é derivado por data; a persistência formal do fechamento entra com o cron na Fase 5.
+
+### Pendências / notas
+
+- **Edição da compra pai propagando p/ parcelas futuras** (trecho final de 5.4): editar/excluir parcela individual já funciona pelo endpoint genérico; a edição em cascata a partir do `Purchase` fica como refinamento (não está nos critérios de aceite desta fase).
+- Excluir um pagamento de fatura pelo endpoint genérico credita a conta de volta, mas **não** reverte `paidCents` da fatura — pagamentos devem ser geridos pela tela da fatura. A reversão de `paidCents` entra quando houver "estorno de pagamento".
+- Recharts adicionado (`^3.10.1`, do stack aprovado). A página de detalhe do cartão carrega ~115 kB por causa do gráfico — aceitável; dá para lazy-load depois.
+
+### Aceite verificado (Fase 3)
+
+- **CI local**: `pnpm lint`, `pnpm typecheck`, `pnpm test` (**77 testes**: shared 51, api 21, web 5) e `pnpm build` — todos verdes.
+- **Testes automatizados das regras**: 5.3/5.4/5.5 em `card-logic.test.ts` (17); 5.4 (6x → 6 faturas, Purchase pai, soma exata) em `credit-cards.service.test.ts`; 5.6 (pagamento é TRANSFER, debita conta, PAID/PARTIAL) em `invoices.service.test.ts`.
+- **Smoke funcional E2E (15/15)** pela API real (via proxy): 6x cai em 6 faturas distintas e consecutivas; parcela numerada na fatura certa; virada na data de fechamento (dia 28 → fatura atual, dia 29 → próxima); disponível = limite − comprometido; **pagar fatura não cria despesa**, debita a conta, marca PAID e libera limite.
+
+---
+
 ## Como rodar
 
 ```bash

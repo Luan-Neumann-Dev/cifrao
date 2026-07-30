@@ -6,6 +6,8 @@ import {
   transactionTypeSchema,
 } from './enums';
 
+const dayOfMonth = z.number().int().min(1).max(31);
+
 /** Valor monetário em centavos trafega como inteiro seguro (regra 5.1). */
 const cents = z.number().int();
 const positiveCents = cents.positive();
@@ -62,6 +64,62 @@ export const createTagSchema = z.object({
   color: hexColor.optional(),
 });
 export type CreateTagInput = z.infer<typeof createTagSchema>;
+
+// ─── Cartão de crédito ─────────────────────────────────────────────────────────
+
+export const createCreditCardSchema = z.object({
+  nickname: z.string().min(1).max(60),
+  brand: z.string().max(30).optional(),
+  last4: z
+    .string()
+    .regex(/^\d{4}$/, 'Informe os 4 últimos dígitos')
+    .optional(),
+  limitCents: positiveCents,
+  closingDay: dayOfMonth,
+  dueDay: dayOfMonth,
+  color: hexColor.optional(),
+  defaultPaymentAccountId: z.string().min(1).optional().nullable(),
+});
+export type CreateCreditCardInput = z.infer<typeof createCreditCardSchema>;
+
+export const updateCreditCardSchema = z.object({
+  nickname: z.string().min(1).max(60).optional(),
+  brand: z.string().max(30).optional().nullable(),
+  last4: z
+    .string()
+    .regex(/^\d{4}$/, 'Informe os 4 últimos dígitos')
+    .optional()
+    .nullable(),
+  limitCents: positiveCents.optional(),
+  closingDay: dayOfMonth.optional(),
+  dueDay: dayOfMonth.optional(),
+  color: hexColor.optional().nullable(),
+  defaultPaymentAccountId: z.string().min(1).optional().nullable(),
+  archived: z.boolean().optional(),
+});
+export type UpdateCreditCardInput = z.infer<typeof updateCreditCardSchema>;
+
+/** Compra no cartão (regra 5.4): `installments` gera N parcelas em N faturas. */
+export const createCardPurchaseSchema = z.object({
+  amountCents: positiveCents,
+  date: z.coerce.date(),
+  description: z.string().min(1).max(200),
+  installments: z.number().int().min(1).max(72).default(1),
+  categoryId: z.string().min(1).optional().nullable(),
+  status: transactionStatusSchema.default('CLEARED'),
+  notes: z.string().max(2000).optional(),
+  isReimbursable: z.boolean().default(false),
+  tagIds: z.array(z.string().min(1)).optional(),
+});
+export type CreateCardPurchaseInput = z.infer<typeof createCardPurchaseSchema>;
+
+/** Pagamento de fatura (regra 5.6): transferência da conta; total ou parcial. */
+export const payInvoiceSchema = z.object({
+  accountId: z.string().min(1),
+  amountCents: positiveCents,
+  date: z.coerce.date().optional(),
+});
+export type PayInvoiceInput = z.infer<typeof payInvoiceSchema>;
 
 // ─── Lançamentos ───────────────────────────────────────────────────────────────
 

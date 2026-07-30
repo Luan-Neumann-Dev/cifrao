@@ -38,6 +38,23 @@ export function formatInSaoPaulo(date: Date, pattern = 'dd/MM/yyyy'): string {
   return formatTz(toZonedTime(date, SP_TIMEZONE), pattern, { timeZone: SP_TIMEZONE });
 }
 
+/** Componentes de calendário (ano/mês/dia) de um instante UTC no fuso de SP. */
+export function saoPauloDateParts(date: Date): { year: number; month: number; day: number } {
+  const [year, month, day] = formatInSaoPaulo(date, 'yyyy-MM-dd').split('-').map(Number);
+  return { year, month, day };
+}
+
+/** Instante UTC do horário de parede de SP para um dia (hora padrão: meio-dia). */
+export function saoPauloWallClockToUtc(
+  year: number,
+  month: number,
+  day: number,
+  time = '12:00:00',
+): Date {
+  const p2 = (n: number) => String(n).padStart(2, '0');
+  return saoPauloToUtc(`${year}-${p2(month)}-${p2(day)}T${time}`);
+}
+
 /**
  * Últimas `n` chaves de mês ("yyyy-MM") no fuso de São Paulo, da mais antiga
  * para a mais recente. Aritmética inteira sobre ano/mês (sem armadilha de fuso).

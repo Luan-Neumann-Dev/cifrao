@@ -1,6 +1,7 @@
 import type {
   AccountType,
   CategoryKind,
+  InvoiceStatus,
   TransactionStatus,
   TransactionType,
 } from '@cifrao/shared';
@@ -77,6 +78,10 @@ export interface Transaction {
   toAccount: TransactionRef | null;
   category: (TransactionRef & { icon: string | null }) | null;
   tags: { tag: Tag }[];
+  creditCardId?: string | null;
+  invoiceId?: string | null;
+  installmentNumber?: number | null;
+  installmentTotal?: number | null;
 }
 
 export interface Paginated<T> {
@@ -84,4 +89,59 @@ export interface Paginated<T> {
   total: number;
   page: number;
   pageSize: number;
+}
+
+// ─── Cartões e faturas (valores em centavos chegam como string) ────────────────
+
+export interface AvailabilityBreakdown {
+  limitCents: string;
+  openInvoiceCents: string;
+  closedUnpaidCents: string;
+  futureCommittedCents: string;
+  committedCents: string;
+  availableCents: string;
+}
+
+export interface CreditCard {
+  id: string;
+  nickname: string;
+  brand: string | null;
+  last4: string | null;
+  limitCents: string;
+  closingDay: number;
+  dueDay: number;
+  color: string | null;
+  archived: boolean;
+  defaultPaymentAccountId: string | null;
+}
+
+export interface CreditCardWithAvailability extends CreditCard {
+  availability: AvailabilityBreakdown;
+}
+
+export interface InvoiceSummary {
+  id: string;
+  creditCardId: string;
+  referenceMonth: string;
+  closingDate: string;
+  dueDate: string;
+  status: InvoiceStatus;
+  paidCents: string;
+  totalCents: string;
+  remainingCents: string;
+}
+
+export interface CreditCardDetail extends CreditCardWithAvailability {
+  invoices: InvoiceSummary[];
+}
+
+export interface InvoiceDetail extends InvoiceSummary {
+  creditCard: { id: string; nickname: string; color: string | null; limitCents: string };
+  transactions: Transaction[];
+}
+
+export interface CommitmentPoint {
+  month: string;
+  totalCents: string;
+  remainingCents: string;
 }

@@ -3,8 +3,9 @@
 // Fase 1: autenticação do Better Auth (User, Session, AuthAccount, Verification,
 // TwoFactor, Jwks). O model de credenciais é `AuthAccount` para não colidir com
 // a conta bancária `Account`.
-// Fase 2: núcleo de domínio (Account, Category, Tag, Transaction, splits). Cartões,
-// faturas e parcelamento (creditCardId/invoiceId/purchaseId) entram na Fase 3.
+// Fase 2: núcleo de domínio (Account, Category, Tag, Transaction, splits).
+// Fase 3: cartões e faturas (CreditCard, Invoice, Purchase) + campos de cartão em
+// Transaction (creditCardId/invoiceId/purchaseId/parcelas).
 
 generator client {
   provider = "prisma-client-js"
@@ -136,6 +137,7 @@ model Account {
   transactions  Transaction[] @relation("AccountTransactions")
   transfersFrom Transaction[] @relation("TransferFrom")
   transfersTo   Transaction[] @relation("TransferTo")
+  defaultForCards CreditCard[] @relation("CardDefaultPayment")
 }
 
 model Category {
@@ -150,6 +152,7 @@ model Category {
 
   transactions Transaction[]
   splits       TransactionSplit[]
+  purchases    Purchase[]
 
   createdAt DateTime @default(now())
 }
@@ -185,6 +188,18 @@ model Transaction {
   categoryId String?
   category   Category? @relation(fields: [categoryId], references: [id])
 
+  // Cartão de crédito (Fase 3). Compras de cartão apontam para o cartão e caem
+  // numa fatura; o pagamento da fatura é um TRANSFER com invoiceId (regra 5.6).
+  creditCardId String?
+  creditCard   CreditCard? @relation(fields: [creditCardId], references: [id])
+  invoiceId    String?
+  invoice      Invoice?    @relation(fields: [invoiceId], references: [id])
+  purchaseId   String?
+  purchase     Purchase?   @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+
+  installmentNumber Int?
+  installmentTotal  Int?
+
   splits TransactionSplit[]
   tags   TransactionTag[]
 
@@ -194,6 +209,70 @@ model Transaction {
   @@index([date])
   @@index([accountId, date])
   @@index([categoryId, date])
+  @@index([invoiceId])
+}
+
+// ─── Cartões e faturas (Fase 3) ────────────────────────────────────────────────
+
+enum InvoiceStatus {
+  OPEN
+  CLOSED
+  PAID
+  PARTIAL
+}
+
+model CreditCard {
+  id                      String   @id @default(cuid())
+  nickname                String
+  brand                   String?
+  last4                   String?
+  limitCents              BigInt
+  closingDay              Int
+  dueDay                  Int
+  color                   String?
+  archived                Boolean  @default(false)
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  defaultPaymentAccountId String?
+  defaultPaymentAccount   Account? @relation("CardDefaultPayment", fields: [defaultPaymentAccountId], references: [id])
+
+  invoices     Invoice[]
+  purchases    Purchase[]
+  transactions Transaction[]
+}
+
+model Invoice {
+  id             String        @id @default(cuid())
+  creditCardId   String
+  creditCard     CreditCard    @relation(fields: [creditCardId], references: [id], onDelete: Cascade)
+  referenceMonth String // "yyyy-MM" do vencimento (regra 5.3: fatura de agosto fecha 28/07)
+  closingDate    DateTime
+  dueDate        DateTime
+  status         InvoiceStatus @default(OPEN)
+  paidCents      BigInt        @default(0)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  transactions Transaction[]
+
+  @@unique([creditCardId, referenceMonth])
+  @@index([creditCardId])
+}
+
+model Purchase {
+  id               String   @id @default(cuid())
+  creditCardId     String
+  creditCard       CreditCard @relation(fields: [creditCardId], references: [id], onDelete: Cascade)
+  description      String
+  totalCents       BigInt
+  installmentTotal Int
+  purchaseDate     DateTime
+  categoryId       String?
+  category         Category? @relation(fields: [categoryId], references: [id])
+  createdAt        DateTime  @default(now())
+
+  transactions Transaction[]
 }
 
 model TransactionSplit {
