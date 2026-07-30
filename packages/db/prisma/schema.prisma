@@ -1,7 +1,9 @@
-// Schema do Cifrão. As entidades de domínio (User, Account, CreditCard,
-// Invoice, Transaction, ...) descritas na Seção 6 do CLAUDE.md serão
-// adicionadas nas fases seguintes. Aqui, na Fase 0, apenas inicializamos
-// o Prisma com datasource (pooler) + directUrl (migrations).
+// Schema do Cifrão.
+//
+// Fase 1: entidades de autenticação do Better Auth (User, Session, AuthAccount,
+// Verification, TwoFactor, Jwks). O model de credenciais é `AuthAccount` para
+// não colidir com a conta bancária `Account` (Seção 6), que entra na Fase 2.
+// As demais entidades de domínio da Seção 6 chegam nas fases seguintes.
 
 generator client {
   provider = "prisma-client-js"
@@ -11,4 +13,82 @@ datasource db {
   provider  = "postgresql"
   url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
+}
+
+// ─── Autenticação (Better Auth) ──────────────────────────────────────────────
+
+model User {
+  id            String   @id
+  name          String
+  email         String   @unique
+  emailVerified Boolean  @default(false)
+  image         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Plugin twoFactor
+  twoFactorEnabled Boolean? @default(false)
+
+  // Campos de domínio do User (Seção 6) preservados sobre o schema do Better Auth
+  theme       String? @default("system")
+  accentColor String? @default("#820AD1")
+
+  sessions   Session[]
+  accounts   AuthAccount[]
+  twofactors TwoFactor[]
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model AuthAccount {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+}
+
+model Verification {
+  id         String    @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime? @default(now())
+  updatedAt  DateTime? @updatedAt
+}
+
+model TwoFactor {
+  id                      String  @id
+  secret                  String
+  backupCodes             String
+  verified                Boolean @default(false)
+  failedVerificationCount Int     @default(0)
+  userId                  String
+  user                    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Jwks {
+  id         String   @id
+  publicKey  String
+  privateKey String
+  createdAt  DateTime @default(now())
 }

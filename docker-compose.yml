@@ -7,8 +7,10 @@ services:
       POSTGRES_USER: cifrao
       POSTGRES_PASSWORD: cifrao
       POSTGRES_DB: cifrao
+    # Host usa 55432 -> container 5432. As portas 5432/5433 do host já estão
+    # ocupadas por um Postgres nativo; 55432 evita a colisão em dev.
     ports:
-      - "5432:5432"
+      - "55432:5432"
     volumes:
       - cifrao-pgdata:/var/lib/postgresql/data
     healthcheck:

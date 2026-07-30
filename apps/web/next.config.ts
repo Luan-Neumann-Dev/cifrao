@@ -6,12 +6,17 @@ const apiUrl = process.env.API_INTERNAL_URL ?? 'http://localhost:3001';
 
 const nextConfig: NextConfig = {
   async rewrites() {
-    return [
-      {
-        source: '/api/:path*',
-        destination: `${apiUrl}/:path*`,
-      },
-    ];
+    return {
+      // afterFiles roda antes de rotas dinâmicas; por isso EXCLUÍMOS /api/auth/*
+      // do proxy — esse prefixo é servido pelo handler do Better Auth no Next.
+      // Todo o resto de /api/* vai para o Nest.
+      afterFiles: [
+        {
+          source: '/api/:path((?!auth/).*)',
+          destination: `${apiUrl}/:path`,
+        },
+      ],
+    };
   },
 };
 

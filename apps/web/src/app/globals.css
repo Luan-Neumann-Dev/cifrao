@@ -1,6 +1,6 @@
 /*
- * Tokens do design system do CLAUDE.md (Seção 4). Na Fase 0 ficam como CSS
- * variables puras; quando o Tailwind v4 entrar, migram para o @theme.
+ * Tokens do design system do CLAUDE.md (Seção 4). Ainda como CSS variables
+ * puras; migram para o @theme quando o Tailwind v4 entrar (fase de UI).
  */
 :root {
   --primary: #820ad1;
@@ -14,7 +14,14 @@
   --ink-2: #6b6577;
   --positive: #00a868;
   --negative: #e5484d;
+  --warn: #f5a524;
+  --invest: #0f9b8e;
   --card-shadow: 0 1px 3px rgba(26, 21, 35, 0.06);
+  --card-border: transparent;
+  --ring: 0 0 0 4px rgba(130, 10, 209, 0.22);
+  --fab-shadow: 0 12px 30px rgba(130, 10, 209, 0.34);
+  --track: #e8e4ef;
+  --overlay: rgba(26, 21, 35, 0.04);
 }
 
 :root[data-theme='dark'] {
@@ -29,7 +36,14 @@
   --ink-2: #a79fb8;
   --positive: #3dd68c;
   --negative: #ff6369;
+  --warn: #f7b955;
+  --invest: #22c3b0;
   --card-shadow: none;
+  --card-border: #2e2740;
+  --ring: 0 0 0 4px rgba(168, 85, 247, 0.32);
+  --fab-shadow: 0 12px 32px rgba(168, 85, 247, 0.28);
+  --track: #2e2740;
+  --overlay: rgba(255, 255, 255, 0.05);
 }
 
 * {
@@ -53,4 +67,178 @@ body {
     Roboto,
     sans-serif;
   -webkit-font-smoothing: antialiased;
+}
+
+/* ─── Primitivas de UI (provisórias até o Tailwind/shadcn) ─────────────────── */
+
+.center-screen {
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.card {
+  width: 100%;
+  max-width: 420px;
+  background: var(--surface);
+  border: 1px solid var(--card-border);
+  border-radius: 20px;
+  box-shadow: var(--card-shadow);
+  padding: 28px;
+}
+
+.title {
+  margin: 0 0 4px;
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.title-brand {
+  color: var(--primary);
+}
+
+.subtitle {
+  margin: 0 0 22px;
+  color: var(--ink-2);
+  font-size: 14px;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-2);
+}
+
+.input {
+  width: 100%;
+  padding: 11px 13px;
+  font-size: 15px;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  outline: none;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
+}
+
+.input:focus {
+  border-color: var(--primary);
+  box-shadow: var(--ring);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 16px;
+  font-size: 15px;
+  font-weight: 600;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    opacity 0.15s;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.btn-primary {
+  background: var(--primary);
+  color: #fff;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--primary-hover);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--ink);
+  border-color: var(--line);
+}
+
+.btn-block {
+  width: 100%;
+}
+
+.alert {
+  padding: 10px 12px;
+  border-radius: 12px;
+  font-size: 13.5px;
+}
+
+.alert-error {
+  background: color-mix(in srgb, var(--negative) 12%, transparent);
+  color: var(--negative);
+}
+
+.alert-ok {
+  background: color-mix(in srgb, var(--positive) 14%, transparent);
+  color: var(--positive);
+}
+
+.muted {
+  color: var(--ink-2);
+  font-size: 13px;
+}
+
+.link {
+  color: var(--primary);
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.link:hover {
+  text-decoration: underline;
+}
+
+.row-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.codes {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--surface-2);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 14px;
+  letter-spacing: 0.04em;
+}
+
+.qr {
+  display: block;
+  width: 200px;
+  height: 200px;
+  margin: 4px auto;
+  border-radius: 12px;
+  background: #fff;
+  padding: 8px;
 }
