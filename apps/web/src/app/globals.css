@@ -1,6 +1,11 @@
+@import 'tailwindcss';
+
+/* Tema escuro por atributo [data-theme="dark"] no <html> (não por media query). */
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+
 /*
- * Tokens do design system do CLAUDE.md (Seção 4). Ainda como CSS variables
- * puras; migram para o @theme quando o Tailwind v4 entrar (fase de UI).
+ * Tokens do design system do CLAUDE.md (Seção 4) como CSS variables. Trocam no
+ * tema escuro; o @theme abaixo expõe cada um como cor/raio utilitário do Tailwind.
  */
 :root {
   --primary: #820ad1;
@@ -46,6 +51,29 @@
   --overlay: rgba(255, 255, 255, 0.05);
 }
 
+/* Mapeia os tokens (via var()) para utilitários do Tailwind: bg-surface, text-ink… */
+@theme inline {
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-soft: var(--primary-soft);
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-line: var(--line);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-positive: var(--positive);
+  --color-negative: var(--negative);
+  --color-warn: var(--warn);
+  --color-invest: var(--invest);
+
+  --radius-card: 20px;
+  --radius-control: 12px;
+
+  --font-sans:
+    Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -59,17 +87,11 @@ body {
 body {
   background: var(--bg);
   color: var(--ink);
-  font-family:
-    Inter,
-    -apple-system,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    Roboto,
-    sans-serif;
+  font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
 }
 
-/* ─── Primitivas de UI (provisórias até o Tailwind/shadcn) ─────────────────── */
+/* ─── Primitivas provisórias usadas pelas telas de auth (Fase 1) ──────────── */
 
 .center-screen {
   min-height: 100dvh;

@@ -1,70 +1,97 @@
 'use client';
 
+import { formatInSaoPaulo } from '@cifrao/shared';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useState } from 'react';
-import { signOut, useSession } from '@/lib/auth-client';
-import { clearApiToken } from '@/lib/session-actions';
+import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
+import { Card } from '@/components/ui/card';
+import { type Account, type Paginated, type Transaction, api } from '@/lib/api';
+import { brl } from '@/lib/format';
 
 export default function PainelPage() {
-  const router = useRouter();
-  const { data: session, isPending } = useSession();
-  const [apiResult, setApiResult] = useState<string | null>(null);
-  const twoFactorEnabled = Boolean(
-    (session?.user as { twoFactorEnabled?: boolean } | undefined)?.twoFactorEnabled,
-  );
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [recent, setRecent] = useState<Transaction[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  async function testarApi() {
-    const res = await fetch('/api/me');
-    const text = await res.text();
-    setApiResult(`HTTP ${res.status} — ${text}`);
-  }
+  useEffect(() => {
+    Promise.all([
+      api<Account[]>('/accounts'),
+      api<Paginated<Transaction>>('/transactions?pageSize=5'),
+    ])
+      .then(([a, t]) => {
+        setAccounts(a);
+        setRecent(t.items);
+      })
+      .catch((e) => toast.error((e as Error).message))
+      .finally(() => setLoading(false));
+  }, []);
 
-  async function sair() {
-    await signOut();
-    await clearApiToken();
-    router.push('/login');
-  }
+  const total = accounts.reduce((acc, a) => acc + Number(a.balanceCents), 0);
 
   return (
-    <main className="center-screen">
-      <section className="card">
-        <h1 className="title">
-          <span className="title-brand">Cifrão</span>
-        </h1>
-        <p className="subtitle">Painel — Fase 1 (autenticação)</p>
+    <div className="space-y-5">
+      <h1 className="text-2xl font-extrabold tracking-tight text-ink">Visão geral</h1>
 
-        {isPending ? (
-          <p className="muted">Carregando sessão…</p>
-        ) : (
-          <div className="stack">
-            <div className="field">
-              <span className="label">Logado como</span>
-              <span>{session?.user?.email ?? '—'}</span>
-            </div>
-            <div className="field">
-              <span className="label">2FA</span>
-              <span>{twoFactorEnabled ? 'ativado' : 'não ativado'}</span>
-            </div>
+      <Card className="bg-primary text-white">
+        <p className="text-sm text-white/80">Patrimônio em contas</p>
+        <p className="mt-1 text-3xl font-extrabold tabular-nums">{loading ? '—' : brl(total)}</p>
+      </Card>
 
-            <button className="btn btn-ghost btn-block" onClick={testarApi} type="button">
-              Testar rota protegida /api/me
-            </button>
-            {apiResult && (
-              <div className="alert alert-ok" style={{ wordBreak: 'break-word' }}>
-                {apiResult}
-              </div>
-            )}
-
-            <Link className="link" href="/configurar-2fa">
-              Configurar 2FA
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="font-semibold text-ink">Contas</h2>
+            <Link href="/painel/contas" className="text-sm font-medium text-primary hover:underline">
+              Ver todas
             </Link>
-            <button className="btn btn-primary btn-block" onClick={sair} type="button">
-              Sair
-            </button>
           </div>
-        )}
-      </section>
-    </main>
+          {accounts.length === 0 ? (
+            <p className="text-sm text-ink-2">Nenhuma conta.</p>
+          ) : (
+            <ul className="space-y-2">
+              {accounts.map((a) => (
+                <li key={a.id} className="flex items-center justify-between text-sm">
+                  <span className="flex items-center gap-2">
+                    <span
+                      className="h-2.5 w-2.5 rounded-full"
+                      style={{ background: a.color ?? 'var(--primary)' }}
+                    />
+                    {a.name}
+                  </span>
+                  <span className="font-semibold tabular-nums text-ink">{brl(a.balanceCents)}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+
+        <Card className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="font-semibold text-ink">Últimos lançamentos</h2>
+            <Link
+              href="/painel/lancamentos"
+              className="text-sm font-medium text-primary hover:underline"
+            >
+              Ver todos
+            </Link>
+          </div>
+          {recent.length === 0 ? (
+            <p className="text-sm text-ink-2">Nada ainda.</p>
+          ) : (
+            <ul className="space-y-2">
+              {recent.map((tx) => (
+                <li key={tx.id} className="flex items-center justify-between gap-2 text-sm">
+                  <span className="min-w-0 flex-1 truncate">
+                    {tx.description}
+                    <span className="text-ink-2"> · {formatInSaoPaulo(new Date(tx.date))}</span>
+                  </span>
+                  <span className="tabular-nums text-ink-2">{brl(tx.amountCents)}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+      </div>
+    </div>
   );
 }

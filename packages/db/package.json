@@ -18,6 +18,8 @@
     "migrate": "prisma migrate dev",
     "migrate:deploy": "prisma migrate deploy",
     "studio": "prisma studio",
+    "seed": "node prisma/seed.mjs",
+    "seed:demo": "node prisma/seed.mjs --demo",
     "lint": "eslint \"src/**/*.ts\"",
     "typecheck": "tsc --noEmit"
   },

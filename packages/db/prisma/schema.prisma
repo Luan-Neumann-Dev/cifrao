@@ -1,9 +1,10 @@
 // Schema do Cifrão.
 //
-// Fase 1: entidades de autenticação do Better Auth (User, Session, AuthAccount,
-// Verification, TwoFactor, Jwks). O model de credenciais é `AuthAccount` para
-// não colidir com a conta bancária `Account` (Seção 6), que entra na Fase 2.
-// As demais entidades de domínio da Seção 6 chegam nas fases seguintes.
+// Fase 1: autenticação do Better Auth (User, Session, AuthAccount, Verification,
+// TwoFactor, Jwks). O model de credenciais é `AuthAccount` para não colidir com
+// a conta bancária `Account`.
+// Fase 2: núcleo de domínio (Account, Category, Tag, Transaction, splits). Cartões,
+// faturas e parcelamento (creditCardId/invoiceId/purchaseId) entram na Fase 3.
 
 generator client {
   provider = "prisma-client-js"
@@ -91,4 +92,124 @@ model Jwks {
   publicKey  String
   privateKey String
   createdAt  DateTime @default(now())
+}
+
+// ─── Domínio (Fase 2) ─────────────────────────────────────────────────────────
+
+enum AccountType {
+  CHECKING
+  SAVINGS
+  WALLET
+  INVESTMENT
+}
+
+enum CategoryKind {
+  EXPENSE
+  INCOME
+  BOTH
+}
+
+enum TransactionType {
+  EXPENSE
+  INCOME
+  TRANSFER
+  ADJUSTMENT
+}
+
+enum TransactionStatus {
+  PENDING
+  CLEARED
+  FORECAST
+}
+
+model Account {
+  id           String      @id @default(cuid())
+  name         String
+  type         AccountType
+  balanceCents BigInt      @default(0)
+  color        String?
+  institution  String?
+  archived     Boolean     @default(false)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  transactions  Transaction[] @relation("AccountTransactions")
+  transfersFrom Transaction[] @relation("TransferFrom")
+  transfersTo   Transaction[] @relation("TransferTo")
+}
+
+model Category {
+  id       String       @id @default(cuid())
+  name     String
+  icon     String?
+  color    String?
+  kind     CategoryKind @default(BOTH)
+  parentId String?
+  parent   Category?    @relation("CategoryChildren", fields: [parentId], references: [id])
+  children Category[]   @relation("CategoryChildren")
+
+  transactions Transaction[]
+  splits       TransactionSplit[]
+
+  createdAt DateTime @default(now())
+}
+
+model Tag {
+  id           String           @id @default(cuid())
+  name         String           @unique
+  color        String?
+  transactions TransactionTag[]
+  createdAt    DateTime         @default(now())
+}
+
+model Transaction {
+  id                  String            @id @default(cuid())
+  type                TransactionType
+  amountCents         BigInt
+  date                DateTime
+  description         String
+  originalDescription String?
+  status              TransactionStatus @default(CLEARED)
+  notes               String?
+  isReimbursable      Boolean           @default(false)
+  reimbursedAt        DateTime?
+
+  accountId String?
+  account   Account? @relation("AccountTransactions", fields: [accountId], references: [id])
+
+  fromAccountId String?
+  fromAccount   Account? @relation("TransferFrom", fields: [fromAccountId], references: [id])
+  toAccountId   String?
+  toAccount     Account? @relation("TransferTo", fields: [toAccountId], references: [id])
+
+  categoryId String?
+  category   Category? @relation(fields: [categoryId], references: [id])
+
+  splits TransactionSplit[]
+  tags   TransactionTag[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([date])
+  @@index([accountId, date])
+  @@index([categoryId, date])
+}
+
+model TransactionSplit {
+  id            String      @id @default(cuid())
+  transactionId String
+  transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  categoryId    String
+  category      Category    @relation(fields: [categoryId], references: [id])
+  amountCents   BigInt
+}
+
+model TransactionTag {
+  transactionId String
+  transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  tagId         String
+  tag           Tag         @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([transactionId, tagId])
 }

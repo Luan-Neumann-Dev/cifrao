@@ -37,3 +37,23 @@ export function monthKeyInSaoPaulo(date: Date): string {
 export function formatInSaoPaulo(date: Date, pattern = 'dd/MM/yyyy'): string {
   return formatTz(toZonedTime(date, SP_TIMEZONE), pattern, { timeZone: SP_TIMEZONE });
 }
+
+/**
+ * Últimas `n` chaves de mês ("yyyy-MM") no fuso de São Paulo, da mais antiga
+ * para a mais recente. Aritmética inteira sobre ano/mês (sem armadilha de fuso).
+ */
+export function recentMonthKeys(n: number, refKey: string = monthKeyInSaoPaulo(nowUtc())): string[] {
+  const [y, m] = refKey.split('-').map(Number);
+  let year = y;
+  let month = m; // 1-12
+  const keys: string[] = [];
+  for (let i = 0; i < n; i++) {
+    keys.push(`${year}-${String(month).padStart(2, '0')}`);
+    month -= 1;
+    if (month === 0) {
+      month = 12;
+      year -= 1;
+    }
+  }
+  return keys.reverse();
+}

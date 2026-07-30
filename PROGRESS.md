@@ -72,6 +72,40 @@ Registro do que foi feito, decisões tomadas e pendências. Uma seção por fase
 
 ---
 
+## Fase 2 — Contas + Categorias + Lançamentos (núcleo) ✅
+
+### O que foi feito
+
+- **Schema de domínio** (Prisma): `Account`, `Category` (hierárquica), `Tag` + `TransactionTag`, `Transaction`, `TransactionSplit` e enums (`AccountType`, `CategoryKind`, `TransactionType`, `TransactionStatus`), com os índices obrigatórios em `Transaction`.
+- **Schemas Zod compartilhados** (`packages/shared`): fonte única de tipos (contas, categorias, tags, lançamentos, filtros, ações em lote). O Nest valida a entrada via `ZodValidationPipe`; o front infere os tipos.
+- **Lógica pura de lançamentos** (`transaction-logic.ts`) com testes: classificação, `accountDeltaCents` (saldo mantido), somas de caixa e `computeAdjustmentDeltaCents` (5.8).
+- **API (Nest)**: `PrismaService` global; CRUD de contas (com **ajuste de saldo 5.8** e **evolução de 6 meses**), categorias e tags; CRUD de lançamentos com **saldo mantido atomicamente** (create/update/delete/bulk dentro de `$transaction`), filtros (período, tipo, conta, categoria, tag, status, busca) + paginação, e ações em lote (categorizar, marcar efetivado, add tag, excluir).
+- **Frontend (Next + Tailwind v4 + shadcn-style)**: telas de Contas (cards de saldo, criar/editar, ajustar) e Lançamentos (filtros, lista, seleção múltipla + barra de lote, criar/editar despesa/receita/transferência, **exclusão com "desfazer"** via toast). Visão geral com patrimônio, contas e últimos lançamentos. Tokens do design no `@theme` do Tailwind.
+- **Seed**: 48 categorias BR padrão (+ "Ajuste"), idempotente. `seed:demo` gera ~4.700 lançamentos em 24 meses (armadilha #6).
+
+### Decisões tomadas (Fase 2)
+
+1. **Tailwind v4 + shadcn/ui agora** (aprovado): novas deps `tailwindcss`, `@tailwindcss/postcss`, `class-variance-authority`, `clsx`, `tailwind-merge`, `lucide-react`, `sonner`, `@radix-ui/react-dialog`, `@radix-ui/react-slot`. `zod` adicionado à API.
+2. **Saldo mantido** (aprovado): `Account.balanceCents` é o saldo atual, atualizado na mesma transação de cada mutação; `FORECAST` não move saldo. Leitura O(1); ajuste (5.8) = real − atual.
+3. **Transferência = 1 linha** `type=TRANSFER` com `from/to` (deriva da Seção 6); nunca entra em receita/despesa (5.7), garantido por teste puro + smoke no endpoint.
+4. **Colisão de nomes**: mantida a decisão da Fase 1 (`AuthAccount` para credenciais; `Account` é a conta bancária).
+5. **Exclusão com desfazer**: a UI remove otimisticamente e só confirma no servidor após o toast fechar (janela de "desfazer").
+6. **`declaration: false`** nos apps (Nest/Next) — evita TS2742 ao expor tipos inferidos do Prisma; os pacotes de lib (shared/db) seguem emitindo `.d.ts`.
+
+### Pendências / notas
+
+- Cartões, faturas e parcelamento (`creditCardId`/`invoiceId`/`purchaseId` em `Transaction`) entram na Fase 3.
+- Exclusão de conta é bloqueada quando há lançamentos (arquivar). Mesclar categorias fica para a Fase 9.
+- API carrega `.env` em dev via `process.loadEnvFile()` (arquivo `apps/api/.env`).
+
+### Aceite verificado (Fase 2)
+
+- **CI local**: `pnpm lint`, `pnpm typecheck`, `pnpm test` (**54 testes**: shared 34, api 15, web 5), `pnpm build` — todos verdes.
+- **Smoke funcional E2E (9/9)** pela API real (via proxy): despesa debita, receita credita, transferência move as duas contas; **filtro `EXPENSE` não inclui a transferência (5.7)**; **ajuste 5.8** cria `ADJUSTMENT` da diferença e reconcilia o saldo; excluir reverte o saldo.
+- **Performance**: lista paginada de 50 sobre **4.704 lançamentos em ~89ms**; `/accounts` em ~9ms.
+
+---
+
 ## Como rodar
 
 ```bash
@@ -79,7 +113,9 @@ pnpm install
 docker compose up -d db      # Postgres em dev (host:55432 -> container:5432)
 cp packages/db/.env.example packages/db/.env
 cp apps/web/.env.example apps/web/.env.local   # defina BETTER_AUTH_SECRET
+cp apps/api/.env.example apps/api/.env
 pnpm --filter @cifrao/db exec prisma migrate deploy   # aplica as migrações
+pnpm --filter @cifrao/db seed        # categorias padrão (seed:demo p/ ~5k lançamentos)
 pnpm test                    # testes (shared + api + web)
 pnpm dev                     # sobe banco + api (3001) + web (3000)
 ```

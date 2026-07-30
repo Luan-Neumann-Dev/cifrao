@@ -1,4 +1,5 @@
 import 'reflect-metadata';
+import './load-env'; // carrega .env antes de qualquer módulo instanciar o Prisma
 import { installBigIntJsonSerializer } from '@cifrao/shared';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
