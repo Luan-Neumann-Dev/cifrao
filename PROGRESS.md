@@ -137,6 +137,36 @@ Registro do que foi feito, decisões tomadas e pendências. Uma seção por fase
 
 ---
 
+## Fase 4 — Dashboard ✅
+
+### O que foi feito
+
+- **Endpoint único** `GET /dashboard?month=yyyy-MM` (`DashboardModule`) que agrega tudo em **~9 queries paralelas** com `groupBy` no banco (armadilha #5): saldos, disponível de verdade até o fim do mês, faturas abertas, gastos por categoria, totais do mês, timeline, patrimônio e insight.
+- **Lógica pura** (`packages/shared/dashboard-logic.ts`), testada: `computeAvailableEndOfMonthCents` (regra 5.11) e `pickTopInsight` (insight do mês).
+- **Tela `/painel` reconstruída**: hero "disponível de verdade até o fim do mês" com o detalhamento (saldo + previstos − previstos − cartão); cards de disponível hoje e patrimônio; totais do mês; timeline "o que vem por aí"; **gastos por categoria** (donut Recharts + legenda, **filtro por clique** → `/lancamentos` pré-filtrado por categoria e período); faturas abertas; insight do mês; últimos lançamentos; e orçamento com estado-vazio.
+- **Filtro por clique**: a tela de lançamentos passou a semear os filtros a partir da URL (`categoryId`, `from`, `to`, …), habilitando o drill-down do dashboard.
+
+### Decisões tomadas (Fase 4) — confirmadas com o dono
+
+1. **Escopo**: não puxei `Budget`/`RecurringRule` (Fase 5) para cá. Orçamento aparece com **estado-vazio** honesto; os "previstos" usam os `FORECAST` já existentes. Ambos são plugados na Fase 5.
+2. **Disponível de verdade até o fim do mês** (5.11): `saldo líquido hoje (contas não-investimento) + receitas previstas até o fim do mês − despesas previstas até o fim do mês − TODO o comprometido do cartão (faturas abertas + parcelas futuras)`. Pode ficar negativo (alerta de estouro).
+3. **Saldo disponível hoje** = soma das contas **não-investimento**; **patrimônio** = todas as contas − faturas em aberto (investimentos entram na Fase 8).
+4. **Insight do mês** = categoria com o maior estouro (delta positivo) vs. a **média dos últimos 3 meses**; ignora lançamentos sem categoria.
+5. Transferências/ajustes continuam fora dos gastos por categoria e dos totais do mês (5.7), pois os `groupBy` filtram `type in (EXPENSE, INCOME)`.
+
+### Pendências / notas
+
+- Orçamento resumido e geração automática de previstos entram na Fase 5 (o dashboard já tem os pontos de encaixe).
+- A tela `/painel` carrega ~284 kB (Recharts); dá para `next/dynamic` com lazy-load do gráfico depois, se incomodar.
+
+### Aceite verificado (Fase 4)
+
+- **CI local**: `pnpm lint`, `pnpm typecheck`, `pnpm test` (**83 testes**: shared 57, api 21, web 5) e `pnpm build` — todos verdes.
+- **Performance**: `GET /dashboard` sobre **4.704 lançamentos** = **min 19ms / p50 23ms / máx 33ms** em 10 chamadas — folgadamente abaixo do alvo de 1s.
+- Regra 5.11 (disponível até o fim do mês) e o insight do mês cobertos por teste puro em `dashboard-logic.test.ts`.
+
+---
+
 ## Como rodar
 
 ```bash

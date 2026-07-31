@@ -198,6 +198,17 @@ export const transactionFilterSchema = z.object({
 });
 export type TransactionFilter = z.infer<typeof transactionFilterSchema>;
 
+// ─── Dashboard ──────────────────────────────────────────────────────────────
+
+export const dashboardQuerySchema = z.object({
+  /** Mês de referência "yyyy-MM" (fuso de São Paulo). Padrão: mês corrente. */
+  month: z
+    .string()
+    .regex(/^\d{4}-\d{2}$/, 'Mês deve ser yyyy-MM')
+    .optional(),
+});
+export type DashboardQuery = z.infer<typeof dashboardQuerySchema>;
+
 export const bulkActionSchema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('categorize'), ids: z.array(z.string()).min(1), categoryId: z.string().min(1) }),
   z.object({ action: z.literal('setStatus'), ids: z.array(z.string()).min(1), status: transactionStatusSchema }),

@@ -97,6 +97,18 @@ export default function LancamentosPage() {
       .catch((e) => toast.error((e as Error).message));
   }, []);
 
+  // Filtro por clique vindo do dashboard: semeia os filtros a partir da URL.
+  useEffect(() => {
+    const sp = new URLSearchParams(window.location.search);
+    const keys: (keyof Filters)[] = ['from', 'to', 'type', 'accountId', 'categoryId', 'tagId', 'status', 'search'];
+    const seed: Partial<Filters> = {};
+    for (const k of keys) {
+      const v = sp.get(k);
+      if (v) seed[k] = v;
+    }
+    if (Object.keys(seed).length > 0) setFilters((f) => ({ ...f, ...seed }));
+  }, []);
+
   const query = useMemo(() => {
     const p = new URLSearchParams();
     for (const [k, v] of Object.entries(filters)) if (v) p.set(k, v);

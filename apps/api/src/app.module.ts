@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { AccountsModule } from './accounts/accounts.module';
 import { CategoriesModule } from './categories/categories.module';
 import { CreditCardsModule } from './credit-cards/credit-cards.module';
+import { DashboardModule } from './dashboard/dashboard.module';
 import { HealthModule } from './health/health.module';
 import { MeModule } from './me/me.module';
 import { PrismaModule } from './prisma/prisma.module';
@@ -18,6 +19,7 @@ import { TransactionsModule } from './transactions/transactions.module';
     TagsModule,
     TransactionsModule,
     CreditCardsModule,
+    DashboardModule,
   ],
 })
 export class AppModule {}

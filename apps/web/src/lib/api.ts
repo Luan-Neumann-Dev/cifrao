@@ -145,3 +145,75 @@ export interface CommitmentPoint {
   totalCents: string;
   remainingCents: string;
 }
+
+// ─── Dashboard (Fase 4) ────────────────────────────────────────────────────────
+
+export interface DashboardAccount {
+  id: string;
+  name: string;
+  type: AccountType;
+  color: string | null;
+  balanceCents: string;
+}
+
+export interface DashboardInvoice {
+  id: string;
+  creditCardId: string;
+  cardNickname: string;
+  cardColor: string | null;
+  referenceMonth: string;
+  closingDate: string;
+  dueDate: string;
+  totalCents: string;
+  paidCents: string;
+  remainingCents: string;
+  status: InvoiceStatus;
+}
+
+export interface DashboardCategorySpend {
+  categoryId: string | null;
+  name: string;
+  color: string | null;
+  icon: string | null;
+  cents: string;
+}
+
+export interface DashboardTimelineEvent {
+  date: string;
+  kind: 'invoice-due' | 'forecast-income' | 'forecast-expense';
+  label: string;
+  amountCents: string;
+  positive: boolean;
+}
+
+export interface DashboardInsight {
+  categoryId: string;
+  name: string;
+  color: string | null;
+  currentCents: string;
+  avgCents: string;
+  deltaCents: string;
+}
+
+export interface Dashboard {
+  month: string;
+  balances: {
+    availableTodayCents: string;
+    netWorthCents: string;
+    availableEndOfMonthCents: string;
+    accounts: DashboardAccount[];
+  };
+  availableBreakdown: {
+    liquidTodayCents: string;
+    forecastIncomeCents: string;
+    forecastExpenseCents: string;
+    cardCommittedCents: string;
+    resultCents: string;
+  };
+  monthTotals: { incomeCents: string; expenseCents: string; netCents: string };
+  openInvoices: DashboardInvoice[];
+  categorySpending: DashboardCategorySpend[];
+  insight: DashboardInsight | null;
+  timeline: DashboardTimelineEvent[];
+  recent: Transaction[];
+}
