@@ -2,11 +2,15 @@ import { z } from 'zod';
 import {
   accountTypeSchema,
   categoryKindSchema,
+  recurrenceFrequencySchema,
   transactionStatusSchema,
   transactionTypeSchema,
 } from './enums';
 
 const dayOfMonth = z.number().int().min(1).max(31);
+
+/** Chave de mês "yyyy-MM" (fuso de São Paulo). */
+export const monthKeySchema = z.string().regex(/^\d{4}-\d{2}$/, 'Mês deve ser yyyy-MM');
 
 /** Valor monetário em centavos trafega como inteiro seguro (regra 5.1). */
 const cents = z.number().int();
@@ -208,6 +212,115 @@ export const dashboardQuerySchema = z.object({
     .optional(),
 });
 export type DashboardQuery = z.infer<typeof dashboardQuerySchema>;
+
+// ─── Recorrências (regra 5.11) ────────────────────────────────────────────────
+
+const recurrenceBase = {
+  description: z.string().min(1).max(200),
+  amountCents: positiveCents,
+  frequency: recurrenceFrequencySchema,
+  startDate: z.coerce.date(),
+  endDate: z.coerce.date().optional().nullable(),
+  /** Dia do mês nas frequências mensais; padrão = dia do startDate. */
+  dayOfMonth: dayOfMonth.optional().nullable(),
+  notes: z.string().max(2000).optional(),
+  active: z.boolean().default(true),
+};
+
+const recurringExpenseSchema = z.object({
+  type: z.literal('EXPENSE'),
+  accountId: z.string().min(1),
+  categoryId: z.string().min(1).optional().nullable(),
+  ...recurrenceBase,
+});
+const recurringIncomeSchema = z.object({
+  type: z.literal('INCOME'),
+  accountId: z.string().min(1),
+  categoryId: z.string().min(1).optional().nullable(),
+  ...recurrenceBase,
+});
+const recurringTransferSchema = z.object({
+  type: z.literal('TRANSFER'),
+  fromAccountId: z.string().min(1),
+  toAccountId: z.string().min(1),
+  ...recurrenceBase,
+});
+
+/** Decisão da Fase 5: recorrência cobre conta (despesa/receita/transferência). */
+export const createRecurringRuleSchema = z
+  .discriminatedUnion('type', [recurringExpenseSchema, recurringIncomeSchema, recurringTransferSchema])
+  .superRefine((data, ctx) => {
+    if (data.type === 'TRANSFER' && data.fromAccountId === data.toAccountId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'A conta de origem e destino devem ser diferentes.',
+        path: ['toAccountId'],
+      });
+    }
+    if (data.endDate && data.endDate < data.startDate) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'A data final não pode ser antes do início.',
+        path: ['endDate'],
+      });
+    }
+  });
+export type CreateRecurringRuleInput = z.infer<typeof createRecurringRuleSchema>;
+
+/** Edição não troca tipo nem contas (isso é excluir e recriar, como no lançamento). */
+export const updateRecurringRuleSchema = z.object({
+  description: z.string().min(1).max(200).optional(),
+  amountCents: positiveCents.optional(),
+  frequency: recurrenceFrequencySchema.optional(),
+  startDate: z.coerce.date().optional(),
+  endDate: z.coerce.date().optional().nullable(),
+  dayOfMonth: dayOfMonth.optional().nullable(),
+  categoryId: z.string().min(1).optional().nullable(),
+  notes: z.string().max(2000).optional().nullable(),
+  active: z.boolean().optional(),
+});
+export type UpdateRecurringRuleInput = z.infer<typeof updateRecurringRuleSchema>;
+
+// ─── Orçamento (regra 5.10) ───────────────────────────────────────────────────
+
+export const upsertBudgetSchema = z.object({
+  categoryId: z.string().min(1),
+  month: monthKeySchema,
+  limitCents: cents.nonnegative(),
+});
+export type UpsertBudgetInput = z.infer<typeof upsertBudgetSchema>;
+
+export const monthQuerySchema = z.object({ month: monthKeySchema.optional() });
+export type MonthQuery = z.infer<typeof monthQuerySchema>;
+
+export const applySuggestionsSchema = z.object({
+  month: monthKeySchema,
+  /** Se omitido, aplica a sugestão de todas as categorias com histórico. */
+  categoryIds: z.array(z.string().min(1)).optional(),
+});
+export type ApplySuggestionsInput = z.infer<typeof applySuggestionsSchema>;
+
+// ─── Metas (regra 5.9) ────────────────────────────────────────────────────────
+
+export const createGoalSchema = z.object({
+  name: z.string().min(1).max(80),
+  targetCents: positiveCents,
+  deadline: z.coerce.date().optional().nullable(),
+  /** A meta aponta para um saldo que já existe — nunca cria saldo paralelo. */
+  linkedAccountId: z.string().min(1),
+  monthlyContributionCents: cents.nonnegative().optional().nullable(),
+});
+export type CreateGoalInput = z.infer<typeof createGoalSchema>;
+
+export const updateGoalSchema = z.object({
+  name: z.string().min(1).max(80).optional(),
+  targetCents: positiveCents.optional(),
+  deadline: z.coerce.date().optional().nullable(),
+  linkedAccountId: z.string().min(1).optional(),
+  monthlyContributionCents: cents.nonnegative().optional().nullable(),
+  archived: z.boolean().optional(),
+});
+export type UpdateGoalInput = z.infer<typeof updateGoalSchema>;
 
 export const bulkActionSchema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('categorize'), ids: z.array(z.string()).min(1), categoryId: z.string().min(1) }),

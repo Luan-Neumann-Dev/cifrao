@@ -6,3 +6,6 @@ export * from './schemas';
 export * from './transaction-logic';
 export * from './card-logic';
 export * from './dashboard-logic';
+export * from './recurrence-logic';
+export * from './budget-logic';
+export * from './goal-logic';

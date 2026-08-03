@@ -2,6 +2,7 @@ import type {
   AccountType,
   CategoryKind,
   InvoiceStatus,
+  RecurrenceFrequency,
   TransactionStatus,
   TransactionType,
 } from '@cifrao/shared';
@@ -195,6 +196,29 @@ export interface DashboardInsight {
   deltaCents: string;
 }
 
+export interface BudgetStatusFields {
+  limitCents: string;
+  spentCents: string;
+  remainingCents: string;
+  percentUsed: number;
+  dailyAllowanceCents: string;
+  daysRemaining: number;
+  over: boolean;
+}
+
+export interface DashboardBudgetItem extends BudgetStatusFields {
+  id: string;
+  categoryId: string;
+  category: { id: string; name: string; color: string | null; icon: string | null };
+}
+
+export interface DashboardBudgetSummary {
+  daysRemaining: number;
+  count: number;
+  items: DashboardBudgetItem[];
+  totals: BudgetStatusFields;
+}
+
 export interface Dashboard {
   month: string;
   balances: {
@@ -213,7 +237,125 @@ export interface Dashboard {
   monthTotals: { incomeCents: string; expenseCents: string; netCents: string };
   openInvoices: DashboardInvoice[];
   categorySpending: DashboardCategorySpend[];
+  budgetSummary: DashboardBudgetSummary;
   insight: DashboardInsight | null;
   timeline: DashboardTimelineEvent[];
   recent: Transaction[];
+}
+
+// ─── Recorrências, orçamento, metas, calendário (Fase 5) ──────────────────────
+
+export interface RecurringRule {
+  id: string;
+  description: string;
+  type: TransactionType;
+  amountCents: string;
+  frequency: RecurrenceFrequency;
+  dayOfMonth: number | null;
+  startDate: string;
+  endDate: string | null;
+  active: boolean;
+  notes: string | null;
+  accountId: string | null;
+  fromAccountId: string | null;
+  toAccountId: string | null;
+  categoryId: string | null;
+  lastGeneratedAt: string | null;
+  account: TransactionRef | null;
+  fromAccount: TransactionRef | null;
+  toAccount: TransactionRef | null;
+  category: (TransactionRef & { icon: string | null }) | null;
+  /** Prévia das próximas datas ("yyyy-MM-dd"), calculada no servidor. */
+  nextDates: string[];
+}
+
+export interface BudgetItem extends BudgetStatusFields {
+  id: string;
+  categoryId: string;
+  month: string;
+  category: { id: string; name: string; color: string | null; icon: string | null };
+}
+
+export interface BudgetList {
+  month: string;
+  daysRemaining: number;
+  items: BudgetItem[];
+  totals: BudgetStatusFields;
+}
+
+export interface BudgetSuggestion {
+  categoryId: string;
+  category: { id: string; name: string; color: string | null; icon: string | null } | null;
+  historyTotalCents: string;
+  suggestedCents: string;
+  currentLimitCents: string | null;
+}
+
+export interface BudgetSuggestions {
+  month: string;
+  months: number;
+  items: BudgetSuggestion[];
+}
+
+export interface Goal {
+  id: string;
+  name: string;
+  deadline: string | null;
+  archived: boolean;
+  monthlyContributionCents: string | null;
+  linkedAccount: {
+    id: string;
+    name: string;
+    type: AccountType;
+    color: string | null;
+    balanceCents: string;
+  };
+  targetCents: string;
+  currentCents: string;
+  remainingCents: string;
+  percent: number;
+  reached: boolean;
+  paceCents: string;
+  paceSource: 'history' | 'contribution' | 'none';
+  etaMonths: number | null;
+  etaMonth: string | null;
+  monthsToDeadline: number | null;
+  onTrack: boolean | null;
+}
+
+export interface CalendarEvent {
+  kind: 'forecast' | 'pending' | 'invoice-due';
+  id: string;
+  label: string;
+  deltaCents: string;
+  amountCents: string;
+  type?: TransactionType;
+  categoryName?: string | null;
+}
+
+export interface CalendarDay {
+  date: string;
+  isToday: boolean;
+  isPast: boolean;
+  projectedBalanceCents: string;
+  realizedDeltaCents: string;
+  projectedDeltaCents: string;
+  events: CalendarEvent[];
+}
+
+export interface CalendarMonth {
+  month: string;
+  todayKey: string;
+  balanceTodayCents: string;
+  endOfMonthBalanceCents: string;
+  lowestPoint: { date: string; projectedBalanceCents: string } | null;
+  days: CalendarDay[];
+}
+
+export interface Receivables {
+  pending: Transaction[];
+  pendingTotalCents: string;
+  pendingCount: number;
+  received: Transaction[];
+  receivedTotalCents: string;
 }

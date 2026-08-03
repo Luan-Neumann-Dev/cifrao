@@ -23,3 +23,7 @@ export type TransactionStatus = z.infer<typeof transactionStatusSchema>;
 export const INVOICE_STATUSES = ['OPEN', 'CLOSED', 'PAID', 'PARTIAL'] as const;
 export const invoiceStatusSchema = z.enum(INVOICE_STATUSES);
 export type InvoiceStatus = z.infer<typeof invoiceStatusSchema>;
+
+export const RECURRENCE_FREQUENCIES = ['WEEKLY', 'MONTHLY', 'QUARTERLY', 'YEARLY'] as const;
+export const recurrenceFrequencySchema = z.enum(RECURRENCE_FREQUENCIES);
+export type RecurrenceFrequency = z.infer<typeof recurrenceFrequencySchema>;

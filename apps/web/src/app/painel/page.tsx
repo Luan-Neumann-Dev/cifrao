@@ -16,23 +16,11 @@ import { type ReactNode, useEffect, useState } from 'react';
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts';
 import { toast } from 'sonner';
 import { Card } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
 import { type Dashboard, type DashboardCategorySpend, api } from '@/lib/api';
 import { brl } from '@/lib/format';
+import { monthLong, monthRange } from '@/lib/month';
 import { cn } from '@/lib/utils';
-
-const MONTHS_LONG = [
-  'janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
-  'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro',
-];
-function monthLong(ref: string): string {
-  const [y, m] = ref.split('-').map(Number);
-  return `${MONTHS_LONG[m - 1]} de ${y}`;
-}
-function monthRange(ref: string): { from: string; to: string } {
-  const [y, m] = ref.split('-').map(Number);
-  const last = new Date(y, m, 0).getDate();
-  return { from: `${ref}-01`, to: `${ref}-${String(last).padStart(2, '0')}` };
-}
 
 const PALETTE = ['#820AD1', '#00A868', '#F5A524', '#E5484D', '#0F9B8E', '#A855F7', '#6B08AD', '#22C3B0'];
 
@@ -120,7 +108,13 @@ export default function PainelPage() {
           <h2 className="font-semibold text-ink">O que vem por aí</h2>
         </div>
         {data.timeline.length === 0 ? (
-          <p className="text-sm text-ink-2">Nada previsto no horizonte. Cadastre recorrências na Fase 5.</p>
+          <p className="text-sm text-ink-2">
+            Nada previsto no horizonte.{' '}
+            <Link href="/painel/recorrencias" className="font-medium text-primary hover:underline">
+              Cadastre uma recorrência
+            </Link>{' '}
+            para o mês se planejar sozinho.
+          </p>
         ) : (
           <ul className="space-y-2">
             {data.timeline.map((e, i) => (
@@ -156,7 +150,7 @@ export default function PainelPage() {
 
       <div className="grid gap-4 lg:grid-cols-2">
         <InsightCard insight={data.insight} />
-        <BudgetEmptyCard />
+        <BudgetCard summary={data.budgetSummary} />
       </div>
 
       {/* Últimos lançamentos */}
@@ -354,14 +348,72 @@ function InsightCard({ insight }: { insight: Dashboard['insight'] }) {
   );
 }
 
-function BudgetEmptyCard() {
+function BudgetCard({ summary }: { summary: Dashboard['budgetSummary'] }) {
+  const totals = summary.totals;
   return (
-    <Card className="space-y-2">
-      <h2 className="font-semibold text-ink">Orçamento do mês</h2>
-      <p className="text-sm text-ink-2">
-        Ainda sem limites definidos. O orçamento por categoria (com média diária permitida e sugestão
-        de limites) chega na Fase 5.
-      </p>
+    <Card className="space-y-3">
+      <div className="flex items-center justify-between">
+        <h2 className="font-semibold text-ink">Orçamento do mês</h2>
+        <Link href="/painel/orcamento" className="text-sm font-medium text-primary hover:underline">
+          Gerenciar
+        </Link>
+      </div>
+
+      {summary.count === 0 ? (
+        <p className="text-sm text-ink-2">
+          Ainda sem limites definidos.{' '}
+          <Link href="/painel/orcamento" className="font-medium text-primary hover:underline">
+            Sugerir limites
+          </Link>{' '}
+          a partir da média dos últimos 3 meses.
+        </p>
+      ) : (
+        <>
+          <div className="flex items-baseline justify-between text-sm">
+            <span className="tabular-nums text-ink">
+              {brl(totals.spentCents)} <span className="text-ink-2">de {brl(totals.limitCents)}</span>
+            </span>
+            <span className={cn('text-xs font-medium', totals.over ? 'text-negative' : 'text-ink-2')}>
+              {Math.round(totals.percentUsed)}%
+            </span>
+          </div>
+          <Progress
+            value={totals.percentUsed}
+            barClassName={totals.over ? 'bg-negative' : 'bg-primary'}
+          />
+          <p className="text-xs text-ink-2">
+            {totals.over ? (
+              <span className="text-negative">Estourou {brl(-Number(totals.remainingCents))}.</span>
+            ) : summary.daysRemaining > 0 ? (
+              <>
+                {brl(totals.dailyAllowanceCents)} por dia nos {summary.daysRemaining} dias que faltam.
+              </>
+            ) : (
+              <>Mês encerrado com {brl(totals.remainingCents)} de folga.</>
+            )}
+          </p>
+
+          <ul className="space-y-2 pt-1">
+            {summary.items.map((item) => (
+              <li key={item.id} className="space-y-1">
+                <div className="flex items-baseline justify-between gap-2 text-sm">
+                  <span className="min-w-0 flex-1 truncate text-ink">{item.category.name}</span>
+                  <span className="shrink-0 text-xs tabular-nums text-ink-2">
+                    {brl(item.spentCents)} / {brl(item.limitCents)}
+                  </span>
+                </div>
+                <Progress
+                  value={item.percentUsed}
+                  className="h-1.5"
+                  barClassName={
+                    item.over ? 'bg-negative' : item.percentUsed >= 80 ? 'bg-warn' : 'bg-primary'
+                  }
+                />
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
     </Card>
   );
 }

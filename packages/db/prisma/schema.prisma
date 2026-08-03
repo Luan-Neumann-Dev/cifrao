@@ -6,6 +6,8 @@
 // Fase 2: núcleo de domínio (Account, Category, Tag, Transaction, splits).
 // Fase 3: cartões e faturas (CreditCard, Invoice, Purchase) + campos de cartão em
 // Transaction (creditCardId/invoiceId/purchaseId/parcelas).
+// Fase 5: recorrências (RecurringRule + recurringRuleId em Transaction), orçamento
+// (Budget) e metas (Goal — aponta para saldo existente, nunca cria saldo).
 
 generator client {
   provider = "prisma-client-js"
@@ -138,6 +140,11 @@ model Account {
   transfersFrom Transaction[] @relation("TransferFrom")
   transfersTo   Transaction[] @relation("TransferTo")
   defaultForCards CreditCard[] @relation("CardDefaultPayment")
+
+  recurringRules     RecurringRule[] @relation("RecurringAccount")
+  recurringFrom      RecurringRule[] @relation("RecurringFrom")
+  recurringTo        RecurringRule[] @relation("RecurringTo")
+  goals              Goal[]          @relation("GoalAccount")
 }
 
 model Category {
@@ -153,6 +160,8 @@ model Category {
   transactions Transaction[]
   splits       TransactionSplit[]
   purchases    Purchase[]
+  budgets      Budget[]
+  recurringRules RecurringRule[]
 
   createdAt DateTime @default(now())
 }
@@ -200,6 +209,11 @@ model Transaction {
   installmentNumber Int?
   installmentTotal  Int?
 
+  // Recorrência (Fase 5). Previstos gerados por uma regra apontam para ela.
+  // SetNull: apagar a regra preserva o histórico já efetivado.
+  recurringRuleId String?
+  recurringRule   RecurringRule? @relation(fields: [recurringRuleId], references: [id], onDelete: SetNull)
+
   splits TransactionSplit[]
   tags   TransactionTag[]
 
@@ -210,6 +224,8 @@ model Transaction {
   @@index([accountId, date])
   @@index([categoryId, date])
   @@index([invoiceId])
+  @@index([recurringRuleId, date])
+  @@index([status, date])
 }
 
 // ─── Cartões e faturas (Fase 3) ────────────────────────────────────────────────
@@ -291,4 +307,81 @@ model TransactionTag {
   tag           Tag         @relation(fields: [tagId], references: [id], onDelete: Cascade)
 
   @@id([transactionId, tagId])
+}
+
+// ─── Recorrências, orçamento e metas (Fase 5) ─────────────────────────────────
+
+enum RecurrenceFrequency {
+  WEEKLY
+  MONTHLY
+  QUARTERLY
+  YEARLY
+}
+
+/// Regra 5.11: gera lançamentos previstos (status = FORECAST) até a data final
+/// ou até o horizonte rolante. O previsto vira efetivado quando o usuário
+/// confirma. Nesta fase o template cobre conta (despesa/receita/transferência).
+model RecurringRule {
+  id          String              @id @default(cuid())
+  description String
+  type        TransactionType
+  amountCents BigInt
+  frequency   RecurrenceFrequency
+  /// Dia do mês nas frequências mensais; null = usa o dia do startDate.
+  dayOfMonth  Int?
+  startDate   DateTime
+  endDate     DateTime?
+  active      Boolean             @default(true)
+  notes       String?
+
+  accountId String?
+  account   Account? @relation("RecurringAccount", fields: [accountId], references: [id])
+
+  fromAccountId String?
+  fromAccount   Account? @relation("RecurringFrom", fields: [fromAccountId], references: [id])
+  toAccountId   String?
+  toAccount     Account? @relation("RecurringTo", fields: [toAccountId], references: [id])
+
+  categoryId String?
+  category   Category? @relation(fields: [categoryId], references: [id])
+
+  lastGeneratedAt DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  transactions Transaction[]
+
+  @@index([active])
+}
+
+/// Regra 5.10: limite mensal por categoria.
+model Budget {
+  id         String   @id @default(cuid())
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  /// "yyyy-MM" no fuso de São Paulo.
+  month      String
+  limitCents BigInt
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([categoryId, month])
+  @@index([month])
+}
+
+/// Regra 5.9: a meta é vinculada a uma conta/investimento que JÁ EXISTE. Ela não
+/// move dinheiro nem cria saldo paralelo — o progresso é lido do saldo vinculado.
+model Goal {
+  id                       String    @id @default(cuid())
+  name                     String
+  targetCents              BigInt
+  deadline                 DateTime?
+  linkedAccountId          String
+  linkedAccount            Account   @relation("GoalAccount", fields: [linkedAccountId], references: [id])
+  monthlyContributionCents BigInt?
+  archived                 Boolean   @default(false)
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
+
+  @@index([linkedAccountId])
 }

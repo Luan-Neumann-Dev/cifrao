@@ -167,6 +167,43 @@ Registro do que foi feito, decisões tomadas e pendências. Uma seção por fase
 
 ---
 
+## Fase 5 — Recorrências, orçamento e metas ✅
+
+### O que foi feito
+
+- **Schema** (Prisma, migração `recorrencias_orcamento_metas`): `RecurringRule` (+ enum `RecurrenceFrequency`: WEEKLY/MONTHLY/QUARTERLY/YEARLY), `Budget` (`@@unique([categoryId, month])`), `Goal` (aponta para `Account`), campo `recurringRuleId` em `Transaction` com `onDelete: SetNull` e índices `@@index([recurringRuleId, date])` / `@@index([status, date])`.
+- **Lógica pura** (`packages/shared`), toda testada: `recurrence-logic.ts` (`occurrencesUntil`, `occurrencesBetween`, `nextOccurrences` — 5.11), `budget-logic.ts` (`computeBudgetStatus`, `daysRemainingInMonth`, `suggestLimitCents` — 5.10) e `goal-logic.ts` (`computeGoalProgress`, `goalOnTrack` — 5.9).
+- **API**: `RecurringModule` (CRUD + geração de previstos com horizonte rolante de 12 meses + `POST /recurring-rules/generate` + **cron diário às 03:00 SP** via `@nestjs/schedule`); `BudgetsModule` (lista com gasto/restante/média diária, upsert, sugestão pela média de 3 meses e aplicação em lote); `GoalsModule` (CRUD + progresso lido do saldo vinculado + ETA); `CalendarModule` (`GET /calendar` com saldo projetado dia a dia); `ReceivablesModule` (`GET /receivables`, regra 5.13). O **dashboard** ganhou `budgetSummary` (reaproveitando o `groupBy` de gastos por categoria).
+- **Frontend**: telas de **Recorrências** (prévia das 3 próximas datas, pausar/reativar, efetivar previsto), **Orçamento** (navegação por mês, barras, média diária, diálogo de sugestão de limites), **Metas** (progresso, ETA, aviso de que não move dinheiro), **Calendário** (área Recharts do saldo projetado, ponto mais baixo, alerta de saldo negativo, eventos por dia) e **A receber** (pendentes, marcar recebido, histórico). Nav virou pill-row rolável (9 seções em 380px) e o card de orçamento do painel deixou de ser estado-vazio.
+
+### Decisões tomadas (Fase 5) — confirmadas com o dono
+
+1. **Recorrência cobre só conta** (EXPENSE/INCOME/TRANSFER) nesta fase. Assinatura lançada no cartão ficou de fora: exigiria decidir se previsto entra no total da fatura e no "disponível de verdade" — hoje não entra.
+2. **ETA da meta** = ritmo histórico (variação média mensal do saldo vinculado nos 3 meses completos anteriores, agregada no banco); sem histórico positivo, cai para o `monthlyContributionCents` declarado; sem os dois, não há ETA (nunca se inventa prazo).
+3. **Calendário desconta a fatura no vencimento**, como evento de fatura marcado — nunca como despesa (5.6). Vencimento já passado e não pago vira alerta, não projeção.
+4. **Horizonte rolante de 12 meses**, regerado a cada mudança na regra e pelo cron diário. A geração é **idempotente**: apaga e reescreve só os previstos de hoje em diante, e **nunca recria uma data já efetivada** (evita duplicata quando um previsto vira lançamento).
+5. **Confirmar previsto = `PATCH /transactions/:id { status: 'CLEARED' }`** — reaproveita o caminho de saldo já testado da Fase 2, sem endpoint novo.
+6. **Excluir regra preserva histórico**: remove os previstos futuros e desliga o vínculo (`SetNull`) do que já foi efetivado.
+7. **5.13 marca status, não movimenta dinheiro**: "marcar como recebido" grava `reimbursedAt`. A entrada do dinheiro é um lançamento de receita normal — assim o relatório não infla receita automaticamente.
+8. **Base da projeção do calendário** = saldo mantido de hoje (contas não-investimento). Dias passados são reconstruídos para trás com os realizados; meses inteiramente passados/futuros usam um ajuste agregado no banco.
+
+### Pendências / notas
+
+- O cron roda em **toda instância** da API. Com uma só (o alvo do Coolify) está correto; se um dia houver réplica, precisa de lock — a fila do pg-boss da Fase 6 resolve isso.
+- `nextDates` da regra é calculado no servidor a cada listagem (barato, lógica pura); não é persistido.
+- Recorrência não altera lançamentos previstos **passados** — eles ficam como estavam até o usuário confirmar ou excluir.
+- Editar a regra troca tipo/contas não é suportado (é excluir e recriar), mesmo padrão do lançamento na Fase 2.
+
+### Aceite verificado (Fase 5)
+
+- **CI local**: `pnpm lint` (4/4), `pnpm typecheck` (6/6), `pnpm test` (**118 testes**: shared 80, api 33, web 5) e `pnpm build` (4/4) — todos verdes.
+- **Aceite 1 — "uma recorrência mensal gera previstos corretos por 12 meses"**: coberto por teste puro (`recurrence-logic.test.ts`), teste de serviço (`recurring-rules.service.test.ts`) e **smoke na API real**: 12 previstos, 12 meses consecutivos e distintos, todos no dia 10 no fuso de SP, todos `FORECAST`, **sem mover saldo**.
+- **Aceite 2 — "meta nunca cria saldo novo"**: teste de serviço com Prisma fake que **falha se houver qualquer escrita** em conta ou lançamento, mais smoke real: criar/editar/excluir meta não altera saldo, não cria lançamento e não mexe no patrimônio.
+- **Smoke funcional E2E (41/41)** pela API real (via proxy): regeneração idempotente sem duplicar mês já efetivado; efetivar previsto debita a conta; orçamento com gasto/restante/média diária e **transferência fora do orçamento (5.7)**; dashboard com `budgetSummary`; calendário ancorado no saldo líquido de hoje; reembolsável entra e sai de "A receber".
+- **Performance** com **5.012 lançamentos**: `/calendar` p50 32ms, `/dashboard` p50 17ms, `/budgets` p50 13ms, `/goals` p50 8ms, `/recurring-rules` p50 10ms, `/receivables` p50 13ms.
+
+---
+
 ## Como rodar
 
 ```bash

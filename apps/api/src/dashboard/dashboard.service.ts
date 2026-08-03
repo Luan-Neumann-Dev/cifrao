@@ -4,6 +4,8 @@ import {
   type DashboardQuery,
   addMonths,
   computeAvailableEndOfMonthCents,
+  computeBudgetStatus,
+  daysRemainingInMonth,
   deriveInvoiceStatus,
   monthKeyInSaoPaulo,
   pickTopInsight,
@@ -57,6 +59,7 @@ export class DashboardService {
       forecastTypeRows,
       forecastUpcoming,
       recent,
+      budgets,
     ] = await Promise.all([
       db.account.findMany({ where: { archived: false }, orderBy: { createdAt: 'asc' } }),
       db.invoice.findMany({ include: { creditCard: { select: { id: true, nickname: true, color: true } } } }),
@@ -96,6 +99,11 @@ export class DashboardService {
         orderBy: [{ date: 'desc' }, { createdAt: 'desc' }],
         take: 8,
         include: recentInclude,
+      }),
+      // Orçamento do mês (Fase 5): reaproveita o groupBy de gastos por categoria.
+      db.budget.findMany({
+        where: { month: monthKey },
+        include: { category: { select: { id: true, name: true, color: true, icon: true } } },
       }),
     ]);
 
@@ -188,6 +196,35 @@ export class DashboardService {
         }
       : null;
 
+    // ── Orçamento do mês (regra 5.10) ─────────────────────────────────────────
+    const spentByCategory = new Map<string, bigint>();
+    for (const row of categorySpendRows) {
+      if (row.categoryId) spentByCategory.set(row.categoryId, row._sum.amountCents ?? 0n);
+    }
+    const daysRemaining = daysRemainingInMonth(year, month, t);
+    const budgetItems = budgets
+      .map((b) => ({
+        id: b.id,
+        categoryId: b.categoryId,
+        category: b.category,
+        ...computeBudgetStatus({
+          limitCents: b.limitCents,
+          spentCents: spentByCategory.get(b.categoryId) ?? 0n,
+          daysRemaining,
+        }),
+      }))
+      .sort((a, b) => b.percentUsed - a.percentUsed);
+    const budgetSummary = {
+      daysRemaining,
+      count: budgetItems.length,
+      items: budgetItems.slice(0, 5),
+      totals: computeBudgetStatus({
+        limitCents: budgetItems.reduce((acc, i) => acc + i.limitCents, 0n),
+        spentCents: budgetItems.reduce((acc, i) => acc + i.spentCents, 0n),
+        daysRemaining,
+      }),
+    };
+
     // ── Timeline "o que vem por aí" ───────────────────────────────────────────
     type Event = { date: Date; kind: string; label: string; amountCents: bigint; positive: boolean };
     const events: Event[] = [];
@@ -238,6 +275,7 @@ export class DashboardService {
       monthTotals: { incomeCents, expenseCents, netCents: incomeCents - expenseCents },
       openInvoices: openInvoicesTop,
       categorySpending,
+      budgetSummary,
       insight,
       timeline,
       recent,
