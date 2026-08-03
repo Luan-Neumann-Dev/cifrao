@@ -184,7 +184,7 @@ Registro do que foi feito, decisões tomadas e pendências. Uma seção por fase
 4. **Horizonte rolante de 12 meses**, regerado a cada mudança na regra e pelo cron diário. A geração é **idempotente**: apaga e reescreve só os previstos de hoje em diante, e **nunca recria uma data já efetivada** (evita duplicata quando um previsto vira lançamento).
 5. **Confirmar previsto = `PATCH /transactions/:id { status: 'CLEARED' }`** — reaproveita o caminho de saldo já testado da Fase 2, sem endpoint novo.
 6. **Excluir regra preserva histórico**: remove os previstos futuros e desliga o vínculo (`SetNull`) do que já foi efetivado.
-7. **5.13 marca status, não movimenta dinheiro**: "marcar como recebido" grava `reimbursedAt`. A entrada do dinheiro é um lançamento de receita normal — assim o relatório não infla receita automaticamente.
+7. **5.13 com estorno vinculado** (revisto após a Fase 5 — ver adendo abaixo).
 8. **Base da projeção do calendário** = saldo mantido de hoje (contas não-investimento). Dias passados são reconstruídos para trás com os realizados; meses inteiramente passados/futuros usam um ajuste agregado no banco.
 
 ### Pendências / notas
@@ -201,6 +201,79 @@ Registro do que foi feito, decisões tomadas e pendências. Uma seção por fase
 - **Aceite 2 — "meta nunca cria saldo novo"**: teste de serviço com Prisma fake que **falha se houver qualquer escrita** em conta ou lançamento, mais smoke real: criar/editar/excluir meta não altera saldo, não cria lançamento e não mexe no patrimônio.
 - **Smoke funcional E2E (41/41)** pela API real (via proxy): regeneração idempotente sem duplicar mês já efetivado; efetivar previsto debita a conta; orçamento com gasto/restante/média diária e **transferência fora do orçamento (5.7)**; dashboard com `budgetSummary`; calendário ancorado no saldo líquido de hoje; reembolsável entra e sai de "A receber".
 - **Performance** com **5.012 lançamentos**: `/calendar` p50 32ms, `/dashboard` p50 17ms, `/budgets` p50 13ms, `/goals` p50 8ms, `/recurring-rules` p50 10ms, `/receivables` p50 13ms.
+
+---
+
+## Adendo à Fase 5 — Reembolso com estorno vinculado (regra 5.13) ✅
+
+Revisão da decisão 7 da Fase 5, tomada junto com o dono antes de abrir a Fase 6 —
+de propósito: os relatórios da Fase 7 ainda não existem, então as queries já
+nascem sabendo abater reembolso, em vez de virar retrabalho depois.
+
+### O problema com a versão anterior
+
+"Marcar como recebido" só gravava `reimbursedAt`. Duas consequências: o dinheiro
+que voltou **não entrava no saldo** (o botão dizia "Recebi" e nada se movia), e o
+gasto reembolsado **continuava consumindo o orçamento** da categoria.
+
+### O que foi feito
+
+- **Schema** (migração `reembolso_estorno_vinculado`): auto-relação
+  `Transaction.reimbursesTransactionId` → `reimbursements[]`, com
+  `onDelete: Restrict` e `@@index([reimbursesTransactionId])`.
+- **`POST /transactions/:id/reimburse`** (`{ accountId, amountCents?, date? }`):
+  cria um `INCOME` vinculado que **credita a conta escolhida** e **herda a
+  categoria do gasto**. Sem `amountCents`, estorna o que falta. **Suporta
+  parcial**: enquanto os estornos não cobrem o valor, o gasto continua em "A
+  receber" com barra de progresso. `DELETE /transactions/:id/reimburse` desfaz.
+- **Agregações líquidas** (`common/expense-aggregates.ts`): gasto por categoria
+  passa a ser bruto − estornos, e a receita do mês **exclui estornos**. Usado por
+  orçamento (mês e janela de sugestão), gastos por categoria, totais do mês e
+  insight.
+- **Lógica pura**: `isReimbursementRefund` + `sumExpenseCents`/`sumIncomeCents`/
+  `sumByCategory` netando o estorno.
+- **Exclusão segura**: apagar um gasto reembolsado remove os estornos **revertendo
+  o saldo** (`deleteWithRefunds`), nunca por cascade do banco; apagar um estorno
+  recalcula o `reimbursedAt` do gasto (`syncReimbursedAt`). Vale para exclusão
+  simples e em lote.
+- **UI**: "Recebi" abre diálogo com conta de destino e valor (padrão = o que
+  falta); pendentes parciais mostram quanto voltou e quanto falta; "desfazer"
+  remove os estornos.
+
+### Decisões
+
+1. **Estorno é atribuído ao mês e à categoria do gasto ORIGINAL**, não à data em
+   que o dinheiro voltou. Um almoço de julho reembolsado em agosto deixa de pesar
+   no orçamento de **julho** — que é a pergunta real ("quanto eu gastei em
+   julho?"). Efeito colateral aceito: um mês fechado pode mudar retroativamente.
+2. **Estorno nunca é receita.** Sem isso, um mês com R$ 3.000 de reembolsos
+   apareceria como "receita 8.000 / despesa 8.000" em vez de 5.000 / 5.000.
+3. **No saldo, estorno é entrada normal** (`accountDeltaCents` não muda): o
+   dinheiro voltou de verdade. Só a leitura de relatório é que difere.
+4. Só **despesa efetivada e marcada como reembolsável** pode ser estornada
+   (previsto e receita são recusados com mensagem explícita).
+
+### Aceite verificado (adendo)
+
+- **CI local**: lint (4/4), typecheck (6/6), `pnpm test` (**135 testes**: shared
+  89, api 41, web 5), build (4/4) — verdes.
+- **Testes de regra**: `reimbursement-logic.test.ts` (9, lógica pura: estorno
+  credita saldo, não é receita, abate a categoria, parcial) e
+  `reimbursement.service.test.ts` (8, serviço: vínculo, herança de categoria,
+  crédito na conta, parcial mantém pendente, travas, desfazer devolve o saldo).
+- **Smoke E2E (28/28)** na API real: reembolso total zera o gasto no orçamento e
+  devolve o saldo; **receita do mês não infla**; parcial deixa o restante
+  pendente e cobra só a diferença no orçamento; desfazer devolve o dinheiro e o
+  gasto volta a pesar; excluir gasto reembolsado leva o estorno junto com o saldo
+  fechando. O smoke da Fase 5 seguiu verde (**42/42**).
+
+### Pendências
+
+- O gasto reembolsável ainda consome **limite de cartão** normalmente quando é
+  compra no cartão — o estorno credita a conta, não a fatura. Estorno na própria
+  fatura é outro caso (5.6) e não foi tocado.
+- Relatórios da Fase 7 devem usar `netExpenseByCategory`/`netIncomeCents` em vez
+  de `groupBy` cru, senão o abatimento se perde.
 
 ---
 

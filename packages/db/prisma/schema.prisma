@@ -214,6 +214,14 @@ model Transaction {
   recurringRuleId String?
   recurringRule   RecurringRule? @relation(fields: [recurringRuleId], references: [id], onDelete: SetNull)
 
+  // Reembolso (regra 5.13): o estorno é um INCOME vinculado ao gasto original.
+  // Credita a conta, abate o gasto da categoria e NÃO conta como receita.
+  // Restrict: o banco impede apagar o gasto deixando estorno órfão — o serviço
+  // remove os estornos revertendo o saldo antes de excluir o gasto.
+  reimbursesTransactionId String?
+  reimburses              Transaction?  @relation("Reimbursement", fields: [reimbursesTransactionId], references: [id], onDelete: Restrict)
+  reimbursements          Transaction[] @relation("Reimbursement")
+
   splits TransactionSplit[]
   tags   TransactionTag[]
 
@@ -226,6 +234,7 @@ model Transaction {
   @@index([invoiceId])
   @@index([recurringRuleId, date])
   @@index([status, date])
+  @@index([reimbursesTransactionId])
 }
 
 // ─── Cartões e faturas (Fase 3) ────────────────────────────────────────────────

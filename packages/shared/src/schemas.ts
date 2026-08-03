@@ -186,6 +186,18 @@ export const updateTransactionSchema = z.object({
 });
 export type UpdateTransactionInput = z.infer<typeof updateTransactionSchema>;
 
+/**
+ * Regra 5.13 — registrar o recebimento de um reembolsável. Gera um estorno
+ * vinculado que credita a conta e abate o gasto. Sem `amountCents`, estorna o
+ * que ainda falta (suporta reembolso parcial).
+ */
+export const reimburseSchema = z.object({
+  accountId: z.string().min(1),
+  amountCents: positiveCents.optional(),
+  date: z.coerce.date().optional(),
+});
+export type ReimburseInput = z.infer<typeof reimburseSchema>;
+
 // ─── Filtros e ações em lote ───────────────────────────────────────────────────
 
 export const transactionFilterSchema = z.object({

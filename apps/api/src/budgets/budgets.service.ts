@@ -11,6 +11,7 @@ import {
   saoPauloWallClockToUtc,
   suggestLimitCents,
 } from '@cifrao/shared';
+import { netExpenseByCategory } from '../common/expense-aggregates';
 import { PrismaService } from '../prisma/prisma.service';
 
 /** Janela usada pela sugestão de limites (regra 5.10). */
@@ -30,22 +31,19 @@ export class BudgetsService {
     const { start, end } = monthRange(month);
     const [year, monthNumber] = month.split('-').map(Number);
 
-    const [budgets, spendRows] = await Promise.all([
+    const [budgets, spend] = await Promise.all([
       this.prisma.client.budget.findMany({
         where: { month },
         include: { category: { select: { id: true, name: true, color: true, icon: true } } },
       }),
-      this.prisma.client.transaction.groupBy({
-        by: ['categoryId'],
-        where: { type: 'EXPENSE', status: { not: 'FORECAST' }, date: { gte: start, lt: end } },
-        _sum: { amountCents: true },
+      // Gasto líquido: reembolso recebido não consome orçamento (regra 5.13).
+      netExpenseByCategory(this.prisma.client, {
+        status: { not: 'FORECAST' },
+        date: { gte: start, lt: end },
       }),
     ]);
 
-    const spentByCategory = new Map<string, bigint>();
-    for (const row of spendRows) {
-      if (row.categoryId) spentByCategory.set(row.categoryId, row._sum.amountCents ?? 0n);
-    }
+    const spentByCategory = spend.byCategory;
 
     const daysRemaining = daysRemainingInMonth(year, monthNumber, saoPauloDateParts(new Date()));
     const items = budgets
@@ -118,15 +116,11 @@ export class BudgetsService {
       '00:00:00',
     );
 
-    const [rows, categories, existing] = await Promise.all([
-      this.prisma.client.transaction.groupBy({
-        by: ['categoryId'],
-        where: {
-          type: 'EXPENSE',
-          status: { not: 'FORECAST' },
-          date: { gte: windowStart, lt: monthStart },
-        },
-        _sum: { amountCents: true },
+    const [history, categories, existing] = await Promise.all([
+      // Média dos 3 meses também é líquida de reembolso (5.13).
+      netExpenseByCategory(this.prisma.client, {
+        status: { not: 'FORECAST' },
+        date: { gte: windowStart, lt: monthStart },
       }),
       this.prisma.client.category.findMany({
         select: { id: true, name: true, color: true, icon: true },
@@ -140,19 +134,16 @@ export class BudgetsService {
     return {
       month,
       months: SUGGESTION_MONTHS,
-      items: rows
-        .filter((r) => r.categoryId !== null && (r._sum.amountCents ?? 0n) > 0n)
-        .map((r) => {
-          const categoryId = r.categoryId as string;
+      items: [...history.byCategory.entries()]
+        .filter(([categoryId, total]) => categoryId !== null && total > 0n)
+        .map(([key, total]) => {
+          const categoryId = key as string;
           // O total da janela já é a soma dos 3 meses; o divisor é a janela inteira.
-          const suggestedCents = suggestLimitCents(
-            [r._sum.amountCents ?? 0n],
-            SUGGESTION_MONTHS,
-          );
+          const suggestedCents = suggestLimitCents([total], SUGGESTION_MONTHS);
           return {
             categoryId,
             category: catById.get(categoryId) ?? null,
-            historyTotalCents: r._sum.amountCents ?? 0n,
+            historyTotalCents: total,
             suggestedCents,
             currentLimitCents: currentByCategory.get(categoryId) ?? null,
           };

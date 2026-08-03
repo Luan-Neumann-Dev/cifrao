@@ -12,10 +12,12 @@ import {
 import {
   type BulkActionInput,
   type CreateTransactionInput,
+  type ReimburseInput,
   type TransactionFilter,
   type UpdateTransactionInput,
   bulkActionSchema,
   createTransactionSchema,
+  reimburseSchema,
   transactionFilterSchema,
   updateTransactionSchema,
 } from '@cifrao/shared';
@@ -46,6 +48,20 @@ export class TransactionsController {
   @Post('bulk')
   bulk(@Body(new ZodValidationPipe(bulkActionSchema)) dto: BulkActionInput) {
     return this.service.bulk(dto);
+  }
+
+  /** Regra 5.13: registra o recebimento (estorno vinculado, total ou parcial). */
+  @Post(':id/reimburse')
+  reimburse(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(reimburseSchema)) dto: ReimburseInput,
+  ) {
+    return this.service.reimburse(id, dto);
+  }
+
+  @Delete(':id/reimburse')
+  undoReimburse(@Param('id') id: string) {
+    return this.service.undoReimburse(id);
   }
 
   @Patch(':id')

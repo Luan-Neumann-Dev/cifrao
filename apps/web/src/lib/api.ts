@@ -352,10 +352,27 @@ export interface CalendarMonth {
   days: CalendarDay[];
 }
 
+export interface Refund {
+  id: string;
+  amountCents: string;
+  date: string;
+  account: TransactionRef | null;
+}
+
+/** Gasto reembolsável com o quanto já voltou (regra 5.13, suporta parcial). */
+export interface Receivable extends Transaction {
+  reimbursements: Refund[];
+  reimbursedCents: string;
+  remainingCents: string;
+  partial: boolean;
+}
+
 export interface Receivables {
-  pending: Transaction[];
+  pending: Receivable[];
+  /** O que ainda falta entrar (já desconta os parciais recebidos). */
   pendingTotalCents: string;
   pendingCount: number;
-  received: Transaction[];
+  pendingGrossCents: string;
+  received: Receivable[];
   receivedTotalCents: string;
 }

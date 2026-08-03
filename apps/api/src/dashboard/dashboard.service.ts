@@ -12,6 +12,7 @@ import {
   saoPauloDateParts,
   saoPauloWallClockToUtc,
 } from '@cifrao/shared';
+import { netExpenseByCategory } from '../common/expense-aggregates';
 import { PrismaService } from '../prisma/prisma.service';
 
 const recentInclude = {
@@ -53,9 +54,9 @@ export class DashboardService {
       invoices,
       invoiceTotals,
       categories,
-      categorySpendRows,
-      prevSpendRows,
-      typeTotalRows,
+      monthSpend,
+      prevSpend,
+      monthIncomeCents,
       forecastTypeRows,
       forecastUpcoming,
       recent,
@@ -69,21 +70,24 @@ export class DashboardService {
         _sum: { amountCents: true },
       }),
       db.category.findMany({ select: { id: true, name: true, color: true, icon: true } }),
-      db.transaction.groupBy({
-        by: ['categoryId'],
-        where: { type: 'EXPENSE', status: { not: 'FORECAST' }, date: monthRange },
-        _sum: { amountCents: true },
+      // Gasto líquido de reembolso, no mês e na janela de 3 meses (regra 5.13).
+      netExpenseByCategory(db, { status: { not: 'FORECAST' }, date: monthRange }),
+      netExpenseByCategory(db, {
+        status: { not: 'FORECAST' },
+        date: { gte: prev3Start, lt: monthStart },
       }),
-      db.transaction.groupBy({
-        by: ['categoryId'],
-        where: { type: 'EXPENSE', status: { not: 'FORECAST' }, date: { gte: prev3Start, lt: monthStart } },
-        _sum: { amountCents: true },
-      }),
-      db.transaction.groupBy({
-        by: ['type'],
-        where: { type: { in: ['EXPENSE', 'INCOME'] }, status: { not: 'FORECAST' }, date: monthRange },
-        _sum: { amountCents: true },
-      }),
+      // Receita do mês exclui estornos: devolução não é ganho.
+      db.transaction
+        .aggregate({
+          where: {
+            type: 'INCOME',
+            reimbursesTransactionId: null,
+            status: { not: 'FORECAST' },
+            date: monthRange,
+          },
+          _sum: { amountCents: true },
+        })
+        .then((agg) => agg._sum.amountCents ?? 0n),
       db.transaction.groupBy({
         by: ['type'],
         where: { type: { in: ['EXPENSE', 'INCOME'] }, status: 'FORECAST', date: { lt: nextMonthStart } },
@@ -157,34 +161,31 @@ export class DashboardService {
       cardCommittedCents,
     });
 
-    // ── Gastos por categoria (mês corrente) ───────────────────────────────────
+    // ── Gastos por categoria (mês corrente, líquido de reembolso) ─────────────
     const catById = new Map(categories.map((c) => [c.id, c]));
-    const categorySpending = categorySpendRows
-      .map((r) => {
-        const cat = r.categoryId ? catById.get(r.categoryId) : null;
+    const categorySpending = [...monthSpend.byCategory.entries()]
+      .map(([categoryId, cents]) => {
+        const cat = categoryId ? catById.get(categoryId) : null;
         return {
-          categoryId: r.categoryId,
+          categoryId,
           name: cat?.name ?? 'Sem categoria',
           color: cat?.color ?? null,
           icon: cat?.icon ?? null,
-          cents: r._sum.amountCents ?? 0n,
+          cents,
         };
       })
       .filter((c) => c.cents > 0n)
       .sort((a, b) => (b.cents > a.cents ? 1 : -1));
 
     // ── Totais do mês (realizados) ────────────────────────────────────────────
-    const incomeCents = sumBigint(typeTotalRows.filter((r) => r.type === 'INCOME'));
-    const expenseCents = sumBigint(typeTotalRows.filter((r) => r.type === 'EXPENSE'));
+    const incomeCents = monthIncomeCents;
+    const expenseCents = monthSpend.totalCents;
 
     // ── Insight do mês (categoria que mais estourou vs. média de 3 meses) ─────
-    const currentByCat = new Map<string | null, bigint>(
-      categorySpendRows.map((r) => [r.categoryId, r._sum.amountCents ?? 0n]),
-    );
     const avgByCat = new Map<string | null, bigint>(
-      prevSpendRows.map((r) => [r.categoryId, (r._sum.amountCents ?? 0n) / 3n]),
+      [...prevSpend.byCategory.entries()].map(([categoryId, cents]) => [categoryId, cents / 3n]),
     );
-    const top = pickTopInsight(currentByCat, avgByCat);
+    const top = pickTopInsight(monthSpend.byCategory, avgByCat);
     const insight = top
       ? {
           categoryId: top.categoryId,
@@ -197,10 +198,7 @@ export class DashboardService {
       : null;
 
     // ── Orçamento do mês (regra 5.10) ─────────────────────────────────────────
-    const spentByCategory = new Map<string, bigint>();
-    for (const row of categorySpendRows) {
-      if (row.categoryId) spentByCategory.set(row.categoryId, row._sum.amountCents ?? 0n);
-    }
+    const spentByCategory = monthSpend.byCategory;
     const daysRemaining = daysRemainingInMonth(year, month, t);
     const budgetItems = budgets
       .map((b) => ({

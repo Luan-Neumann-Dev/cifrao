@@ -1,8 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import type { Prisma } from '@cifrao/db';
 import {
   type BulkActionInput,
   type CreateTransactionInput,
+  type ReimburseInput,
   type TransactionFilter,
   type UpdateTransactionInput,
   accountDeltaCents,
@@ -124,6 +125,10 @@ export class TransactionsService {
 
       const updated = await tx.transaction.update({ where: { id }, data });
       await this.applyBalance(tx, updated, 1);
+      // Mexer no valor de um estorno muda o quanto do gasto foi reembolsado.
+      if (old.reimbursesTransactionId) {
+        await this.syncReimbursedAt(tx, old.reimbursesTransactionId);
+      }
       return this.findByIdOrThrow(tx, id);
     });
   }
@@ -132,9 +137,93 @@ export class TransactionsService {
     return this.prisma.client.$transaction(async (tx) => {
       const old = await tx.transaction.findUnique({ where: { id } });
       if (!old) throw new NotFoundException('Lançamento não encontrado');
-      await this.applyBalance(tx, old, -1);
-      await tx.transaction.delete({ where: { id } });
+      await this.deleteWithRefunds(tx, old);
       return { ok: true };
+    });
+  }
+
+  /**
+   * Regra 5.13 — registra o recebimento de um reembolsável criando um estorno
+   * vinculado ao gasto original. O estorno credita a conta escolhida, herda a
+   * categoria do gasto (para abatê-lo nos relatórios) e nunca conta como
+   * receita. Sem `amountCents`, estorna o que falta — suporta reembolso parcial.
+   */
+  async reimburse(id: string, input: ReimburseInput) {
+    return this.prisma.client.$transaction(async (tx) => {
+      const original = await tx.transaction.findUnique({
+        where: { id },
+        include: { reimbursements: { select: { amountCents: true } } },
+      });
+      if (!original) throw new NotFoundException('Lançamento não encontrado');
+      if (original.type !== 'EXPENSE') {
+        throw new BadRequestException('Só uma despesa pode ser reembolsada.');
+      }
+      if (!original.isReimbursable) {
+        throw new BadRequestException('Lançamento não está marcado como reembolsável.');
+      }
+      if (original.status === 'FORECAST') {
+        throw new BadRequestException('Efetive o lançamento previsto antes de registrar o reembolso.');
+      }
+
+      const already = original.reimbursements.reduce((acc, r) => acc + r.amountCents, 0n);
+      const remaining = original.amountCents - already;
+      if (remaining <= 0n) throw new BadRequestException('Este gasto já foi totalmente reembolsado.');
+
+      const amount = input.amountCents === undefined ? remaining : BigInt(input.amountCents);
+      if (amount > remaining) {
+        throw new BadRequestException('Valor acima do que falta reembolsar.');
+      }
+
+      const account = await tx.account.findUnique({ where: { id: input.accountId } });
+      if (!account) throw new NotFoundException('Conta de recebimento não encontrada');
+
+      const date = input.date ?? new Date();
+      const refund = await tx.transaction.create({
+        data: {
+          type: 'INCOME',
+          amountCents: amount,
+          date,
+          description: `Reembolso · ${original.description}`,
+          status: 'CLEARED',
+          accountId: input.accountId,
+          categoryId: original.categoryId,
+          reimbursesTransactionId: original.id,
+        },
+      });
+      await this.applyBalance(tx, refund, 1);
+
+      const reimbursedCents = already + amount;
+      const settled = reimbursedCents >= original.amountCents;
+      await tx.transaction.update({
+        where: { id },
+        data: { reimbursedAt: settled ? date : null },
+      });
+
+      return {
+        refund,
+        original: await this.findByIdOrThrow(tx, id),
+        reimbursedCents,
+        remainingCents: original.amountCents - reimbursedCents,
+        settled,
+      };
+    });
+  }
+
+  /** Desfaz o recebimento: apaga os estornos do gasto e devolve o saldo. */
+  async undoReimburse(id: string) {
+    return this.prisma.client.$transaction(async (tx) => {
+      const original = await tx.transaction.findUnique({
+        where: { id },
+        include: { reimbursements: true },
+      });
+      if (!original) throw new NotFoundException('Lançamento não encontrado');
+
+      for (const refund of original.reimbursements) {
+        await this.applyBalance(tx, refund, -1);
+      }
+      await tx.transaction.deleteMany({ where: { reimbursesTransactionId: id } });
+      await tx.transaction.update({ where: { id }, data: { reimbursedAt: null } });
+      return { ok: true, removed: original.reimbursements.length };
     });
   }
 
@@ -166,9 +255,43 @@ export class TransactionsService {
       }
       // delete
       const rows = await tx.transaction.findMany({ where: { id: { in: input.ids } } });
-      for (const row of rows) await this.applyBalance(tx, row, -1);
-      await tx.transaction.deleteMany({ where: { id: { in: input.ids } } });
+      for (const row of rows) await this.deleteWithRefunds(tx, row);
       return { count: rows.length };
+    });
+  }
+
+  /**
+   * Exclui um lançamento revertendo o saldo. Se ele tinha estornos de reembolso
+   * (5.13), eles saem junto — com o saldo revertido também, nunca por cascade do
+   * banco. Se ele É um estorno, o gasto de origem volta a ficar pendente.
+   */
+  private async deleteWithRefunds(tx: TxClient, row: Prisma.TransactionGetPayload<object>) {
+    const refunds = await tx.transaction.findMany({ where: { reimbursesTransactionId: row.id } });
+    for (const refund of refunds) {
+      await this.applyBalance(tx, refund, -1);
+    }
+    if (refunds.length > 0) {
+      await tx.transaction.deleteMany({ where: { reimbursesTransactionId: row.id } });
+    }
+    await this.applyBalance(tx, row, -1);
+    await tx.transaction.delete({ where: { id: row.id } });
+    if (row.reimbursesTransactionId) {
+      await this.syncReimbursedAt(tx, row.reimbursesTransactionId);
+    }
+  }
+
+  /** Recalcula `reimbursedAt` do gasto a partir da soma dos estornos vivos. */
+  private async syncReimbursedAt(tx: TxClient, originalId: string) {
+    const original = await tx.transaction.findUnique({
+      where: { id: originalId },
+      include: { reimbursements: { orderBy: { date: 'desc' }, select: { amountCents: true, date: true } } },
+    });
+    if (!original) return;
+    const total = original.reimbursements.reduce((acc, r) => acc + r.amountCents, 0n);
+    const settled = total >= original.amountCents && original.reimbursements.length > 0;
+    await tx.transaction.update({
+      where: { id: originalId },
+      data: { reimbursedAt: settled ? original.reimbursements[0].date : null },
     });
   }
 

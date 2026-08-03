@@ -13,6 +13,17 @@ export interface TxLike {
   toAccountId?: string | null;
   categoryId?: string | null;
   status?: TransactionStatus;
+  /** Preenchido quando este lançamento é o estorno de um gasto (regra 5.13). */
+  reimbursesTransactionId?: string | null;
+}
+
+/**
+ * Regra 5.13: o estorno de um reembolsável é dinheiro voltando, não receita
+ * nova. Ele credita a conta (ver `accountDeltaCents`), mas nos relatórios abate
+ * o gasto da categoria em vez de somar como entrada.
+ */
+export function isReimbursementRefund(tx: TxLike): boolean {
+  return Boolean(tx.reimbursesTransactionId);
 }
 
 function toBig(v: bigint | number): bigint {
@@ -61,20 +72,30 @@ export function accountDeltaCents(tx: TxLike, accountId: string): bigint {
   }
 }
 
-/** Soma das DESPESAS (magnitude). Ignora INCOME, TRANSFER, ADJUSTMENT e FORECAST. */
+/**
+ * Soma das DESPESAS (magnitude), já **líquida de reembolsos** (5.13). Ignora
+ * INCOME, TRANSFER, ADJUSTMENT e FORECAST.
+ */
 export function sumExpenseCents(txs: TxLike[]): bigint {
   let total = 0n;
   for (const tx of txs) {
-    if (isExpense(tx) && isRealized(tx)) total += toBig(tx.amountCents);
+    if (!isRealized(tx)) continue;
+    if (isExpense(tx)) total += toBig(tx.amountCents);
+    else if (isIncome(tx) && isReimbursementRefund(tx)) total -= toBig(tx.amountCents);
   }
   return total;
 }
 
-/** Soma das RECEITAS (magnitude). Ignora EXPENSE, TRANSFER, ADJUSTMENT e FORECAST. */
+/**
+ * Soma das RECEITAS (magnitude). Ignora EXPENSE, TRANSFER, ADJUSTMENT, FORECAST
+ * e **estornos de reembolso** — devolução não é ganho (5.13).
+ */
 export function sumIncomeCents(txs: TxLike[]): bigint {
   let total = 0n;
   for (const tx of txs) {
-    if (isIncome(tx) && isRealized(tx)) total += toBig(tx.amountCents);
+    if (isIncome(tx) && isRealized(tx) && !isReimbursementRefund(tx)) {
+      total += toBig(tx.amountCents);
+    }
   }
   return total;
 }
@@ -108,6 +129,8 @@ export function sumByCategory(txs: TxLike[]): Map<string | null, CategoryTotals>
     const key = tx.categoryId ?? null;
     const entry = map.get(key) ?? { expenseCents: 0n, incomeCents: 0n };
     if (isExpense(tx)) entry.expenseCents += toBig(tx.amountCents);
+    // Estorno abate o gasto da categoria em vez de virar receita (5.13).
+    else if (isReimbursementRefund(tx)) entry.expenseCents -= toBig(tx.amountCents);
     else entry.incomeCents += toBig(tx.amountCents);
     map.set(key, entry);
   }
