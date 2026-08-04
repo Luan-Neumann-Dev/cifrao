@@ -277,7 +277,73 @@ gasto reembolsado **continuava consumindo o orçamento** da categoria.
 
 ---
 
-## Como rodar
+## Fase 6 — Importação ✅
+
+### O que foi feito
+
+- **Schema** (migrações `importacao_staging_regras` e `importacao_previa_e_match_previsto`): `ImportBatch` + `ImportRow` (staging), `CategoryRule`, enums `ImportFormat`/`ImportStatus`/`ImportRowStatus`, e em `Transaction` os campos `externalId` (FITID do OFX) + relações de importação.
+- **Fila pg-boss** (`queue/queue.service.ts`): sobe no próprio Postgres, schema `pgboss`, conexão pela `DIRECT_URL`. Duas filas: `import.process` e `import.confirm`. A API sobe mesmo sem fila (só a importação fica indisponível, com mensagem clara).
+- **Parsers** (`imports/parsers/`), nenhum escrito à mão: `ofx-js` (OFX de conta **e** de cartão), `papaparse` (CSV com `;`/`,`/tab e par débito/crédito) e `qif-ts` (QIF). Detecção de formato pelo **conteúdo**, com a extensão só como desempate. Charset `windows-1252` tratado no servidor.
+- **Lógica pura** (`shared/import-logic.ts`), testada: normalização de descrição, similaridade por trigramas, `findDuplicate`, motor de `matchCategoryRule`, `suggestRulePattern`/`countMatchingPattern` e as datas de extrato (`parseOfxDate`, `parseStatementDate`, `detectDateFormat`).
+- **API**: `POST /imports` (upload base64 → enfileira), `GET /imports/:id` (estado + linhas + contagens), `PATCH /imports/:id/mapping` (CSV), `PATCH /imports/:id/rows/:rowId`, `POST /imports/:id/apply-pattern`, `GET /imports/:id/pattern` (o "N" do botão), `POST /imports/:id/confirm`, e CRUD de `/category-rules` com `GET /category-rules/test`.
+- **Frontend**: `/painel/importar` (upload, lista com progresso do job), `/painel/importar/[id]` (mapeamento de colunas com prévia de 5 linhas, tabela de revisão com duplicata e sugestão de categoria, diálogo "aplicar a todos e criar regra", barra de confirmação) e `/painel/regras` (CRUD + testador de descrição).
+
+### Decisões tomadas (Fase 6) — confirmadas com o dono
+
+1. **Arquivo fica no Postgres** (`ImportBatch.rawContent`, base64) nesta fase. O R2 entra na Fase 9 junto com anexos e backup, atrás de uma interface de storage — assim a fase inteira é testável sem credencial de serviço externo.
+2. **QIF via `qif-ts`** (dep nova aprovada): zero dependências transitivas, escrito em TypeScript. A alternativa `qif2json` puxava 4.
+3. **"Descrição similar" = trigramas** com duas etapas: se todas as palavras significativas de uma descrição aparecem na outra, é o mesmo estabelecimento com ruído do banco (vale 1); senão, coeficiente de Dice. Limiar 0,6. A comparação é **por palavra inteira**, então "UBER" não casa com "UBERABA SUPERMERCADO".
+4. **FITID ganha da heurística**: quando o OFX traz `FITID`, a duplicata é exata (score 1) e o campo é gravado em `Transaction.externalId`, o que torna reimportação do mesmo arquivo 100% detectável.
+5. **Estorno da 5.11 fechado aqui**: uma linha que casa com um `FORECAST` da mesma conta marca `matchedForecastId`; na confirmação o previsto **vira efetivado** em vez de nascer um lançamento duplicado ao lado.
+6. **Upload em base64 no corpo JSON** (limite de 12 MB, `API_BODY_LIMIT`), sem multer: extrato BR costuma vir em `windows-1252` e decodificar no servidor evita corromper acento — o que estragaria descrição, similaridade e regra.
+7. **Padrão de regra é gravado normalizado**, do mesmo jeito que o motor compara, para "IFD*IFOOD" e "ifd ifood" nunca virarem duas regras.
+
+### Armadilha resolvida (vale para as próximas fases)
+
+`pg-boss@12` e `ofx-js@1` são publicados **só como ESM**, mas a API compila para CommonJS e roda no **Node 20**, onde `require()` de ESM quebra. A solução está isolada em [`apps/api/src/common/esm.ts`](apps/api/src/common/esm.ts): tenta o `import()` nativo (que funciona sob o Vitest) e cai para um `import()` preservado por `new Function` (que o TypeScript não rebaixa para `require`) no bundle CommonJS. Os tipos continuam corretos via `import type`, que some na compilação. **Quando a API virar ESM ou o Node 22 for o mínimo, esse arquivo pode sumir.**
+
+### Pendências / notas
+
+- O `rawContent` fica no Postgres; um extrato muito grande (> 12 MB) é recusado pelo `API_BODY_LIMIT`. Migrar para o R2 na Fase 9 resolve os dois pontos.
+- Reimportar depois de trocar a conta do lote refaz o staging (a duplicata depende da conta) — isso descarta a categorização manual já feita naquele lote.
+- Desfazer uma importação confirmada não existe: hoje é excluir os lançamentos pela tela de Lançamentos. Um "desfazer lote" caberia na Fase 9.
+- QIF com decimal brasileiro depende de como o `qif-ts` lê o número; OFX e CSV foram testados com vírgula decimal e passam.
+
+### Aceite verificado (Fase 6)
+
+- **CI local**: `pnpm lint` (4/4), `pnpm typecheck` (6/6), `pnpm test` (**183 testes**: shared 121, api 57, web 5) e `pnpm build` (4/4) — todos verdes.
+- **Aceite da fase, provado por smoke E2E (43/43)** na API real:
+  - **OFX de 220 transações** importado: formato e conta (`12345-6`) detectados do arquivo, 220 linhas em staging, progresso a 100%.
+  - **Nada gravado antes de confirmar**: zero lançamentos e saldo intacto durante toda a revisão.
+  - **Duplicatas detectadas**: reimportar o mesmo arquivo marcou **as 220 linhas** como duplicata (score 1, dedupe por FITID), apontando o lançamento original, e a confirmação foi barrada.
+  - **Regras aprendidas categorizam sozinhas**: "aplicar a todos" criou a regra `uber`; num arquivo novo, **todas** as linhas de Uber chegaram já categorizadas, cada uma dizendo qual regra a gerou.
+  - **CSV**: pediu mapeamento, devolveu cabeçalhos e prévia limitada a 5 linhas (com 7 no arquivo), leu decimal brasileiro e preservou acento (`MERCADO SÃO JOÃO`).
+  - **Regra 5.11**: linha casou com o previsto, a confirmação **efetivou o previsto** sem criar duplicado e o saldo mexeu uma única vez.
+- **Testes de regra**: `import-logic.test.ts` (25) e `parsers.test.ts` (16) cobrem normalização, similaridade, janela de ±3 dias, precedência do FITID, motor de regras, formatos de data, charset e os três parsers.
+- **Regressão**: os 10 endpoints das fases anteriores conferidos após a mudança global no `main.ts` — todos respondendo.
+
+---
+
+## Retomando o trabalho em outra sessão
+
+Estado atual: **Fases 0 a 6 concluídas e commitadas.** A próxima é a **Fase 7 — Relatórios**.
+
+```bash
+docker compose up -d db                    # Postgres em dev (host 55432)
+pnpm install && pnpm build
+pnpm --filter @cifrao/db exec prisma migrate deploy
+pnpm dev                                   # web 3000 + api 3001
+```
+
+Antes de começar a Fase 7, o que um novo chat precisa saber:
+
+1. **Leia o `CLAUDE.md` inteiro** — a Seção 5 são requisitos, não sugestões, e a Seção 10 define o ritual (3 linhas antes de começar, uma fase por vez, teste obrigatório por regra, parar no fim).
+2. **Relatórios têm que usar `netExpenseByCategory`/`netIncomeCents`** ([apps/api/src/common/expense-aggregates.ts](apps/api/src/common/expense-aggregates.ts)) em vez de `groupBy` cru — senão o abatimento de reembolso (5.13) se perde justamente onde mais importa. Esta é a pendência mais fácil de esquecer.
+3. **Transferência e ajuste ficam fora de receita/despesa** (5.7) e **estorno de reembolso não é receita** (5.13): o aceite da Fase 7 é "os números batem exatamente com a soma dos lançamentos filtrados", então os dois têm que estar certos.
+4. **Dinheiro é `bigint` em centavos e data é UTC** (5.1 e 5.2) — formatação e fuso só na apresentação, via helpers de `packages/shared`.
+5. **Agregação é no banco** (armadilha #5), nunca `reduce` no Node sobre milhares de linhas.
+6. Exportação PDF da Fase 7 provavelmente pede dependência nova — **perguntar antes** (regra da Seção 2).
+
 
 ```bash
 pnpm install

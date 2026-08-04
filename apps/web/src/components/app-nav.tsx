@@ -18,6 +18,8 @@ const LINKS = [
   { href: '/painel/metas', label: 'Metas' },
   { href: '/painel/recorrencias', label: 'Recorrências' },
   { href: '/painel/a-receber', label: 'A receber' },
+  { href: '/painel/importar', label: 'Importar' },
+  { href: '/painel/regras', label: 'Regras' },
 ];
 
 export function AppNav() {

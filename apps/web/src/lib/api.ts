@@ -1,8 +1,12 @@
 import type {
   AccountType,
   CategoryKind,
+  ImportFormat,
+  ImportRowStatus,
+  ImportStatus,
   InvoiceStatus,
   RecurrenceFrequency,
+  StatementDateFormat,
   TransactionStatus,
   TransactionType,
 } from '@cifrao/shared';
@@ -365,6 +369,87 @@ export interface Receivable extends Transaction {
   reimbursedCents: string;
   remainingCents: string;
   partial: boolean;
+}
+
+// ─── Importação e regras (Fase 6) ─────────────────────────────────────────────
+
+export interface ImportSummary {
+  id: string;
+  filename: string;
+  format: ImportFormat;
+  status: ImportStatus;
+  progress: number;
+  totalRows: number;
+  duplicateRows: number;
+  importedRows: number;
+  error: string | null;
+  createdAt: string;
+  confirmedAt: string | null;
+  account: TransactionRef | null;
+}
+
+export interface ImportRowRef {
+  id: string;
+  date: string;
+  description: string;
+  amountCents: string;
+}
+
+export interface ImportRow {
+  id: string;
+  lineNumber: number;
+  date: string;
+  amountCents: string;
+  description: string;
+  originalDescription: string;
+  type: TransactionType;
+  externalId: string | null;
+  status: ImportRowStatus;
+  categoryId: string | null;
+  suggestedCategoryId: string | null;
+  matchedRuleId: string | null;
+  duplicateOfId: string | null;
+  duplicateScore: number | null;
+  category: (TransactionRef & { icon: string | null }) | null;
+  duplicateOf: ImportRowRef | null;
+  matchedForecast: ImportRowRef | null;
+}
+
+export interface CsvPreview {
+  headers: string[];
+  preview: Record<string, string>[];
+  rowCount: number;
+  suggestion: Partial<CsvMappingInput>;
+}
+
+export interface CsvMappingInput {
+  date: string;
+  description: string;
+  amount?: string;
+  debit?: string;
+  credit?: string;
+  dateFormat: StatementDateFormat;
+  invertSign: boolean;
+}
+
+export interface ImportDetail extends ImportSummary {
+  detectedAccountLabel: string | null;
+  columnMapping: CsvMappingInput | null;
+  preview: CsvPreview | null;
+  rows: ImportRow[];
+  pagination: { page: number; pageSize: number; total: number };
+  counts: { pending: number; duplicate: number; ignored: number; imported: number };
+}
+
+export interface CategoryRule {
+  id: string;
+  pattern: string;
+  minCents: string | null;
+  maxCents: string | null;
+  categoryId: string;
+  appliedCount: number;
+  active: boolean;
+  category: { id: string; name: string; color: string | null; icon: string | null };
 }
 
 export interface Receivables {
