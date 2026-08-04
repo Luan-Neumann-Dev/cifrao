@@ -7,6 +7,7 @@ import { CategoriesModule } from './categories/categories.module';
 import { CategoryRulesModule } from './category-rules/category-rules.module';
 import { CreditCardsModule } from './credit-cards/credit-cards.module';
 import { ImportsModule } from './imports/imports.module';
+import { InvestmentsModule } from './investments/investments.module';
 import { QueueModule } from './queue/queue.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { GoalsModule } from './goals/goals.module';
@@ -42,6 +43,7 @@ import { TransactionsModule } from './transactions/transactions.module';
     ImportsModule,
     CategoryRulesModule,
     ReportsModule,
+    InvestmentsModule,
   ],
 })
 export class AppModule {}

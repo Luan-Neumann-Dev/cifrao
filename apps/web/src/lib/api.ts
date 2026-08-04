@@ -4,6 +4,7 @@ import type {
   ImportFormat,
   ImportRowStatus,
   ImportStatus,
+  InvestmentClass,
   InvoiceStatus,
   RecurrenceFrequency,
   StatementDateFormat,
@@ -450,6 +451,69 @@ export interface CategoryRule {
   appliedCount: number;
   active: boolean;
   category: { id: string; name: string; color: string | null; icon: string | null };
+}
+
+// ─── Investimentos (Fase 8) ───────────────────────────────────────────────────
+
+export interface InvestmentPosition {
+  id: string;
+  ticker: string;
+  name: string | null;
+  class: InvestmentClass;
+  /** Inteiro na escala 1e-8 — use `formatQuantity` do shared para exibir. */
+  quantity: string;
+  avgPriceCents: string;
+  currentPriceCents: string;
+  priceUpdatedAt: string | null;
+  investedCents: string;
+  marketValueCents: string;
+  gainCents: string;
+  gainPercent: number | null;
+  realizedGainCents: string;
+}
+
+export interface InvestmentTrade {
+  id: string;
+  type: 'BUY' | 'SELL';
+  quantity: string;
+  priceCents: string;
+  feesCents: string;
+  totalCents: string;
+  date: string;
+  avgPriceAfterCents: string;
+  realizedGainCents: string;
+  notes: string | null;
+  account: TransactionRef | null;
+}
+
+export interface InvestmentDetail extends InvestmentPosition {
+  notes: string | null;
+  archived: boolean;
+  transactions: InvestmentTrade[];
+  prices: { id: string; date: string; priceCents: string }[];
+}
+
+export interface AllocationSlice {
+  class: InvestmentClass;
+  marketValueCents: string;
+  percent: number;
+  targetPercent: number | null;
+  deviationPoints: number | null;
+  adjustmentCents: string | null;
+}
+
+export interface Portfolio {
+  totals: {
+    marketValueCents: string;
+    investedCents: string;
+    gainCents: string;
+    gainPercent: number | null;
+    realizedGainCents: string;
+    positionCount: number;
+  };
+  positions: InvestmentPosition[];
+  allocation: AllocationSlice[];
+  evolution: { month: string; marketValueCents: string }[];
 }
 
 // ─── Relatórios (Fase 7) ──────────────────────────────────────────────────────

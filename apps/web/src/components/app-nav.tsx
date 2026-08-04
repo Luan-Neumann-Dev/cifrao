@@ -14,6 +14,7 @@ const LINKS = [
   { href: '/painel/cartoes', label: 'Cartões' },
   { href: '/painel/lancamentos', label: 'Lançamentos' },
   { href: '/painel/relatorios', label: 'Relatórios' },
+  { href: '/painel/investimentos', label: 'Investimentos' },
   { href: '/painel/calendario', label: 'Calendário' },
   { href: '/painel/orcamento', label: 'Orçamento' },
   { href: '/painel/metas', label: 'Metas' },

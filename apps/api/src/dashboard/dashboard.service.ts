@@ -13,6 +13,7 @@ import {
   saoPauloWallClockToUtc,
 } from '@cifrao/shared';
 import { netExpenseByCategory } from '../common/expense-aggregates';
+import { currentPortfolioValueCents } from '../common/portfolio';
 import { PrismaService } from '../prisma/prisma.service';
 
 const recentInclude = {
@@ -61,6 +62,7 @@ export class DashboardService {
       forecastUpcoming,
       recent,
       budgets,
+      portfolioValueCents,
     ] = await Promise.all([
       db.account.findMany({ where: { archived: false }, orderBy: { createdAt: 'asc' } }),
       db.invoice.findMany({ include: { creditCard: { select: { id: true, nickname: true, color: true } } } }),
@@ -109,6 +111,9 @@ export class DashboardService {
         where: { month: monthKey },
         include: { category: { select: { id: true, name: true, color: true, icon: true } } },
       }),
+      // Carteira a preço de mercado (Fase 8). Aportar tira o dinheiro da conta,
+      // então somar contas + carteira não conta o mesmo real duas vezes.
+      currentPortfolioValueCents(db),
     ]);
 
     // ── Saldos e patrimônio ───────────────────────────────────────────────────
@@ -148,8 +153,8 @@ export class DashboardService {
 
     const openInvoicesTop = openInvoices.slice(0, 6);
 
-    // ── Patrimônio = contas − faturas em aberto ───────────────────────────────
-    const netWorthCents = accountsTotalCents - cardCommittedCents;
+    // ── Patrimônio = contas + carteira − faturas em aberto ────────────────────
+    const netWorthCents = accountsTotalCents + portfolioValueCents - cardCommittedCents;
 
     // ── Disponível de verdade até o fim do mês (regra 5.11) ───────────────────
     const forecastIncomeCents = sumBigint(forecastTypeRows.filter((r) => r.type === 'INCOME'));
@@ -254,6 +259,7 @@ export class DashboardService {
       balances: {
         availableTodayCents,
         netWorthCents,
+        portfolioValueCents,
         availableEndOfMonthCents,
         accounts: accounts.map((a) => ({
           id: a.id,

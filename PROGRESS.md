@@ -369,9 +369,52 @@ gasto reembolsado **continuava consumindo o orçamento** da categoria.
 
 ---
 
+## Fase 8 — Investimentos ✅
+
+### O que foi feito
+
+- **Schema** (migração `investimentos`): `Investment`, `InvestmentTransaction`, `PriceHistory`, `AllocationTarget` + enums `InvestmentClass`/`InvestmentSource`/`InvestmentTransactionType`.
+- **Lógica pura** (`shared/investment-logic.ts`), testada: `toQuantity`/`formatQuantity` (quantidade é inteiro na escala 1e-8, para cripto ter fração sem float), `costOfCents`, `averagePriceCents`, `applyContribution`, `applyRedemption`, `positionMetrics` e `allocationByClass`.
+- **API**: CRUD de posições, `POST /investments/:id/contribute` e `/redeem`, `PATCH /investments/:id/price` (cotação manual que grava ponto no `PriceHistory`), `PUT /investments/targets`, `DELETE /investments/:id/trades/:tradeId` (desfaz devolvendo o dinheiro) e `GET /investments` com totais, posições, alocação e evolução de 12 meses.
+- **Patrimônio integrado**: dashboard e relatório passaram a somar a carteira a preço de mercado. O relatório reconstrói a carteira **mês a mês** pelo `PriceHistory` (`common/portfolio.ts`), não projeta a foto de hoje para trás.
+- **Tela `/painel/investimentos`**: card do valor da carteira com rentabilidade, donut de alocação, barras por classe com alvo e "faltam R$ X para bater o alvo", lista de posições com aportar/resgatar/cotação, e gráfico de evolução.
+
+### Decisões tomadas (Fase 8) — confirmadas com o dono
+
+1. **Aportar tira o dinheiro da conta.** É o que impede o mesmo real de existir na conta e na carteira ao mesmo tempo: patrimônio = contas + valor de mercado das posições − faturas. A conta do tipo `INVESTMENT` passa a significar "caixa parado na corretora", não "meus investimentos".
+2. **Conta de origem é opcional**: sem conta, registra só a posição — serve para cadastrar carteira antiga sem inventar histórico bancário.
+3. **Classe é lista fixa BR**: Ações, FIIs, Renda Fixa, Tesouro, Fundos, Cripto, Internacional e Outros.
+4. **O movimento de caixa é `TRANSFER`** (regra 5.7): comprar ativo não é despesa, e por isso não polui orçamento nem relatório.
+5. **Custo investido é a fonte da verdade; preço médio é derivado dele.** Guardar o preço médio e recalcular em cima dele mesmo acumularia erro de arredondamento a cada aporte — há teste com 50 aportes de preço "feio" provando que não acumula.
+6. **Venda não altera o preço médio** (regra brasileira): reduz a quantidade, realiza o lucro e baixa o custo proporcionalmente. Taxas entram no custo da compra e saem do valor da venda.
+7. **Desfazer operação recalcula a posição do zero** a partir das operações restantes — mais confiável que tentar subtrair a operação removida do estado atual.
+
+### Pendências / notas
+
+- **Quantidade tem 8 casas decimais**; preço unitário é inteiro em centavos, então ativo que custa menos de R$ 0,01 por unidade não é representável. Não afeta ação, FII, tesouro nem cripto em reais.
+- **Sem API de cotação** (a Seção 7 pede manual nesta fase). Cada atualização manual vira um ponto no `PriceHistory`; a evolução usa a última cotação até cada mês e, sem nenhuma, cai para o preço médio pago.
+- `portfolioValueByMonth` percorre as operações em memória por mês. Com carteira pessoal (dezenas de posições) é irrelevante; se um dia virar centenas, vira SQL.
+- A tela não tem edição/arquivamento de posição pela UI (o endpoint existe).
+- O smoke da Fase 7 foi atualizado: a fórmula do patrimônio mudou de propósito nesta fase.
+
+### Aceite verificado (Fase 8)
+
+- **CI local**: `pnpm lint` (4/4), `pnpm typecheck` (6/6), `pnpm test` (**237 testes**: shared 165, api 67, web 5) e `pnpm build` (4/4) — todos verdes.
+- **Aceite da fase — "preço médio recalcula corretamente após novo aporte"** — coberto por teste puro e por smoke na API real: 10 a R$ 20,00 + 10 a R$ 30,00 = médio **R$ 25,00**; + 5 a R$ 26,00 = médio **R$ 25,20** (ponderado, não média simples).
+- **Smoke E2E (36/36)**, com destaque para o risco central da fase:
+  - conta debitada **exatamente** pelos aportes; cada aporte virou lançamento `TRANSFER`; **comprar ativo não aparece como gasto**;
+  - resgate credita a conta, **não altera o preço médio** e registra o lucro realizado;
+  - aporte sem conta não move saldo nenhum;
+  - alocação com alvo, desvio e "quanto falta comprar"; soma das posições = total da carteira; alvos acima de 100% recusados;
+  - **patrimônio = contas + carteira − faturas** no dashboard e no relatório;
+  - desfazer o aporte devolve o dinheiro e recalcula a posição.
+- **Regressão**: smoke da Fase 7 (41/41) e os 10 endpoints das fases anteriores, verdes.
+
+---
+
 ## Retomando o trabalho em outra sessão
 
-Estado atual: **Fases 0 a 7 concluídas e commitadas.** A próxima é a **Fase 8 — Investimentos**.
+Estado atual: **Fases 0 a 8 concluídas e commitadas.** A próxima é a **Fase 9 — Configurações, backup e deploy** (a última).
 
 ```bash
 docker compose up -d db                    # Postgres em dev (host 55432)
@@ -380,15 +423,16 @@ pnpm --filter @cifrao/db exec prisma migrate deploy
 pnpm dev                                   # web 3000 + api 3001
 ```
 
-Antes de começar a Fase 8, o que um novo chat precisa saber:
+Antes de começar a Fase 9, o que um novo chat precisa saber:
 
 1. **Leia o `CLAUDE.md` inteiro** — a Seção 5 são requisitos, não sugestões, e a Seção 10 define o ritual (3 linhas antes de começar, uma fase por vez, teste obrigatório por regra, parar no fim).
 2. **Qualquer soma de despesa usa `netExpenseByCategory`/`netIncomeCents`** ([apps/api/src/common/expense-aggregates.ts](apps/api/src/common/expense-aggregates.ts)) em vez de `groupBy` cru — senão o abatimento de reembolso (5.13) se perde. Dashboard, orçamento e relatórios já passam por lá.
 3. **Dinheiro é `bigint` em centavos e data é UTC** (5.1 e 5.2). Cuidado com filtro de data vindo da URL: `z.coerce.date()` em `"2026-03-31"` dá meia-noite UTC, que em São Paulo ainda é dia 30 — foi bug real na Fase 7. Use dia de calendário de SP.
 4. **Agregação é no banco** (armadilha #5), nunca `reduce` no Node sobre milhares de linhas.
-5. **Investimento hoje é conta do tipo INVESTMENT**: o dashboard (Fase 4) e o patrimônio do relatório (Fase 7) já contam assim. Ao criar o model `Investment`, os dois precisam passar a somar as posições reais **sem contar duas vezes** — é o mesmo cuidado da regra 5.9.
-6. **`pg-boss` e `ofx-js` são ESM** e a API é CommonJS no Node 20: se precisar de outra lib ESM, use `importEsm` de [apps/api/src/common/esm.ts](apps/api/src/common/esm.ts).
-7. Dependência nova, serviço externo ou abstração fora do CLAUDE.md: **perguntar antes** (Seção 2).
+5. **Patrimônio = contas + carteira − faturas.** Aportar tira dinheiro da conta (Fase 8), então nada é contado duas vezes. O export/backup da Fase 9 tem que levar `Investment`, `InvestmentTransaction`, `PriceHistory` e `AllocationTarget` junto, ou a carteira some na restauração.
+6. **`pg-boss` e `ofx-js` são ESM** e a API é CommonJS no Node 20: se precisar de outra lib ESM, use `importEsm` de [apps/api/src/common/esm.ts](apps/api/src/common/esm.ts). O job semanal de backup da Fase 9 usa a mesma fila da importação (`QueueService`).
+7. **O R2 ficou para a Fase 9**: hoje o arquivo importado vive no Postgres em base64 (`ImportBatch.rawContent`, limite de 12 MB via `API_BODY_LIMIT`). A Fase 9 leva anexos, backup e esse arquivo para o R2, atrás de uma interface de storage — e **precisa das credenciais do dono**.
+8. Dependência nova, serviço externo ou abstração fora do CLAUDE.md: **perguntar antes** (Seção 2).
 
 
 ```bash

@@ -46,3 +46,36 @@ export type ImportStatus = z.infer<typeof importStatusSchema>;
 export const IMPORT_ROW_STATUSES = ['PENDING', 'DUPLICATE', 'IGNORED', 'IMPORTED'] as const;
 export const importRowStatusSchema = z.enum(IMPORT_ROW_STATUSES);
 export type ImportRowStatus = z.infer<typeof importRowStatusSchema>;
+
+export const INVESTMENT_CLASSES = [
+  'STOCKS',
+  'REITS',
+  'FIXED_INCOME',
+  'TREASURY',
+  'FUNDS',
+  'CRYPTO',
+  'INTERNATIONAL',
+  'OTHER',
+] as const;
+export const investmentClassSchema = z.enum(INVESTMENT_CLASSES);
+export type InvestmentClass = z.infer<typeof investmentClassSchema>;
+
+/** Rótulos em português, usados na UI e nas exportações. */
+export const INVESTMENT_CLASS_LABELS: Record<InvestmentClass, string> = {
+  STOCKS: 'Ações',
+  REITS: 'FIIs',
+  FIXED_INCOME: 'Renda Fixa',
+  TREASURY: 'Tesouro',
+  FUNDS: 'Fundos',
+  CRYPTO: 'Cripto',
+  INTERNATIONAL: 'Internacional',
+  OTHER: 'Outros',
+};
+
+export const INVESTMENT_SOURCES = ['MANUAL', 'SYNCED'] as const;
+export const investmentSourceSchema = z.enum(INVESTMENT_SOURCES);
+export type InvestmentSource = z.infer<typeof investmentSourceSchema>;
+
+export const INVESTMENT_TRANSACTION_TYPES = ['BUY', 'SELL'] as const;
+export const investmentTransactionTypeSchema = z.enum(INVESTMENT_TRANSACTION_TYPES);
+export type InvestmentTransactionType = z.infer<typeof investmentTransactionTypeSchema>;

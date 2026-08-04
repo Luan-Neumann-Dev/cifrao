@@ -10,6 +10,9 @@
 // (Budget) e metas (Goal — aponta para saldo existente, nunca cria saldo).
 // Fase 6: importação (ImportBatch/ImportRow como staging — nada vira lançamento
 // antes da confirmação) e CategoryRule (regras aprendidas de categorização).
+// Fase 8: investimentos (Investment, InvestmentTransaction, PriceHistory,
+// AllocationTarget). Aportar move dinheiro de uma conta para a posição, então
+// nenhum real é contado duas vezes no patrimônio.
 
 generator client {
   provider = "prisma-client-js"
@@ -148,6 +151,7 @@ model Account {
   recurringTo        RecurringRule[] @relation("RecurringTo")
   goals              Goal[]          @relation("GoalAccount")
   importBatches      ImportBatch[]
+  investmentMoves    InvestmentTransaction[]
 }
 
 model Category {
@@ -522,6 +526,118 @@ model Budget {
 
   @@unique([categoryId, month])
   @@index([month])
+}
+
+// ─── Investimentos (Fase 8) ───────────────────────────────────────────────────
+
+enum InvestmentClass {
+  STOCKS
+  REITS
+  FIXED_INCOME
+  TREASURY
+  FUNDS
+  CRYPTO
+  INTERNATIONAL
+  OTHER
+}
+
+enum InvestmentSource {
+  MANUAL
+  SYNCED
+}
+
+enum InvestmentTransactionType {
+  /// Aporte: compra de cotas/ações.
+  BUY
+  /// Resgate: venda.
+  SELL
+}
+
+/// Posição em carteira. `quantity` é inteiro na escala 1e-8 (cripto precisa de
+/// fração), e o dinheiro segue a regra 5.1: inteiro em centavos.
+///
+/// `investedCents` é a FONTE DA VERDADE do custo (soma exata do que foi pago);
+/// `avgPriceCents` é derivado dele a cada mudança, para leitura O(1) na tela.
+model Investment {
+  id     String          @id @default(cuid())
+  ticker String          @unique
+  name   String?
+  class  InvestmentClass
+
+  quantity      BigInt @default(0)
+  investedCents BigInt @default(0)
+  avgPriceCents BigInt @default(0)
+
+  currentPriceCents BigInt           @default(0)
+  priceUpdatedAt    DateTime?
+  source            InvestmentSource @default(MANUAL)
+
+  /// Lucro/prejuízo já realizado em vendas (regra do preço médio brasileiro).
+  realizedGainCents BigInt @default(0)
+
+  notes     String?
+  archived  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  transactions InvestmentTransaction[]
+  prices       PriceHistory[]
+
+  @@index([class])
+}
+
+/// Aporte ou resgate. Quando há conta de origem/destino, o movimento de
+/// dinheiro vira um `Transaction` do tipo TRANSFER — que não conta como
+/// receita nem despesa (regra 5.7): comprar ativo não é gasto.
+model InvestmentTransaction {
+  id           String                    @id @default(cuid())
+  investmentId String
+  investment   Investment                @relation(fields: [investmentId], references: [id], onDelete: Cascade)
+  type         InvestmentTransactionType
+
+  quantity   BigInt
+  priceCents BigInt
+  feesCents  BigInt   @default(0)
+  totalCents BigInt
+  date       DateTime
+
+  /// Conta que pagou o aporte / recebeu o resgate. Opcional: dá para cadastrar
+  /// posição antiga sem reconstruir o histórico bancário.
+  accountId String?
+  account   Account? @relation(fields: [accountId], references: [id])
+
+  /// Lançamento gerado quando houve conta (para desfazer junto).
+  transactionId String?
+
+  /// Preço médio e lucro realizado logo após esta operação (auditoria).
+  avgPriceAfterCents    BigInt @default(0)
+  realizedGainCents     BigInt @default(0)
+
+  notes     String?
+  createdAt DateTime @default(now())
+
+  @@index([investmentId, date])
+}
+
+/// Cotação diária por ativo. Cada atualização manual de preço grava um ponto,
+/// e é daqui que sai a evolução patrimonial da carteira.
+model PriceHistory {
+  id           String     @id @default(cuid())
+  investmentId String
+  investment   Investment @relation(fields: [investmentId], references: [id], onDelete: Cascade)
+  date         DateTime
+  priceCents   BigInt
+  createdAt    DateTime   @default(now())
+
+  @@unique([investmentId, date])
+  @@index([date])
+}
+
+/// Alvo de alocação por classe, para a tela mostrar o desvio.
+model AllocationTarget {
+  class         InvestmentClass @id
+  targetPercent Int
+  updatedAt     DateTime        @updatedAt
 }
 
 /// Regra 5.9: a meta é vinculada a uma conta/investimento que JÁ EXISTE. Ela não

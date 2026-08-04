@@ -4,6 +4,7 @@ import {
   categoryKindSchema,
   importFormatSchema,
   importRowStatusSchema,
+  investmentClassSchema,
   recurrenceFrequencySchema,
   transactionStatusSchema,
   transactionTypeSchema,
@@ -281,6 +282,64 @@ export const updateCategoryRuleSchema = z.object({
   active: z.boolean().optional(),
 });
 export type UpdateCategoryRuleInput = z.infer<typeof updateCategoryRuleSchema>;
+
+// ─── Investimentos (Fase 8) ───────────────────────────────────────────────────
+
+/** Quantidade trafega como string e é convertida com `toQuantity` (escala 1e-8). */
+const quantityInput = z.string().min(1).max(30);
+
+export const createInvestmentSchema = z.object({
+  ticker: z
+    .string()
+    .min(1)
+    .max(20)
+    .transform((value) => value.trim().toUpperCase()),
+  name: z.string().max(120).optional(),
+  class: investmentClassSchema,
+  currentPriceCents: cents.nonnegative().optional(),
+  notes: z.string().max(2000).optional(),
+});
+export type CreateInvestmentInput = z.infer<typeof createInvestmentSchema>;
+
+export const updateInvestmentSchema = z.object({
+  name: z.string().max(120).optional().nullable(),
+  class: investmentClassSchema.optional(),
+  notes: z.string().max(2000).optional().nullable(),
+  archived: z.boolean().optional(),
+});
+export type UpdateInvestmentInput = z.infer<typeof updateInvestmentSchema>;
+
+/**
+ * Aporte ou resgate. `accountId` é opcional (decisão do dono): com conta, o
+ * dinheiro sai/entra de verdade e vira lançamento; sem conta, só registra a
+ * posição — serve para cadastrar carteira antiga sem reconstruir histórico.
+ */
+export const investmentTradeSchema = z.object({
+  quantity: quantityInput,
+  priceCents: positiveCents,
+  feesCents: cents.nonnegative().default(0),
+  date: z.coerce.date(),
+  accountId: z.string().min(1).optional().nullable(),
+  notes: z.string().max(500).optional(),
+});
+export type InvestmentTradeInput = z.infer<typeof investmentTradeSchema>;
+
+/** Cotação manual (a Fase 8 não integra API de preço). Grava no PriceHistory. */
+export const updatePriceSchema = z.object({
+  priceCents: cents.nonnegative(),
+  date: z.coerce.date().optional(),
+});
+export type UpdatePriceInput = z.infer<typeof updatePriceSchema>;
+
+export const allocationTargetsSchema = z.object({
+  targets: z.array(
+    z.object({
+      class: investmentClassSchema,
+      targetPercent: z.number().int().min(0).max(100),
+    }),
+  ),
+});
+export type AllocationTargetsInput = z.infer<typeof allocationTargetsSchema>;
 
 // ─── Relatórios (Fase 7) ──────────────────────────────────────────────────────
 

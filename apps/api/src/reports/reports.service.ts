@@ -17,6 +17,7 @@ import {
   saoPauloWallClockToUtc,
 } from '@cifrao/shared';
 import { netExpenseByCategory, netIncomeCents } from '../common/expense-aggregates';
+import { portfolioValueByMonth } from '../common/portfolio';
 import { PrismaService } from '../prisma/prisma.service';
 
 /**
@@ -261,12 +262,12 @@ export class ReportsService {
   // ─── Evolução do patrimônio líquido ──────────────────────────────────────────
 
   /**
-   * Patrimônio ao fim de cada mês = saldo de todas as contas − dívida de cartão.
+   * Patrimônio ao fim de cada mês = contas + carteira − dívida de cartão.
    *
-   * A dívida de cartão naquele instante é histórica de verdade: compras de
-   * cartão lançadas até a data menos pagamentos de fatura feitos até a data —
-   * e não a foto de hoje. Investimentos entram como contas do tipo INVESTMENT
-   * até a Fase 8 trazer as posições reais (decisão do dono).
+   * Tudo histórico de verdade, não a foto de hoje projetada para trás: a dívida
+   * de cartão é o que foi comprado menos o que foi pago até aquela data, e a
+   * carteira é a quantidade que existia então × a cotação registrada no
+   * `PriceHistory` até então (Fase 8).
    */
   private async netWorthSeries(period: { from: Date; to: Date }) {
     const today = saoPauloDateParts(new Date());
@@ -288,21 +289,27 @@ export class ReportsService {
 
     const windowStart = saoPauloWallClockToUtc(startYear, startMonth, 1, '00:00:00');
 
-    const [accounts, investmentAccounts, cardDebtNow, deltas] = await Promise.all([
+    // Fim de cada mês (o do mês corrente é "agora", não o fim do mês).
+    const now = new Date();
+    const monthEnds = months.map((month) => {
+      const [year, monthNumber] = month.split('-').map(Number);
+      const next = addMonths(year, monthNumber, 1);
+      const end = new Date(saoPauloWallClockToUtc(next.year, next.month, 1, '00:00:00').getTime() - 1);
+      return { month, at: end > now ? now : end };
+    });
+
+    const [accounts, cardDebtNow, deltas, portfolioByMonth] = await Promise.all([
       this.prisma.client.account.aggregate({ _sum: { balanceCents: true } }),
-      this.prisma.client.account.aggregate({
-        where: { type: 'INVESTMENT' },
-        _sum: { balanceCents: true },
-      }),
       this.currentCardDebt(),
       this.monthlyDeltas(windowStart),
+      portfolioValueByMonth(this.prisma.client, monthEnds),
     ]);
 
     const accountsNow = accounts._sum.balanceCents ?? 0n;
-    const investmentsNow = investmentAccounts._sum.balanceCents ?? 0n;
 
-    // Caminha de trás para frente: o valor no fim do mês M é o de hoje menos
-    // tudo que se moveu depois de M.
+    // Caminha de trás para frente: o saldo no fim do mês M é o de hoje menos
+    // tudo que se moveu depois de M. A carteira não entra nessa caminhada — ela
+    // é reconstruída direto do histórico de cotações.
     const byMonth = new Map(deltas.map((d) => [d.month, d]));
     const points: {
       month: string;
@@ -313,22 +320,21 @@ export class ReportsService {
     }[] = [];
 
     let accountsRunning = accountsNow;
-    let investmentsRunning = investmentsNow;
     let cardDebtRunning = cardDebtNow;
 
     for (let i = months.length - 1; i >= 0; i--) {
       const month = months[i];
+      const investmentsCents = portfolioByMonth.get(month) ?? 0n;
       points.unshift({
         month,
         accountsCents: accountsRunning,
-        investmentsCents: investmentsRunning,
+        investmentsCents,
         cardDebtCents: cardDebtRunning,
-        netWorthCents: accountsRunning - cardDebtRunning,
+        netWorthCents: accountsRunning + investmentsCents - cardDebtRunning,
       });
 
       const delta = byMonth.get(month);
       accountsRunning -= delta?.accountDelta ?? 0n;
-      investmentsRunning -= delta?.investmentDelta ?? 0n;
       cardDebtRunning -= delta?.cardDelta ?? 0n;
     }
 
