@@ -5,7 +5,13 @@ type Db = PrismaClient | Prisma.TransactionClient;
 export interface NetExpense {
   /** Gasto líquido por categoria (despesa bruta − estornos de reembolso). */
   byCategory: Map<string | null, bigint>;
+  /**
+   * Quantos lançamentos de despesa por categoria. O estorno abate o VALOR, mas
+   * não apaga o fato de a despesa ter acontecido — por isso não reduz a contagem.
+   */
+  countByCategory: Map<string | null, number>;
   totalCents: bigint;
+  count: number;
   /** Total dos estornos abatidos, para exibir no detalhe. */
   refundedCents: bigint;
 }
@@ -31,6 +37,7 @@ export async function netExpenseByCategory(
       by: ['categoryId'],
       where: expenseWhere,
       _sum: { amountCents: true },
+      _count: { _all: true },
     }),
     // Estornos cujo gasto de origem cai no recorte pedido.
     db.transaction.findMany({
@@ -40,11 +47,15 @@ export async function netExpenseByCategory(
   ]);
 
   const byCategory = new Map<string | null, bigint>();
+  const countByCategory = new Map<string | null, number>();
   let totalCents = 0n;
+  let count = 0;
   for (const row of expenseRows) {
     const value = row._sum.amountCents ?? 0n;
     byCategory.set(row.categoryId, value);
+    countByCategory.set(row.categoryId, row._count._all);
     totalCents += value;
+    count += row._count._all;
   }
 
   let refundedCents = 0n;
@@ -55,7 +66,7 @@ export async function netExpenseByCategory(
     refundedCents += refund.amountCents;
   }
 
-  return { byCategory, totalCents, refundedCents };
+  return { byCategory, countByCategory, totalCents, count, refundedCents };
 }
 
 /**

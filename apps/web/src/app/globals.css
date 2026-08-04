@@ -264,3 +264,59 @@ body {
   background: #fff;
   padding: 8px;
 }
+
+/* ─── Impressão (Fase 7: "Exportar PDF" = imprimir para PDF) ──────────────────
+   O navegador gera o PDF a partir desta folha: fundo branco, sem navegação,
+   sem botões, e cartões que não se partem no meio entre páginas. */
+@media print {
+  @page {
+    size: A4;
+    margin: 14mm;
+  }
+
+  html,
+  body {
+    background: #fff;
+    color: #000;
+  }
+
+  /* Tokens em versão clara: PDF impresso não deve sair com fundo escuro. */
+  :root,
+  [data-theme='dark'] {
+    --bg: #fff;
+    --surface: #fff;
+    --surface-2: #f6f6f8;
+    --line: #d8d8de;
+    --ink: #1a1523;
+    --ink-2: #55505f;
+    --card-shadow: none;
+    --card-border: #d8d8de;
+    --track: #e8e4ef;
+  }
+
+  header,
+  nav,
+  .print\:hidden {
+    display: none !important;
+  }
+
+  main {
+    max-width: none !important;
+    padding: 0 !important;
+  }
+
+  .break-inside-avoid {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* Recharts desenha em SVG: força a impressão das cores exatas. */
+  svg {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  a[href]::after {
+    content: none !important;
+  }
+}

@@ -13,6 +13,7 @@ const LINKS = [
   { href: '/painel/contas', label: 'Contas' },
   { href: '/painel/cartoes', label: 'Cartões' },
   { href: '/painel/lancamentos', label: 'Lançamentos' },
+  { href: '/painel/relatorios', label: 'Relatórios' },
   { href: '/painel/calendario', label: 'Calendário' },
   { href: '/painel/orcamento', label: 'Orçamento' },
   { href: '/painel/metas', label: 'Metas' },

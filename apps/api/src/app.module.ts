@@ -15,6 +15,7 @@ import { MeModule } from './me/me.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { ReceivablesModule } from './receivables/receivables.module';
 import { RecurringModule } from './recurring/recurring.module';
+import { ReportsModule } from './reports/reports.module';
 import { TagsModule } from './tags/tags.module';
 import { TransactionsModule } from './transactions/transactions.module';
 
@@ -40,6 +41,7 @@ import { TransactionsModule } from './transactions/transactions.module';
     ReceivablesModule,
     ImportsModule,
     CategoryRulesModule,
+    ReportsModule,
   ],
 })
 export class AppModule {}

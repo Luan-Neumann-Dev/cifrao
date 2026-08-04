@@ -282,6 +282,29 @@ export const updateCategoryRuleSchema = z.object({
 });
 export type UpdateCategoryRuleInput = z.infer<typeof updateCategoryRuleSchema>;
 
+// ─── Relatórios (Fase 7) ──────────────────────────────────────────────────────
+
+/**
+ * Janela do relatório. As datas vêm como "yyyy-MM-dd" e são lidas como DIAS DE
+ * CALENDÁRIO de São Paulo — `to` inclui o dia inteiro (regra 5.2). Se virassem
+ * `Date` direto, "2026-03-31" seria meia-noite UTC, que em São Paulo ainda é
+ * dia 30, e o relatório perderia o último dia do mês.
+ */
+const isoDay = z.string().regex(/^\d{4}-\d{2}-\d{2}/, 'Data deve ser yyyy-MM-dd');
+
+export const reportQuerySchema = z.object({
+  from: isoDay.optional(),
+  to: isoDay.optional(),
+  accountId: z.string().min(1).optional(),
+});
+export type ReportQuery = z.infer<typeof reportQuerySchema>;
+
+export const REPORT_EXPORTS = ['categorias', 'lancamentos', 'serie', 'estabelecimentos'] as const;
+export const reportExportSchema = reportQuerySchema.extend({
+  section: z.enum(REPORT_EXPORTS).default('categorias'),
+});
+export type ReportExportQuery = z.infer<typeof reportExportSchema>;
+
 // ─── Filtros e ações em lote ───────────────────────────────────────────────────
 
 export const transactionFilterSchema = z.object({

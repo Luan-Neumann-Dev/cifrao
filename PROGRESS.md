@@ -324,9 +324,54 @@ gasto reembolsado **continuava consumindo o orçamento** da categoria.
 
 ---
 
+## Fase 7 — Relatórios ✅
+
+### O que foi feito
+
+- **Endpoint único** `GET /reports?from&to&accountId` com tudo agregado no Postgres: totais com variação, série de entradas × saídas × saldo acumulado, tabela por categoria, maiores variações, 20 maiores lançamentos, 10 estabelecimentos mais frequentes e evolução do patrimônio líquido.
+- **Lógica pura** (`shared/report-logic.ts`), testada: `previousPeriod`, `computeVariation`, `percentOf`, `averageCents`, `accumulateSeries`, `buildCategoryReport`, `biggestVariations` e os helpers de CSV (`csvCell`/`toCsv`).
+- **Exportação CSV** (`GET /reports/export?section=`) em 4 recortes (categorias, lançamentos, série, estabelecimentos), com `;` e BOM — o Excel pt-BR abre sem perguntar nada. Cada linha traz o valor em **centavos** e em BRL, para dar para conferir a soma na planilha.
+- **Exportação PDF pela impressão do navegador**: folha `@media print` em `globals.css` que troca os tokens para a versão clara, esconde nav e botões, e marca os cartões com `break-inside: avoid`.
+- **Tela `/painel/relatorios`**: presets de período (mês, mês passado, 3 meses, ano, livre), filtro por conta, gráficos Recharts (barras de entradas × saídas, área do acumulado, linha do patrimônio), tabela por categoria com **drill-down por clique** para `/lancamentos` já filtrado, e botões de CSV/PDF.
+
+### Decisões tomadas (Fase 7) — confirmadas com o dono
+
+1. **PDF é a impressão do navegador** (zero dependência nova): o botão dispara `window.print()` sobre um layout de impressão. Sai idêntico ao app, com as fontes certas, e você escolhe "Salvar como PDF".
+2. **Período anterior = janela imediatamente anterior.** Com um ajuste que a implementação exigiu: **mês cheio compara com mês cheio**. Março (31 dias) contra fevereiro (28) por tamanho fixo cairia em 29/01 e misturaria dois meses — foi o que o smoke pegou. Para recorte livre continua valendo a janela do mesmo tamanho colada antes.
+3. **Patrimônio usa contas do tipo INVESTMENT** até a Fase 8 trazer as posições reais, igual ao dashboard já fazia.
+4. **Dívida de cartão no histórico é histórica de verdade**: compras de cartão lançadas até a data menos pagamentos de fatura feitos até a data — não a foto de hoje projetada para trás.
+5. **Estabelecimento é agrupado no Postgres** por descrição normalizada (`translate` + `regexp_replace`), numa normalização mais grossa que a do `import-logic`: derruba todo dígito, para juntar "IFOOD *PEDIDO 123" e "IFOOD *PEDIDO 987".
+6. **Contagem por categoria não é abatida pelo estorno**: o reembolso abate o **valor**, mas a despesa aconteceu. A média usa o valor líquido sobre a contagem cheia.
+
+### Bug de fuso corrigido no caminho
+
+`to=2026-03-31` chegava como `z.coerce.date()` → meia-noite **UTC**, que em São Paulo ainda é dia 30 — o relatório perdia o último dia do mês inteiro. Agora `from`/`to` são strings `yyyy-MM-dd` interpretadas como **dias de calendário de São Paulo**, com `to` cobrindo até 23:59:59 (regra 5.2). Vale a pena olhar se algum filtro de outra tela tem o mesmo problema.
+
+### Pendências / notas
+
+- A tabela por categoria cobre **despesas**. Receita por categoria não foi pedida na Seção 7 e ficou de fora.
+- `/reports` filtra por conta, mas não por categoria ou tag — o drill-down cobre isso levando para `/lancamentos`.
+- O gráfico de patrimônio começa no mês do início do período; para ver a série longa, escolha um período longo.
+- Impressão testada só na folha de estilo; **vale você conferir o resultado no seu navegador** e me dizer se alguma quebra de página ficou ruim.
+
+### Aceite verificado (Fase 7)
+
+- **CI local**: `pnpm lint` (4/4), `pnpm typecheck` (6/6), `pnpm test` (**201 testes**: shared 139, api 57, web 5) e `pnpm build` (4/4) — todos verdes.
+- **Aceite da fase — "os números batem exatamente com a soma dos lançamentos filtrados" — provado por smoke E2E (41/41)**, e provado do jeito certo: cada número do relatório é comparado com uma **soma independente** vinda do endpoint de lançamentos, não com valor escrito à mão no teste.
+  - despesa, receita, líquido e contagem do relatório = soma dos lançamentos filtrados;
+  - **transferência e ajuste existem no período e ficam fora** dos dois totais (5.7 e 5.8);
+  - soma das categorias = total de despesa; soma da série = total; **acumulado final = líquido do período**;
+  - **estorno de reembolso abate a despesa e não vira receita** (5.13), inclusive na série;
+  - período de comparação correto (01–28/02 para março) e período cobrindo o dia 31;
+  - último ponto do patrimônio = saldo real das contas hoje;
+  - **somar a coluna de centavos do CSV dá exatamente o total do relatório**, e o arquivo sai com BOM UTF-8.
+- **Regressão**: smoke da Fase 6 (43/43) e os 10 endpoints das fases anteriores, todos verdes.
+
+---
+
 ## Retomando o trabalho em outra sessão
 
-Estado atual: **Fases 0 a 6 concluídas e commitadas.** A próxima é a **Fase 7 — Relatórios**.
+Estado atual: **Fases 0 a 7 concluídas e commitadas.** A próxima é a **Fase 8 — Investimentos**.
 
 ```bash
 docker compose up -d db                    # Postgres em dev (host 55432)
@@ -335,14 +380,15 @@ pnpm --filter @cifrao/db exec prisma migrate deploy
 pnpm dev                                   # web 3000 + api 3001
 ```
 
-Antes de começar a Fase 7, o que um novo chat precisa saber:
+Antes de começar a Fase 8, o que um novo chat precisa saber:
 
 1. **Leia o `CLAUDE.md` inteiro** — a Seção 5 são requisitos, não sugestões, e a Seção 10 define o ritual (3 linhas antes de começar, uma fase por vez, teste obrigatório por regra, parar no fim).
-2. **Relatórios têm que usar `netExpenseByCategory`/`netIncomeCents`** ([apps/api/src/common/expense-aggregates.ts](apps/api/src/common/expense-aggregates.ts)) em vez de `groupBy` cru — senão o abatimento de reembolso (5.13) se perde justamente onde mais importa. Esta é a pendência mais fácil de esquecer.
-3. **Transferência e ajuste ficam fora de receita/despesa** (5.7) e **estorno de reembolso não é receita** (5.13): o aceite da Fase 7 é "os números batem exatamente com a soma dos lançamentos filtrados", então os dois têm que estar certos.
-4. **Dinheiro é `bigint` em centavos e data é UTC** (5.1 e 5.2) — formatação e fuso só na apresentação, via helpers de `packages/shared`.
-5. **Agregação é no banco** (armadilha #5), nunca `reduce` no Node sobre milhares de linhas.
-6. Exportação PDF da Fase 7 provavelmente pede dependência nova — **perguntar antes** (regra da Seção 2).
+2. **Qualquer soma de despesa usa `netExpenseByCategory`/`netIncomeCents`** ([apps/api/src/common/expense-aggregates.ts](apps/api/src/common/expense-aggregates.ts)) em vez de `groupBy` cru — senão o abatimento de reembolso (5.13) se perde. Dashboard, orçamento e relatórios já passam por lá.
+3. **Dinheiro é `bigint` em centavos e data é UTC** (5.1 e 5.2). Cuidado com filtro de data vindo da URL: `z.coerce.date()` em `"2026-03-31"` dá meia-noite UTC, que em São Paulo ainda é dia 30 — foi bug real na Fase 7. Use dia de calendário de SP.
+4. **Agregação é no banco** (armadilha #5), nunca `reduce` no Node sobre milhares de linhas.
+5. **Investimento hoje é conta do tipo INVESTMENT**: o dashboard (Fase 4) e o patrimônio do relatório (Fase 7) já contam assim. Ao criar o model `Investment`, os dois precisam passar a somar as posições reais **sem contar duas vezes** — é o mesmo cuidado da regra 5.9.
+6. **`pg-boss` e `ofx-js` são ESM** e a API é CommonJS no Node 20: se precisar de outra lib ESM, use `importEsm` de [apps/api/src/common/esm.ts](apps/api/src/common/esm.ts).
+7. Dependência nova, serviço externo ou abstração fora do CLAUDE.md: **perguntar antes** (Seção 2).
 
 
 ```bash

@@ -452,6 +452,88 @@ export interface CategoryRule {
   category: { id: string; name: string; color: string | null; icon: string | null };
 }
 
+// ─── Relatórios (Fase 7) ──────────────────────────────────────────────────────
+
+export interface Variation {
+  currentCents: string;
+  previousCents: string;
+  deltaCents: string;
+  percentChange: number | null;
+}
+
+export interface ReportSeriesPoint {
+  bucket: string;
+  incomeCents: string;
+  expenseCents: string;
+  netCents: string;
+  cumulativeCents: string;
+}
+
+export interface ReportCategoryRow {
+  categoryId: string | null;
+  name: string;
+  color: string | null;
+  icon: string | null;
+  totalCents: string;
+  count: number;
+  percent: number;
+  averageCents: string;
+  previousCents: string;
+  deltaCents: string;
+  percentChange: number | null;
+}
+
+export interface ReportMerchant {
+  key: string;
+  label: string;
+  count: number;
+  totalCents: string;
+}
+
+export interface ReportNetWorthPoint {
+  month: string;
+  accountsCents: string;
+  investmentsCents: string;
+  cardDebtCents: string;
+  netWorthCents: string;
+}
+
+export interface Report {
+  period: {
+    from: string;
+    to: string;
+    previousFrom: string;
+    previousTo: string;
+    granularity: 'day' | 'month';
+  };
+  totals: {
+    incomeCents: string;
+    expenseCents: string;
+    netCents: string;
+    refundedCents: string;
+    transactionCount: number;
+    income: Variation;
+    expense: Variation;
+    net: Variation;
+    savingsRate: number;
+  };
+  series: ReportSeriesPoint[];
+  categories: ReportCategoryRow[];
+  biggestVariations: ReportCategoryRow[];
+  topTransactions: {
+    id: string;
+    date: string;
+    description: string;
+    amountCents: string;
+    type: TransactionType;
+    category: (TransactionRef & { icon: string | null }) | null;
+    account: { id: string; name: string } | null;
+    creditCard: { id: string; nickname: string } | null;
+  }[];
+  topMerchants: ReportMerchant[];
+  netWorth: ReportNetWorthPoint[];
+}
+
 export interface Receivables {
   pending: Receivable[];
   /** O que ainda falta entrar (já desconta os parciais recebidos). */

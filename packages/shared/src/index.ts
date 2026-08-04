@@ -10,3 +10,4 @@ export * from './recurrence-logic';
 export * from './budget-logic';
 export * from './goal-logic';
 export * from './import-logic';
+export * from './report-logic';
