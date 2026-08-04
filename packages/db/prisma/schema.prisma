@@ -8,6 +8,8 @@
 // Transaction (creditCardId/invoiceId/purchaseId/parcelas).
 // Fase 5: recorrências (RecurringRule + recurringRuleId em Transaction), orçamento
 // (Budget) e metas (Goal — aponta para saldo existente, nunca cria saldo).
+// Fase 6: importação (ImportBatch/ImportRow como staging — nada vira lançamento
+// antes da confirmação) e CategoryRule (regras aprendidas de categorização).
 
 generator client {
   provider = "prisma-client-js"
@@ -145,6 +147,7 @@ model Account {
   recurringFrom      RecurringRule[] @relation("RecurringFrom")
   recurringTo        RecurringRule[] @relation("RecurringTo")
   goals              Goal[]          @relation("GoalAccount")
+  importBatches      ImportBatch[]
 }
 
 model Category {
@@ -162,6 +165,8 @@ model Category {
   purchases    Purchase[]
   budgets      Budget[]
   recurringRules RecurringRule[]
+  importRows     ImportRow[]
+  categoryRules  CategoryRule[]
 
   createdAt DateTime @default(now())
 }
@@ -222,6 +227,13 @@ model Transaction {
   reimburses              Transaction?  @relation("Reimbursement", fields: [reimbursesTransactionId], references: [id], onDelete: Restrict)
   reimbursements          Transaction[] @relation("Reimbursement")
 
+  // Importação (Fase 6). `externalId` guarda o FITID do OFX: quando o banco
+  // fornece, a duplicata é detectada por igualdade exata, sem heurística.
+  externalId String?
+  importRows ImportRow[] @relation("ImportedTransaction")
+  duplicateOf ImportRow[] @relation("DuplicateMatch")
+  forecastMatches ImportRow[] @relation("ForecastMatch")
+
   splits TransactionSplit[]
   tags   TransactionTag[]
 
@@ -235,6 +247,7 @@ model Transaction {
   @@index([recurringRuleId, date])
   @@index([status, date])
   @@index([reimbursesTransactionId])
+  @@index([externalId])
 }
 
 // ─── Cartões e faturas (Fase 3) ────────────────────────────────────────────────
@@ -360,6 +373,139 @@ model RecurringRule {
 
   transactions Transaction[]
 
+  @@index([active])
+}
+
+// ─── Importação (Fase 6) ──────────────────────────────────────────────────────
+
+enum ImportFormat {
+  OFX
+  QIF
+  CSV
+}
+
+enum ImportStatus {
+  /// Arquivo recebido, job ainda não pegou.
+  UPLOADED
+  PARSING
+  /// Só CSV: precisa que o usuário diga qual coluna é o quê.
+  NEEDS_MAPPING
+  /// Linhas em staging, esperando revisão e confirmação.
+  REVIEW
+  CONFIRMED
+  FAILED
+}
+
+enum ImportRowStatus {
+  /// Vai ser importada (padrão).
+  PENDING
+  /// Parece já existir no banco (regra 5.12).
+  DUPLICATE
+  /// Usuário decidiu não importar.
+  IGNORED
+  IMPORTED
+}
+
+/// Regra 5.12 — staging da importação. NADA vira lançamento antes da
+/// confirmação final: até lá tudo vive aqui.
+model ImportBatch {
+  id       String       @id @default(cuid())
+  filename String
+  format   ImportFormat
+  status   ImportStatus @default(UPLOADED)
+  /// Conteúdo do arquivo (base64). Vai para o R2 na Fase 9.
+  rawContent String @db.Text
+  fileSize   Int
+
+  accountId String?
+  account   Account? @relation(fields: [accountId], references: [id])
+  /// Conta detectada no arquivo (nº do OFX), para conferência do usuário.
+  detectedAccountLabel String?
+
+  /// Mapeamento de colunas do CSV escolhido pelo usuário.
+  columnMapping Json?
+  /// Só CSV: cabeçalhos + 5 primeiras linhas, para a tela de mapeamento.
+  preview       Json?
+
+  totalRows     Int @default(0)
+  duplicateRows Int @default(0)
+  importedRows  Int @default(0)
+  /// 0–100, atualizado pelo job para a UI acompanhar.
+  progress      Int @default(0)
+
+  error       String?
+  confirmedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  rows ImportRow[]
+
+  @@index([status])
+}
+
+/// Uma linha do arquivo em staging, já normalizada.
+model ImportRow {
+  id         String      @id @default(cuid())
+  batchId    String
+  batch      ImportBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  lineNumber Int
+
+  /// Linha crua como veio do arquivo (auditoria e remapeamento de CSV).
+  raw Json
+
+  date                DateTime
+  amountCents         BigInt
+  description         String
+  originalDescription String
+  type                TransactionType
+  /// FITID do OFX quando existe: dedupe exato.
+  externalId          String?
+
+  status ImportRowStatus @default(PENDING)
+
+  categoryId          String?
+  category            Category? @relation(fields: [categoryId], references: [id])
+  /// Sugestão do motor de CategoryRule (o usuário confirma ou troca).
+  suggestedCategoryId String?
+  /// Regra que gerou a sugestão, para mostrar "por que veio assim".
+  matchedRuleId       String?
+
+  /// Lançamento existente que parece ser o mesmo (regra 5.12).
+  duplicateOfId  String?
+  duplicateOf    Transaction? @relation("DuplicateMatch", fields: [duplicateOfId], references: [id], onDelete: SetNull)
+  duplicateScore Float?
+
+  /// Regra 5.11 — previsto que esta linha veio efetivar. Na confirmação o
+  /// previsto vira lançamento real em vez de nascer um duplicado ao lado dele.
+  matchedForecastId String?
+  matchedForecast   Transaction? @relation("ForecastMatch", fields: [matchedForecastId], references: [id], onDelete: SetNull)
+
+  /// Preenchido na confirmação — a prova de que a linha virou lançamento.
+  transactionId String?
+  transaction   Transaction? @relation("ImportedTransaction", fields: [transactionId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@index([batchId, status])
+  @@index([batchId, lineNumber])
+}
+
+/// Regra 5.12 — padrão de descrição (+ faixa de valor opcional) → categoria.
+/// Aprendida na revisão da importação e reaplicada nas próximas.
+model CategoryRule {
+  id         String   @id @default(cuid())
+  pattern    String
+  minCents   BigInt?
+  maxCents   BigInt?
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  /// Quantas vezes a regra já categorizou algo (ordena as mais úteis).
+  appliedCount Int     @default(0)
+  active       Boolean @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([pattern, categoryId])
   @@index([active])
 }
 

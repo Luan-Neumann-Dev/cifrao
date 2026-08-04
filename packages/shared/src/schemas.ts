@@ -2,10 +2,13 @@ import { z } from 'zod';
 import {
   accountTypeSchema,
   categoryKindSchema,
+  importFormatSchema,
+  importRowStatusSchema,
   recurrenceFrequencySchema,
   transactionStatusSchema,
   transactionTypeSchema,
 } from './enums';
+import { DATE_FORMATS } from './import-logic';
 
 const dayOfMonth = z.number().int().min(1).max(31);
 
@@ -197,6 +200,87 @@ export const reimburseSchema = z.object({
   date: z.coerce.date().optional(),
 });
 export type ReimburseInput = z.infer<typeof reimburseSchema>;
+
+// ─── Importação (regra 5.12) ──────────────────────────────────────────────────
+
+/**
+ * Upload. O conteúdo trafega em base64 porque extrato de banco BR costuma vir em
+ * windows-1252 — decodificar no servidor evita corromper acento na descrição.
+ */
+export const createImportSchema = z.object({
+  filename: z.string().min(1).max(200),
+  contentBase64: z.string().min(1),
+  /** Se omitido, é detectado pelo conteúdo do arquivo. */
+  format: importFormatSchema.optional(),
+  accountId: z.string().min(1).optional(),
+});
+export type CreateImportInput = z.infer<typeof createImportSchema>;
+
+/** Mapeamento de colunas do CSV — só o CSV precisa desta etapa. */
+export const csvMappingSchema = z
+  .object({
+    date: z.string().min(1),
+    description: z.string().min(1),
+    /** Coluna única com sinal… */
+    amount: z.string().min(1).optional(),
+    /** …ou par débito/crédito, como alguns bancos exportam. */
+    debit: z.string().min(1).optional(),
+    credit: z.string().min(1).optional(),
+    dateFormat: z.enum(DATE_FORMATS).default('dd/MM/yyyy'),
+    /** Para extratos que exportam despesa como positivo. */
+    invertSign: z.boolean().default(false),
+  })
+  .superRefine((data, ctx) => {
+    if (!data.amount && !data.debit && !data.credit) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Escolha a coluna de valor, ou as colunas de débito e crédito.',
+        path: ['amount'],
+      });
+    }
+  });
+export type CsvMapping = z.infer<typeof csvMappingSchema>;
+
+export const setImportAccountSchema = z.object({ accountId: z.string().min(1) });
+export type SetImportAccountInput = z.infer<typeof setImportAccountSchema>;
+
+/** Edição de uma linha na revisão (categorizar, ignorar, corrigir descrição). */
+export const updateImportRowSchema = z.object({
+  categoryId: z.string().min(1).optional().nullable(),
+  status: importRowStatusSchema.optional(),
+  description: z.string().min(1).max(200).optional(),
+});
+export type UpdateImportRowInput = z.infer<typeof updateImportRowSchema>;
+
+/**
+ * Regra 5.12 — "aplicar a todos os N lançamentos com esse padrão e criar regra".
+ * Categoriza as linhas do lote que casam e, por padrão, aprende a `CategoryRule`.
+ */
+export const applyPatternSchema = z.object({
+  pattern: z.string().min(2).max(120),
+  categoryId: z.string().min(1),
+  createRule: z.boolean().default(true),
+  minCents: cents.nonnegative().optional().nullable(),
+  maxCents: cents.nonnegative().optional().nullable(),
+});
+export type ApplyPatternInput = z.infer<typeof applyPatternSchema>;
+
+export const createCategoryRuleSchema = z.object({
+  pattern: z.string().min(2).max(120),
+  categoryId: z.string().min(1),
+  minCents: cents.nonnegative().optional().nullable(),
+  maxCents: cents.nonnegative().optional().nullable(),
+});
+export type CreateCategoryRuleInput = z.infer<typeof createCategoryRuleSchema>;
+
+export const updateCategoryRuleSchema = z.object({
+  pattern: z.string().min(2).max(120).optional(),
+  categoryId: z.string().min(1).optional(),
+  minCents: cents.nonnegative().optional().nullable(),
+  maxCents: cents.nonnegative().optional().nullable(),
+  active: z.boolean().optional(),
+});
+export type UpdateCategoryRuleInput = z.infer<typeof updateCategoryRuleSchema>;
 
 // ─── Filtros e ações em lote ───────────────────────────────────────────────────
 

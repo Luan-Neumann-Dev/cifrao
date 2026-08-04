@@ -4,7 +4,10 @@ import { AccountsModule } from './accounts/accounts.module';
 import { BudgetsModule } from './budgets/budgets.module';
 import { CalendarModule } from './calendar/calendar.module';
 import { CategoriesModule } from './categories/categories.module';
+import { CategoryRulesModule } from './category-rules/category-rules.module';
 import { CreditCardsModule } from './credit-cards/credit-cards.module';
+import { ImportsModule } from './imports/imports.module';
+import { QueueModule } from './queue/queue.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { GoalsModule } from './goals/goals.module';
 import { HealthModule } from './health/health.module';
@@ -20,6 +23,8 @@ import { TransactionsModule } from './transactions/transactions.module';
     // Cron da regra 5.11 (geração diária de previstos).
     ScheduleModule.forRoot(),
     PrismaModule,
+    // Fila do pg-boss (regra 5.12: importação roda em job, não no request).
+    QueueModule,
     HealthModule,
     MeModule,
     AccountsModule,
@@ -33,6 +38,8 @@ import { TransactionsModule } from './transactions/transactions.module';
     GoalsModule,
     CalendarModule,
     ReceivablesModule,
+    ImportsModule,
+    CategoryRulesModule,
   ],
 })
 export class AppModule {}

@@ -27,3 +27,22 @@ export type InvoiceStatus = z.infer<typeof invoiceStatusSchema>;
 export const RECURRENCE_FREQUENCIES = ['WEEKLY', 'MONTHLY', 'QUARTERLY', 'YEARLY'] as const;
 export const recurrenceFrequencySchema = z.enum(RECURRENCE_FREQUENCIES);
 export type RecurrenceFrequency = z.infer<typeof recurrenceFrequencySchema>;
+
+export const IMPORT_FORMATS = ['OFX', 'QIF', 'CSV'] as const;
+export const importFormatSchema = z.enum(IMPORT_FORMATS);
+export type ImportFormat = z.infer<typeof importFormatSchema>;
+
+export const IMPORT_STATUSES = [
+  'UPLOADED',
+  'PARSING',
+  'NEEDS_MAPPING',
+  'REVIEW',
+  'CONFIRMED',
+  'FAILED',
+] as const;
+export const importStatusSchema = z.enum(IMPORT_STATUSES);
+export type ImportStatus = z.infer<typeof importStatusSchema>;
+
+export const IMPORT_ROW_STATUSES = ['PENDING', 'DUPLICATE', 'IGNORED', 'IMPORTED'] as const;
+export const importRowStatusSchema = z.enum(IMPORT_ROW_STATUSES);
+export type ImportRowStatus = z.infer<typeof importRowStatusSchema>;
