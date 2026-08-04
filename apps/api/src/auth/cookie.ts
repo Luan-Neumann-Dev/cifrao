@@ -1,3 +1,5 @@
+import { AUTH_SESSION_COOKIE } from './auth.constants';
+
 /**
  * Lê um cookie do header `Cookie` sem depender de cookie-parser (mantém o Nest
  * leve). Retorna null se ausente.
@@ -13,4 +15,12 @@ export function getCookie(cookieHeader: string | undefined, name: string): strin
     }
   }
   return null;
+}
+
+/** Extrai o token da sessão do cookie assinado (`<token>.<assinatura>`). */
+export function sessionTokenFromCookie(cookieHeader: string | undefined): string | null {
+  const raw = getCookie(cookieHeader, AUTH_SESSION_COOKIE);
+  if (!raw) return null;
+  const dot = raw.indexOf('.');
+  return dot === -1 ? raw : raw.slice(0, dot);
 }

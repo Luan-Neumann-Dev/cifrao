@@ -507,3 +507,75 @@ export const bulkActionSchema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('delete'), ids: z.array(z.string()).min(1) }),
 ]);
 export type BulkActionInput = z.infer<typeof bulkActionSchema>;
+
+// ─── Configurações, backup e zona de risco (Fase 9) ───────────────────────────
+
+export const updateProfileSchema = z.object({
+  name: z.string().min(1).max(80).optional(),
+  /** 'system' segue o sistema operacional; os outros forçam o tema. */
+  theme: z.enum(['system', 'light', 'dark']).optional(),
+  accentColor: z
+    .string()
+    .regex(/^#[0-9a-fA-F]{6}$/, 'Cor deve ser hexadecimal, ex.: #820AD1')
+    .optional(),
+});
+export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
+
+export const updateNotificationPrefsSchema = z.object({
+  notifyInvoiceDue: z.boolean().optional(),
+  notifyBudgetExceeded: z.boolean().optional(),
+  notifyGoalReached: z.boolean().optional(),
+  notifyForecastDue: z.boolean().optional(),
+  notifyDaysBefore: z.number().int().min(0).max(30).optional(),
+});
+export type UpdateNotificationPrefsInput = z.infer<typeof updateNotificationPrefsSchema>;
+
+/**
+ * Mesclagem de categorias (decisão do dono): tudo migra para a categoria destino
+ * e, quando as duas tinham orçamento no mesmo mês, **os limites somam**.
+ */
+export const mergeCategoriesSchema = z.object({
+  targetId: z.string().min(1),
+});
+export type MergeCategoriesInput = z.infer<typeof mergeCategoriesSchema>;
+
+/** Seções que o export CSV oferece — uma tabela por arquivo (sem zip). */
+export const BACKUP_CSV_SECTIONS = [
+  'lancamentos',
+  'contas',
+  'cartoes',
+  'faturas',
+  'categorias',
+  'orcamentos',
+  'metas',
+  'recorrencias',
+  'investimentos',
+  'operacoes',
+] as const;
+export const backupCsvSchema = z.object({
+  section: z.enum(BACKUP_CSV_SECTIONS).default('lancamentos'),
+});
+export type BackupCsvQuery = z.infer<typeof backupCsvSchema>;
+
+/**
+ * Restauração. O arquivo sobe como texto JSON no corpo — a decisão do dono foi
+ * não ter storage nesta fase, então nada é gravado em disco no caminho.
+ */
+export const restoreBackupSchema = z.object({
+  content: z.string().min(2),
+  /**
+   * 'replace' apaga o que existe antes de gravar (restaurar num banco limpo);
+   * 'merge' grava por cima, mantendo o que não colide com o backup.
+   */
+  mode: z.enum(['replace', 'merge']).default('replace'),
+});
+export type RestoreBackupInput = z.infer<typeof restoreBackupSchema>;
+
+/** Frases que a zona de risco exige por escrito antes de apagar. */
+export const WIPE_CONFIRMATION = 'APAGAR LANCAMENTOS';
+export const DELETE_ACCOUNT_CONFIRMATION = 'EXCLUIR MINHA CONTA';
+
+export const dangerZoneSchema = z.object({
+  confirm: z.string().min(1),
+});
+export type DangerZoneInput = z.infer<typeof dangerZoneSchema>;

@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ScheduleModule } from '@nestjs/schedule';
 import { AccountsModule } from './accounts/accounts.module';
+import { BackupModule } from './backup/backup.module';
 import { BudgetsModule } from './budgets/budgets.module';
 import { CalendarModule } from './calendar/calendar.module';
 import { CategoriesModule } from './categories/categories.module';
@@ -17,6 +18,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { ReceivablesModule } from './receivables/receivables.module';
 import { RecurringModule } from './recurring/recurring.module';
 import { ReportsModule } from './reports/reports.module';
+import { SettingsModule } from './settings/settings.module';
 import { TagsModule } from './tags/tags.module';
 import { TransactionsModule } from './transactions/transactions.module';
 
@@ -44,6 +46,9 @@ import { TransactionsModule } from './transactions/transactions.module';
     CategoryRulesModule,
     ReportsModule,
     InvestmentsModule,
+    // Fase 9: configurações, avisos, backup e zona de risco.
+    SettingsModule,
+    BackupModule,
   ],
 })
 export class AppModule {}

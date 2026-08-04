@@ -412,9 +412,142 @@ gasto reembolsado **continuava consumindo o orçamento** da categoria.
 
 ---
 
+
+## Fase 9 — Configurações, backup e deploy 🚧 (backend pronto, front pendente)
+
+> **Commit intermediário a pedido do dono.** O backend da fase está completo e
+> testado; a parte de front (tela de configurações, sino de avisos, PWA) e os
+> arquivos de deploy ainda não foram escritos. Detalhes do que falta no fim
+> desta seção.
+
+### Decisão que abriu a fase — storage
+
+Antes de começar, o dono perguntou sobre trocar o Postgres pelo **Turso** e se o
+**R2 é gratuito**. As duas respostas viraram decisão:
+
+1. **Turso está fora.** Turso é libSQL, ou seja, SQLite, e o `pg-boss` roda
+   *dentro* do Postgres (`LISTEN/NOTIFY`, `SKIP LOCKED`, advisory locks, schema
+   próprio). Não existe versão dele para SQLite, e desde a Fase 6 **toda a
+   importação é job de fila** — trocar o banco seria reescrever a camada de fila,
+   não migrar dados. Somando: 19 `groupBy`, 12 enums e 3 colunas `Json`.
+2. **O limite de 500 MB nunca foi um problema.** O deploy alvo (Seção 9) é uma
+   VPS com Coolify e o **Postgres em container no próprio servidor** — o disco é
+   o da VPS. E a escala real do app é pequena: o banco de desenvolvimento inteiro
+   tem **13 MB** com 1.205 lançamentos e 2.537 linhas de importação, ou seja
+   ~1,25 KB por lançamento com índices. 500 MB dariam ~400 mil lançamentos.
+3. **O R2 é gratuito** (10 GB, 1M operações de escrita e 10M de leitura por mês,
+   egress zero), mas exige cartão cadastrado na Cloudflare. **Decisão do dono:
+   nenhum driver de storage nesta fase** — nem R2, nem disco local. O export baixa
+   no navegador, a restauração sobe por upload, e o aceite da fase fecha assim.
+
+### Decisões tomadas (Fase 9) — confirmadas com o dono
+
+1. **Sem storage.** Nada de arquivo gravado no servidor. O único lugar onde o
+   backup enviado repousa é `RestoreJob.content`, enquanto o job roda — e é
+   apagado ao terminar, no sucesso e na falha.
+2. **Mesclar categoria migra tudo e os limites de orçamento SOMAM.** Se as duas
+   tinham orçamento no mesmo mês, R$ 300 + R$ 200 vira R$ 500.
+3. **Zona de risco em dois níveis.** "Apagar lançamentos" zera movimentação,
+   fatura, importação e carteira, mas mantém conta, cartão, categoria, tag e a
+   configuração (orçamento, meta, recorrência, regra) — dá para recomeçar sem
+   reconfigurar tudo. "Excluir conta" apaga o domínio inteiro e o usuário. Cada
+   um exige uma **frase diferente** digitada por escrito.
+4. **Notificações são preferência + aviso no app.** Não há e-mail nem push: os
+   avisos são derivados sob demanda dos dados que já existem (fatura vencendo,
+   orçamento estourado, meta atingida, previsto a confirmar).
+
+### O que foi feito (backend)
+
+- **Schema**: preferências de aviso no `User` (`notifyInvoiceDue`,
+  `notifyBudgetExceeded`, `notifyGoalReached`, `notifyForecastDue`,
+  `notifyDaysBefore`) e o model `RestoreJob` (status, modo, progresso, resultado
+  por seção, erro, conteúdo temporário). Migrações `preferencias_de_aviso` e
+  `restauracao_de_backup`.
+- **`packages/shared/src/backup-logic.ts`**: formato do arquivo (`BACKUP_VERSION`,
+  Zod), **ordem das 17 tabelas com pai antes de filho**, ordem inversa para
+  apagar, o que cada nível da zona de risco remove, `sortByParent` (hierarquia de
+  categoria) e `splitSelfReference` (vínculo do estorno gravado em 2º passe).
+- **`packages/shared/src/notification-logic.ts`**: `buildNotifications` puro —
+  fatura vencendo/vencida, orçamento em 80% e estourado, meta alcançada e
+  previsto a confirmar, ordenados por gravidade e data, com id estável.
+- **`apps/api/src/settings/`**: perfil e aparência, preferências de aviso,
+  **sessões ativas** (com rótulo de dispositivo e marcação de "este aqui") e
+  revogação individual ou de todas as outras. `GET /notifications` monta o sino.
+- **`apps/api/src/categories/`**: `POST /categories/:id/mesclar` e
+  `GET /categories/uso` (contagem por categoria, para saber o que dá para apagar).
+- **`apps/api/src/backup/`**: `GET /backup/exportar.json` (tudo),
+  `GET /backup/exportar.csv?section=…` (10 seções, `;` + BOM para o Excel),
+  `POST /backup/restaurar` (valida e enfileira), `GET /backup/restaurar/:id`
+  (progresso), `POST /backup/apagar-lancamentos` e `DELETE /backup/conta`.
+- **`apps/api/src/backup/backup.processor.ts`**: a restauração roda em job do
+  pg-boss, dentro de **uma transação só** (ou o banco fica igual ao arquivo, ou
+  nada muda), em lotes de 500, com progresso gravado no `RestoreJob`.
+
+### Detalhes técnicos que valem registro
+
+- **Os tipos das colunas vêm do DMMF do Prisma**, não de uma lista escrita à mão
+  ([apps/api/src/backup/model-fields.ts](apps/api/src/backup/model-fields.ts)). O
+  JSON não carrega `BigInt` nem `Date`, então a restauração precisa saber o que
+  converter de volta — e uma lista fixa ficaria desatualizada no dia em que
+  alguém somasse um campo ao schema, com o sintoma sendo *valor errado no banco*,
+  não erro de compilação. Coluna desconhecida é descartada; valor que não é
+  inteiro em centavos é **recusado** em vez de virar float.
+- **O backup não leva credencial**: nada de `User` (identidade), `Session`,
+  `AuthAccount`, `TwoFactor` ou `Jwks`. Perfil e preferências viajam junto e são
+  reaplicados na restauração; senha e 2FA, nunca.
+- **O staging da importação fica de fora** (`ImportBatch`/`ImportRow`): é
+  descartável e carrega o arquivo original em base64. Os lançamentos que saíram
+  dele estão em `transaction`, que vai no backup.
+- **Apagar lançamentos zera o saldo das contas** junto — saldo remanescente sem
+  nenhum lançamento por trás seria um número sem história.
+- **Mesclar categoria respeita as duas chaves únicas** que a migração poderia
+  violar: `Budget(categoryId, month)` (limites somam) e
+  `CategoryRule(pattern, categoryId)` (regra repetida vira uma, somando
+  `appliedCount`). Mesclar numa subcategoria da própria origem é recusado, porque
+  viraria ciclo na árvore.
+
+### Verificado até aqui
+
+- **CI local verde**: `pnpm lint` (4/4), `pnpm typecheck` (6/6), `pnpm test`
+  (**318 testes**: shared 203, api 110, web 5) e `pnpm build` (4/4).
+- **38 testes novos no shared**: ordem de FK das 17 tabelas provada par a par,
+  recusa de backup de versão futura, seção desconhecida ignorada sem reprovar o
+  arquivo, ausência de qualquer seção de credencial, `sortByParent` com entrada
+  invertida/pai ausente/ciclo, e os quatro tipos de aviso com suas preferências.
+- **32 testes novos na API**: mesclagem (soma de limites, unificação de regra,
+  recusa de ciclo, tudo numa transação), zona de risco (frase exata, o que morre
+  e o que sobrevive, saldo zerado, filho antes do pai) e restauração (ordem de
+  gravação, categoria ordenada, vínculo do estorno em 2º passe, `replace` ×
+  `merge`, `BigInt`/`Date` revividos, falha marcando `FAILED` e limpando o
+  arquivo).
+
+### O que falta para fechar a Fase 9
+
+1. **Tela `/painel/configuracoes`** com as seções: perfil, aparência (tema +
+   cor de acento — os campos `theme` e `accentColor` existem no `User` desde a
+   Fase 1 e **nunca ganharam UI**), gestão de categorias (criar, mesclar,
+   apagar), sessões ativas, notificações, backup (exportar/restaurar) e zona de
+   risco. Link novo no `AppNav`.
+2. **Aplicador de tema** no front: `data-theme` no `<html>` (Seção 4) e a cor de
+   acento sobrescrevendo o token `--primary`.
+3. **Sino de avisos** no topo, consumindo `GET /notifications`.
+4. **PWA completo**: não existe nem `apps/web/public/` hoje. Falta manifest,
+   ícones (há `python3` com PIL na máquina para gerar os PNG, e `sharp` no
+   `node_modules` — gerar ícone é asset de build, não dependência do projeto),
+   service worker e offline shell.
+5. **Deploy**: **não existe nenhum `Dockerfile`** no repositório — a Seção 9 diz
+   para prepará-los desde a Fase 0, mas isso não foi feito. Falta um `Dockerfile`
+   por app, `docker-compose.prod.yml` com `web`/`api`/`postgres` em rede interna,
+   healthchecks e README de deploy para Coolify.
+6. **Smoke E2E da fase** contra a API real, incluindo o aceite: exportar o
+   histórico inteiro e restaurar num banco limpo, conferindo que os totais batem.
+
+---
+
 ## Retomando o trabalho em outra sessão
 
-Estado atual: **Fases 0 a 8 concluídas e commitadas.** A próxima é a **Fase 9 — Configurações, backup e deploy** (a última).
+Estado atual: **Fases 0 a 8 concluídas. Fase 9 com o backend pronto e commitado,
+front e deploy pendentes** (lista acima, em "O que falta para fechar a Fase 9").
 
 ```bash
 docker compose up -d db                    # Postgres em dev (host 55432)
@@ -423,17 +556,28 @@ pnpm --filter @cifrao/db exec prisma migrate deploy
 pnpm dev                                   # web 3000 + api 3001
 ```
 
-Antes de começar a Fase 9, o que um novo chat precisa saber:
+Antes de continuar, o que um novo chat precisa saber:
 
-1. **Leia o `CLAUDE.md` inteiro** — a Seção 5 são requisitos, não sugestões, e a Seção 10 define o ritual (3 linhas antes de começar, uma fase por vez, teste obrigatório por regra, parar no fim).
-2. **Qualquer soma de despesa usa `netExpenseByCategory`/`netIncomeCents`** ([apps/api/src/common/expense-aggregates.ts](apps/api/src/common/expense-aggregates.ts)) em vez de `groupBy` cru — senão o abatimento de reembolso (5.13) se perde. Dashboard, orçamento e relatórios já passam por lá.
-3. **Dinheiro é `bigint` em centavos e data é UTC** (5.1 e 5.2). Cuidado com filtro de data vindo da URL: `z.coerce.date()` em `"2026-03-31"` dá meia-noite UTC, que em São Paulo ainda é dia 30 — foi bug real na Fase 7. Use dia de calendário de SP.
-4. **Agregação é no banco** (armadilha #5), nunca `reduce` no Node sobre milhares de linhas.
-5. **Patrimônio = contas + carteira − faturas.** Aportar tira dinheiro da conta (Fase 8), então nada é contado duas vezes. O export/backup da Fase 9 tem que levar `Investment`, `InvestmentTransaction`, `PriceHistory` e `AllocationTarget` junto, ou a carteira some na restauração.
-6. **`pg-boss` e `ofx-js` são ESM** e a API é CommonJS no Node 20: se precisar de outra lib ESM, use `importEsm` de [apps/api/src/common/esm.ts](apps/api/src/common/esm.ts). O job semanal de backup da Fase 9 usa a mesma fila da importação (`QueueService`).
-7. **O R2 ficou para a Fase 9**: hoje o arquivo importado vive no Postgres em base64 (`ImportBatch.rawContent`, limite de 12 MB via `API_BODY_LIMIT`). A Fase 9 leva anexos, backup e esse arquivo para o R2, atrás de uma interface de storage — e **precisa das credenciais do dono**.
-8. Dependência nova, serviço externo ou abstração fora do CLAUDE.md: **perguntar antes** (Seção 2).
-
+1. **Leia o `CLAUDE.md` inteiro** — a Seção 5 são requisitos, não sugestões, e a
+   Seção 10 define o ritual (3 linhas antes de começar, uma fase por vez, teste
+   obrigatório por regra, parar no fim).
+2. **Storage está fora da Fase 9 por decisão do dono.** Não crie driver de disco
+   nem de R2, e não implemente o "job semanal de dump" que a Seção 7 lista — ele
+   virou melhoria futura. O que cobre o aceite é exportar/restaurar por
+   download/upload.
+3. **Qualquer soma de despesa usa `netExpenseByCategory`/`netIncomeCents`**
+   ([apps/api/src/common/expense-aggregates.ts](apps/api/src/common/expense-aggregates.ts))
+   em vez de `groupBy` cru — senão o abatimento de reembolso (5.13) se perde.
+4. **Dinheiro é `bigint` em centavos e data é UTC** (5.1 e 5.2). Cuidado com
+   filtro de data vindo da URL: `z.coerce.date()` em `"2026-03-31"` dá meia-noite
+   UTC, que em São Paulo ainda é dia 30 — foi bug real na Fase 7.
+5. **Agregação é no banco** (armadilha #5), nunca `reduce` no Node sobre milhares
+   de linhas.
+6. **`pg-boss` e `ofx-js` são ESM** e a API é CommonJS no Node 20: para outra lib
+   ESM, use `importEsm` de [apps/api/src/common/esm.ts](apps/api/src/common/esm.ts).
+7. **Dependência nova, serviço externo ou abstração fora do CLAUDE.md:
+   perguntar antes** (Seção 2). Vale para qualquer lib de PWA/service worker — o
+   manifest e o `sw.js` dão para escrever à mão, sem `next-pwa`.
 
 ```bash
 pnpm install
@@ -447,4 +591,7 @@ pnpm test                    # testes (shared + api + web)
 pnpm dev                     # sobe banco + api (3001) + web (3000)
 ```
 
-> Observação de ambiente: nesta máquina as portas **3000/3100** (Next) e **5432/5433** (Postgres) já estavam ocupadas por outros serviços. O `docker-compose` publica o Postgres em **55432**; se a **3000** estiver ocupada ao rodar `pnpm dev`, libere-a ou ajuste a porta do web.
+> Observação de ambiente: nesta máquina as portas **3000/3100** (Next) e
+> **5432/5433** (Postgres) já estavam ocupadas por outros serviços. O
+> `docker-compose` publica o Postgres em **55432**; se a **3000** estiver ocupada
+> ao rodar `pnpm dev`, libere-a ou ajuste a porta do web.

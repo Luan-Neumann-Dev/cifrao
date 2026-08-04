@@ -12,3 +12,5 @@ export * from './goal-logic';
 export * from './import-logic';
 export * from './report-logic';
 export * from './investment-logic';
+export * from './backup-logic';
+export * from './notification-logic';

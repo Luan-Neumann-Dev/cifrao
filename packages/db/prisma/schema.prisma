@@ -13,6 +13,8 @@
 // Fase 8: investimentos (Investment, InvestmentTransaction, PriceHistory,
 // AllocationTarget). Aportar move dinheiro de uma conta para a posição, então
 // nenhum real é contado duas vezes no patrimônio.
+// Fase 9: preferências de aviso no User e `RestoreJob` (progresso da restauração
+// de backup). O export lê o banco e a restauração grava nas tabelas existentes.
 
 generator client {
   provider = "prisma-client-js"
@@ -41,6 +43,15 @@ model User {
   // Campos de domínio do User (Seção 6) preservados sobre o schema do Better Auth
   theme       String? @default("system")
   accentColor String? @default("#820AD1")
+
+  // Fase 9: preferências de aviso. Não há e-mail nem push — os avisos são
+  // derivados dos dados que já existem e mostrados dentro do app.
+  notifyInvoiceDue     Boolean @default(true)
+  notifyBudgetExceeded Boolean @default(true)
+  notifyGoalReached    Boolean @default(true)
+  notifyForecastDue    Boolean @default(true)
+  /// Antecedência, em dias, para avisar de vencimento e de previsto.
+  notifyDaysBefore     Int     @default(3)
 
   sessions   Session[]
   accounts   AuthAccount[]
@@ -655,4 +666,33 @@ model Goal {
   updatedAt                DateTime  @updatedAt
 
   @@index([linkedAccountId])
+}
+
+// ─── Backup (Fase 9) ──────────────────────────────────────────────────────────
+
+enum RestoreStatus {
+  PENDING
+  RUNNING
+  DONE
+  FAILED
+}
+
+/// Restauração de backup em andamento. O arquivo enviado fica em `content` só
+/// enquanto o job roda e é apagado ao terminar — decisão do dono: nesta fase não
+/// existe storage, então nada de arquivo sobrevive no servidor.
+model RestoreJob {
+  id           String        @id @default(cuid())
+  status       RestoreStatus @default(PENDING)
+  /// 'replace' apaga antes de gravar; 'merge' grava por cima.
+  mode         String        @default("replace")
+  progress     Int           @default(0)
+  totalRecords Int           @default(0)
+  /// Quantas linhas entraram por seção, para a tela mostrar o resultado.
+  restored     Json?
+  error        String?
+  content      String?       @db.Text
+  createdAt    DateTime      @default(now())
+  finishedAt   DateTime?
+
+  @@index([createdAt])
 }
