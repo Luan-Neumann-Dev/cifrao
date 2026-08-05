@@ -1,0 +1,35 @@
+{
+  "id": "/painel",
+  "name": "Cifrão — finanças pessoais",
+  "short_name": "Cifrão",
+  "description": "Contas, cartões, faturas, orçamento e investimentos em um lugar só.",
+  "lang": "pt-BR",
+  "dir": "ltr",
+  "start_url": "/painel",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#FAFAFC",
+  "theme_color": "#820AD1",
+  "categories": ["finance", "productivity"],
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    {
+      "src": "/icons/icon-maskable-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    { "name": "Lançamentos", "url": "/painel/lancamentos" },
+    { "name": "Cartões", "url": "/painel/cartoes" },
+    { "name": "Orçamento", "url": "/painel/orcamento" }
+  ]
+}

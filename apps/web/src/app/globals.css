@@ -51,6 +51,27 @@
   --overlay: rgba(255, 255, 255, 0.05);
 }
 
+/*
+ * Cor de acento personalizada (Fase 9). Só entra quando o usuário escolhe uma
+ * cor diferente da padrão — aí o `<html>` ganha `data-accent` e `--accent`, e os
+ * derivados saem por `color-mix`. Enquanto ninguém personaliza, valem os
+ * hexadecimais exatos do CLAUDE.md acima.
+ */
+:root[data-accent] {
+  --primary: var(--accent);
+  --primary-hover: color-mix(in srgb, var(--accent) 84%, #000);
+  --primary-soft: color-mix(in srgb, var(--accent) 12%, #fff);
+  --ring: 0 0 0 4px color-mix(in srgb, var(--accent) 22%, transparent);
+  --fab-shadow: 0 12px 30px color-mix(in srgb, var(--accent) 34%, transparent);
+}
+
+:root[data-accent][data-theme='dark'] {
+  /* No escuro o "soft" é um fundo, não um realce claro: mistura com o bg. */
+  --primary-soft: color-mix(in srgb, var(--accent) 26%, #0e0b12);
+  --ring: 0 0 0 4px color-mix(in srgb, var(--accent) 32%, transparent);
+  --fab-shadow: 0 12px 32px color-mix(in srgb, var(--accent) 28%, transparent);
+}
+
 /* Mapeia os tokens (via var()) para utilitários do Tailwind: bg-surface, text-ink… */
 @theme inline {
   --color-primary: var(--primary);
@@ -70,8 +91,12 @@
   --radius-card: 20px;
   --radius-control: 12px;
 
+  /* Seção 4: Inter no texto, Manrope em número e título. As duas entram por
+     `next/font` no layout raiz, que define --ff-inter e --ff-manrope. */
   --font-sans:
-    Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    var(--ff-inter), Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-manrope:
+    var(--ff-manrope), Manrope, var(--ff-inter), Inter, -apple-system, sans-serif;
 }
 
 * {

@@ -6,6 +6,7 @@ import type {
   ImportStatus,
   InvestmentClass,
   InvoiceStatus,
+  NotificationKind,
   RecurrenceFrequency,
   StatementDateFormat,
   TransactionStatus,
@@ -596,6 +597,101 @@ export interface Report {
   }[];
   topMerchants: ReportMerchant[];
   netWorth: ReportNetWorthPoint[];
+}
+
+// ─── Configurações, avisos e backup (Fase 9) ──────────────────────────────────
+
+export interface Profile {
+  id: string;
+  name: string | null;
+  email: string;
+  emailVerified: boolean;
+  twoFactorEnabled: boolean | null;
+  createdAt: string;
+  theme: string | null;
+  accentColor: string | null;
+  notifyInvoiceDue: boolean;
+  notifyBudgetExceeded: boolean;
+  notifyGoalReached: boolean;
+  notifyForecastDue: boolean;
+  notifyDaysBefore: number;
+}
+
+export interface ActiveSession {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+  expiresAt: string;
+  ipAddress: string | null;
+  userAgent: string | null;
+  device: string;
+  /** A sessão deste navegador — a única que os botões não podem derrubar. */
+  current: boolean;
+}
+
+export interface AppNotification {
+  id: string;
+  kind: NotificationKind;
+  severity: 'danger' | 'warn' | 'info';
+  title: string;
+  detail: string;
+  href: string;
+  dateKey?: string;
+  amountCents?: string;
+}
+
+export interface NotificationList {
+  notifications: AppNotification[];
+  unread: number;
+}
+
+/** Categoria com o que aponta para ela — é o que diz se dá para apagar. */
+export interface CategoryUsage extends Category {
+  transactionCount: number;
+  budgetCount: number;
+  ruleCount: number;
+  recurringCount: number;
+  childCount: number;
+  /** Sem lançamento e sem filha: dá para apagar direto, sem mesclar. */
+  deletable: boolean;
+}
+
+export interface MergeResult {
+  merged: { from: string; into: string };
+  moved: {
+    transactions: number;
+    splits: number;
+    purchases: number;
+    recurringRules: number;
+    importRows: number;
+    children: number;
+    budgets: number;
+    categoryRules: number;
+  };
+  budgetsSomados: { month: string; limitCents: string }[];
+  regrasUnificadas: number;
+}
+
+export interface BackupSummary {
+  sections: { model: string; label: string; count: number }[];
+  totalRecords: number;
+}
+
+export interface RestoreJob {
+  id: string;
+  status: 'PENDING' | 'RUNNING' | 'DONE' | 'FAILED';
+  mode: 'replace' | 'merge';
+  progress: number;
+  totalRecords: number;
+  restored: Record<string, number> | null;
+  error: string | null;
+  createdAt: string;
+  finishedAt: string | null;
+}
+
+export interface RestoreEnqueued {
+  job: Pick<RestoreJob, 'id' | 'status' | 'mode' | 'totalRecords' | 'createdAt'>;
+  check: { counts: Record<string, number>; unknownModels: string[] };
 }
 
 export interface Receivables {

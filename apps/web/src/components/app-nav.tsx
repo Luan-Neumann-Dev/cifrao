@@ -3,6 +3,7 @@
 import { LogOut } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
+import { NotificationsBell } from '@/components/notifications-bell';
 import { Button } from '@/components/ui/button';
 import { signOut } from '@/lib/auth-client';
 import { clearApiToken } from '@/lib/session-actions';
@@ -22,6 +23,7 @@ const LINKS = [
   { href: '/painel/a-receber', label: 'A receber' },
   { href: '/painel/importar', label: 'Importar' },
   { href: '/painel/regras', label: 'Regras' },
+  { href: '/painel/configuracoes', label: 'Configurações' },
 ];
 
 export function AppNav() {
@@ -56,6 +58,7 @@ export function AppNav() {
             );
           })}
         </nav>
+        <NotificationsBell />
         <Button variant="ghost" size="icon" className="shrink-0" onClick={sair} title="Sair">
           <LogOut className="h-4 w-4" />
           <span className="sr-only">Sair</span>

@@ -1,0 +1,72 @@
+# Produção: uma VPS, três containers, uma rede interna (Seção 9 do CLAUDE.md).
+#
+# Só o `web` publica porta — é ele que o proxy do Coolify enxerga. A API e o
+# Postgres ficam na rede interna, e o front fala com a API pelo rewrite /api/*
+# (armadilha #7: nada de CORS permissivo).
+#
+#   cp .env.prod.example .env && docker compose -f docker-compose.prod.yml up -d --build
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-cifrao}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-cifrao}
+    volumes:
+      - cifrao-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-cifrao} -d ${POSTGRES_DB:-cifrao}']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [cifrao]
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      # Sem pooler externo: o Postgres é local, então as duas URLs são a mesma
+      # (armadilha #1 só morde em Neon/Supabase).
+      DATABASE_URL: postgresql://${POSTGRES_USER:-cifrao}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-cifrao}?schema=public
+      DIRECT_URL: postgresql://${POSTGRES_USER:-cifrao}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-cifrao}?schema=public
+      # De onde a API busca o JWKS para validar o JWT emitido pelo Next.
+      BETTER_AUTH_URL: http://web:3000
+      API_PORT: 3001
+      API_BODY_LIMIT: ${API_BODY_LIMIT:-12mb}
+    networks: [cifrao]
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        # Rewrite /api/* é resolvido no build (ver o Dockerfile do web).
+        API_INTERNAL_URL: http://api:3001
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-cifrao}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-cifrao}?schema=public
+      DIRECT_URL: postgresql://${POSTGRES_USER:-cifrao}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-cifrao}?schema=public
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?defina BETTER_AUTH_SECRET}
+      # URL pública do app — é o que vai nos links e nos cookies.
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL:?defina BETTER_AUTH_URL}
+      # Depois de criar a sua conta, mantenha fechado (regra da Fase 1).
+      REGISTRATION_OPEN: ${REGISTRATION_OPEN:-false}
+    ports:
+      - '${WEB_PORT:-3000}:3000'
+    networks: [cifrao]
+
+volumes:
+  cifrao-pgdata:
+
+networks:
+  cifrao:

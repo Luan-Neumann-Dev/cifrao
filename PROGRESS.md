@@ -413,12 +413,11 @@ gasto reembolsado **continuava consumindo o orçamento** da categoria.
 ---
 
 
-## Fase 9 — Configurações, backup e deploy 🚧 (backend pronto, front pendente)
+## Fase 9 — Configurações, backup e deploy ✅
 
-> **Commit intermediário a pedido do dono.** O backend da fase está completo e
-> testado; a parte de front (tela de configurações, sino de avisos, PWA) e os
-> arquivos de deploy ainda não foram escritos. Detalhes do que falta no fim
-> desta seção.
+> Fechada em dois commits, a pedido do dono: o primeiro entregou o backend
+> (configurações, avisos e backup) e o segundo, o front, o PWA e o deploy. As
+> duas partes estão descritas abaixo, na ordem em que foram feitas.
 
 ### Decisão que abriu a fase — storage
 
@@ -521,33 +520,132 @@ Antes de começar, o dono perguntou sobre trocar o Postgres pelo **Turso** e se 
   `merge`, `BigInt`/`Date` revividos, falha marcando `FAILED` e limpando o
   arquivo).
 
-### O que falta para fechar a Fase 9
+### O que foi feito (front, PWA e deploy)
 
-1. **Tela `/painel/configuracoes`** com as seções: perfil, aparência (tema +
-   cor de acento — os campos `theme` e `accentColor` existem no `User` desde a
-   Fase 1 e **nunca ganharam UI**), gestão de categorias (criar, mesclar,
-   apagar), sessões ativas, notificações, backup (exportar/restaurar) e zona de
-   risco. Link novo no `AppNav`.
-2. **Aplicador de tema** no front: `data-theme` no `<html>` (Seção 4) e a cor de
-   acento sobrescrevendo o token `--primary`.
-3. **Sino de avisos** no topo, consumindo `GET /notifications`.
-4. **PWA completo**: não existe nem `apps/web/public/` hoje. Falta manifest,
-   ícones (há `python3` com PIL na máquina para gerar os PNG, e `sharp` no
-   `node_modules` — gerar ícone é asset de build, não dependência do projeto),
-   service worker e offline shell.
-5. **Deploy**: **não existe nenhum `Dockerfile`** no repositório — a Seção 9 diz
-   para prepará-los desde a Fase 0, mas isso não foi feito. Falta um `Dockerfile`
-   por app, `docker-compose.prod.yml` com `web`/`api`/`postgres` em rede interna,
-   healthchecks e README de deploy para Coolify.
-6. **Smoke E2E da fase** contra a API real, incluindo o aceite: exportar o
-   histórico inteiro e restaurar num banco limpo, conferindo que os totais batem.
+- **Tela `/painel/configuracoes`** (uma seção por card, com régua de atalhos
+  rolável em 380px): **perfil** (nome, e-mail, estado do 2FA e **troca de
+  senha**), **aparência**, **avisos**, **categorias** (criar, editar, mesclar,
+  apagar, com a contagem de uso de cada uma), **sessões ativas** (encerrar uma
+  ou todas as outras), **backup** e **zona de risco**. Link novo no `AppNav`.
+- **Aparência de verdade**: `data-theme` no `<html>` escrito por um script inline
+  que roda **antes da primeira pintura** (sem piscar branco ao abrir no escuro),
+  com o servidor como fonte da verdade — o tema escolhido no celular vale no
+  computador. `apps/web/src/lib/theme.ts` concentra a lógica, testada.
+- **Sino de avisos** no topo, consumindo `GET /notifications`, com contador,
+  severidade por cor, valor e link para a tela que resolve o aviso. Recarrega ao
+  trocar de tela, então pagar a fatura apaga o aviso dela.
+- **Fontes da Seção 4**: Inter e Manrope entraram por `next/font` (parte do
+  Next, sem dependência nova). A classe `font-manrope` era usada em 8 telas
+  desde a Fase 2 e **não fazia nada** — o token não existia no `@theme`. Agora
+  todo número grande sai em Manrope tabular, como o design pede.
+- **PWA completo**: `manifest.webmanifest` (ícones, atalhos, cores do tema),
+  ícones gerados por [design/gerar-icones-pwa.py](design/gerar-icones-pwa.py),
+  service worker escrito à mão e página `/offline`.
+- **Deploy**: `Dockerfile` por app, `docker-compose.prod.yml` (web/api/postgres
+  em rede interna, só o web publica porta), `.dockerignore`, `.env.prod.example`
+  e [README.md](README.md) com o passo a passo do Coolify.
+
+### Decisões (front e deploy) — confirmadas com o dono
+
+1. **Cor de acento só escreve `--primary`.** Hover, realce, foco e sombra saem
+   por `color-mix` no CSS, e só quando existe acento personalizado — assim os
+   hexadecimais exatos do CLAUDE.md continuam sendo o padrão, em vez de virarem
+   aproximação calculada. A cor vale nos dois temas.
+2. **O service worker não cacheia `/api/*`.** Saldo, fatura e orçamento vindos de
+   resposta velha seriam pior que tela offline: o app mentiria com números que
+   parecem certos. Só o casco (JS, CSS, ícone) e a página de offline são
+   guardados; navegação é sempre rede, e sem rede cai no `/offline` — nunca numa
+   tela autenticada antiga.
+3. **Troca de senha na tela de configurações** (não estava na lista da Seção 7,
+   mas está no design de Configurações): a recuperação por e-mail depende de um
+   provedor de envio que o projeto não tem, então sem isto a única saída seria
+   mexer no banco à mão.
+4. **Sem `next-pwa`**: manifest e `sw.js` são 60 linhas escritas à mão. Ícone é
+   asset gerado por script (PIL), não dependência.
+5. **Migração roda no start da API** (`prisma migrate deploy`, idempotente), não
+   num container à parte — o alvo é uma VPS com uma instância só.
+6. **A imagem da API não faz prune de devDependencies**: o client gerado do
+   Prisma e os symlinks do pnpm vivem no `node_modules` do builder, e
+   reinstalar em modo produção apagaria o client sem ter mais a CLI para
+   regerá-lo. Imagem maior, um passo a menos que quebra em produção.
+
+### Três armadilhas que só apareceram rodando
+
+1. **`next dev` quebrado com Next 15.5.22.** Qualquer client component que
+   importa `@cifrao/shared` derrubava o servidor de desenvolvimento com
+   *"Cannot use 'import.meta' outside a module"*: o pnpm resolve o pacote pelo
+   caminho real (`packages/shared/dist`, fora de `node_modules`), o Next passa a
+   tratá-lo como código do app e o loader do React Refresh injeta `import.meta`
+   num arquivo CommonJS. Não era código novo — o trace apontava
+   `painel/page.tsx`, da Fase 4; apareceu quando o `pnpm install` sincronizou o
+   `node_modules` com a versão do lockfile. **`transpilePackages` não resolve** e
+   `resolve.symlinks = false` quebra o recharts. A saída foi
+   **`next dev --turbopack`** (bundler que já vem no Next, sem dependência
+   nova); o build de produção segue no webpack, como sempre esteve.
+2. **Prisma no container do web.** O `standalone` empacotava o client e deixava
+   o **query engine** para trás: a imagem subia e quebrava no primeiro acesso ao
+   banco. Corrigido com `serverExternalPackages` + `@prisma/client` declarado
+   explicitamente em `apps/web` (já era dependência de fato, via `@cifrao/db` e
+   o adapter do Better Auth — só não estava escrita).
+3. **O rewrite `/api/*` é resolvido no build**, não em runtime: `API_INTERNAL_URL`
+   definido só no compose não tinha efeito nenhum e o web tentava
+   `localhost:3001` dentro do próprio container. Virou `ARG` do Dockerfile
+   (`build.args` no compose). Mudou o endereço da API, reconstrói a imagem.
+
+### Aceite verificado (Fase 9)
+
+- **CI local**: `pnpm lint` (4/4), `pnpm typecheck` (6/6), `pnpm test`
+  (**327 testes**: shared 203, api 110, web 14) e `pnpm build` (4/4) — verdes.
+- **Aceite da fase — "exportar o histórico inteiro e restaurar num banco limpo"
+  — provado por smoke E2E (59/59)** na API real, do jeito certo: os números de
+  antes e de depois vêm dos mesmos endpoints que as telas usam, com o banco
+  arrasado no meio.
+  - export com **90 registros**, exatamente o que o resumo prometia; **nenhuma
+    seção de credencial** no arquivo; centavo como string (BigInt);
+  - zona de risco: frase errada **não apaga nada**; nível 1 apagou 25
+    lançamentos, **zerou o saldo** e manteve contas, cartões e as 49 categorias;
+  - restauração em job do pg-boss, `replace`, chegando a 100% e limpando o
+    arquivo enviado;
+  - **e então tudo volta idêntico**: saldo das contas (R$ 2.915,00), 25
+    lançamentos de todos os tipos, despesa, receita, patrimônio, fatura do
+    cartão, disponível de verdade, carteira, orçamento, saldo lido pela meta, os
+    12 previstos da recorrência, o parcelamento em 6 faturas, o estorno de
+    reembolso vinculado e até tema e preferência de aviso;
+  - mesclagem: lançamento migrado, **limites do mesmo mês somados** (R$ 300 +
+    R$ 200 = R$ 500), origem apagada;
+  - avisos derivados sem gravar nada, e desligar a preferência apaga o aviso;
+  - CSV com **BOM**, `;` e uma linha por lançamento.
+- **Smoke de UI (16/16)** com o Next rodando: `/painel/configuracoes` responde
+  200 com as sete seções, o sino aparece no topo, o script de tema entra antes
+  da pintura, o manifest está no `<head>`, o Manrope carrega e `/offline` abre
+  sem sessão. Conferido também no navegador em **390px**: tema e cor de acento
+  aplicados na hora ao clicar, sino listando os avisos com valor.
+- **Deploy provado de verdade**: `docker compose -f docker-compose.prod.yml up`
+  numa stack isolada — as três imagens sobem **healthy**, a API aplica as 11
+  migrações no start, o proxy `/api/*` alcança o Nest pela rede interna, o
+  cadastro grava no Postgres do container e uma chamada autenticada
+  (`/api/settings`) volta 200 com o JWT validado via JWKS entre containers.
 
 ---
 
 ## Retomando o trabalho em outra sessão
 
-Estado atual: **Fases 0 a 8 concluídas. Fase 9 com o backend pronto e commitado,
-front e deploy pendentes** (lista acima, em "O que falta para fechar a Fase 9").
+Estado atual: **as 10 fases (0 a 9) estão concluídas.** O app está inteiro:
+contas, cartões com fatura, parcelamento, dashboard, recorrências, orçamento,
+metas, importação, relatórios, investimentos, configurações, backup, PWA e os
+arquivos de deploy. O passo a passo de subir em produção está no
+[README.md](README.md).
+
+O que ficou de fora, de propósito, e caberia num próximo trabalho:
+
+- **Job semanal de dump para o R2** (Seção 9 do CLAUDE.md): virou melhoria
+  futura quando o dono decidiu fechar a fase **sem storage**. Hoje o backup é
+  manual (export pela tela ou `pg_dump`).
+- **Anexo de comprovante** (`Attachment` da Seção 6) — depende do mesmo storage.
+- **Entrega de e-mail** (recuperação de senha) — sem provedor no stack; a troca
+  de senha pela tela de configurações cobre o caso do dia a dia.
+- **Desfazer uma importação confirmada** e **editar a compra pai propagando para
+  as parcelas futuras** (trecho final de 5.4).
 
 ```bash
 docker compose up -d db                    # Postgres em dev (host 55432)
@@ -561,10 +659,8 @@ Antes de continuar, o que um novo chat precisa saber:
 1. **Leia o `CLAUDE.md` inteiro** — a Seção 5 são requisitos, não sugestões, e a
    Seção 10 define o ritual (3 linhas antes de começar, uma fase por vez, teste
    obrigatório por regra, parar no fim).
-2. **Storage está fora da Fase 9 por decisão do dono.** Não crie driver de disco
-   nem de R2, e não implemente o "job semanal de dump" que a Seção 7 lista — ele
-   virou melhoria futura. O que cobre o aceite é exportar/restaurar por
-   download/upload.
+2. **Storage está fora por decisão do dono.** Não crie driver de disco nem de
+   R2 sem falar com ele: o backup é export/import por download e upload.
 3. **Qualquer soma de despesa usa `netExpenseByCategory`/`netIncomeCents`**
    ([apps/api/src/common/expense-aggregates.ts](apps/api/src/common/expense-aggregates.ts))
    em vez de `groupBy` cru — senão o abatimento de reembolso (5.13) se perde.
@@ -577,7 +673,15 @@ Antes de continuar, o que um novo chat precisa saber:
    ESM, use `importEsm` de [apps/api/src/common/esm.ts](apps/api/src/common/esm.ts).
 7. **Dependência nova, serviço externo ou abstração fora do CLAUDE.md:
    perguntar antes** (Seção 2). Vale para qualquer lib de PWA/service worker — o
-   manifest e o `sw.js` dão para escrever à mão, sem `next-pwa`.
+   manifest e o `sw.js` estão escritos à mão, sem `next-pwa`.
+8. **O `next dev` roda com Turbopack** (`--turbopack` no script do web) porque o
+   webpack de desenvolvimento quebra com pacote CommonJS do workspace em client
+   component — detalhe na armadilha 1 da Fase 9. O **build continua no webpack**.
+9. **Mexeu em `next.config.ts`? Teste o `next dev` E o `next build`.** Foi ali
+   que moraram três bugs da Fase 9 (rewrite resolvido no build, Prisma sem
+   engine no standalone, `outputFileTracingRoot` derrubando o dev no Windows).
+   E **nunca rode `pnpm build` do web com o `next dev` no ar**: os dois disputam
+   a mesma pasta `.next` e o servidor de desenvolvimento passa a servir erro.
 
 ```bash
 pnpm install

@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { AppNav } from '@/components/app-nav';
 import { auth } from '@/lib/auth';
+import { ThemeSync } from './theme-sync';
 import { TokenSync } from './token-sync';
 
 // Área autenticada: sem sessão, volta para o login (checagem no servidor).
@@ -14,6 +15,7 @@ export default async function PainelLayout({ children }: { children: ReactNode }
   return (
     <div className="min-h-dvh bg-bg">
       <TokenSync />
+      <ThemeSync />
       <AppNav />
       <main className="mx-auto max-w-5xl px-4 py-6">{children}</main>
     </div>

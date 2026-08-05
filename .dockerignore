@@ -1,0 +1,21 @@
+# O build acontece dentro da imagem: nada de artefato nem segredo da máquina
+# local entra no contexto.
+**/node_modules
+**/.next
+**/dist
+**/.turbo
+**/coverage
+**/*.tsbuildinfo
+
+.git
+.gitignore
+.vscode
+.idea
+
+# Segredos ficam no ambiente do Coolify, nunca na imagem.
+**/.env
+**/.env.*
+!**/.env.example
+
+design
+PROGRESS.md
