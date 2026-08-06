@@ -1,7 +1,7 @@
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import type { ReactNode } from 'react';
-import { AppNav } from '@/components/app-nav';
+import { AppShell } from '@/components/app-shell';
 import { auth } from '@/lib/auth';
 import { ThemeSync } from './theme-sync';
 import { TokenSync } from './token-sync';
@@ -13,11 +13,10 @@ export default async function PainelLayout({ children }: { children: ReactNode }
     redirect('/login');
   }
   return (
-    <div className="min-h-dvh bg-bg">
+    <AppShell>
       <TokenSync />
       <ThemeSync />
-      <AppNav />
-      <main className="mx-auto max-w-5xl px-4 py-6">{children}</main>
-    </div>
+      {children}
+    </AppShell>
   );
 }

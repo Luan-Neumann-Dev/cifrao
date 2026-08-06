@@ -321,6 +321,7 @@ body {
 
   header,
   nav,
+  aside,
   .print\:hidden {
     display: none !important;
   }
@@ -328,6 +329,11 @@ body {
   main {
     max-width: none !important;
     padding: 0 !important;
+  }
+
+  /* Sem sidebar no papel, o conteúdo volta a ocupar a folha inteira. */
+  .app-content {
+    padding-left: 0 !important;
   }
 
   .break-inside-avoid {

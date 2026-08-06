@@ -12,6 +12,7 @@ import type {
   TransactionStatus,
   TransactionType,
 } from '@cifrao/shared';
+import { type ApiErrorBody, messageFromApiError } from './api-error';
 
 /**
  * Cliente da API (via proxy /api/* -> Nest). O JWT httpOnly vai junto no cookie.
@@ -24,14 +25,13 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
     headers: { 'content-type': 'application/json', ...(init?.headers ?? {}) },
   });
   if (!res.ok) {
-    let message = `Erro ${res.status}`;
+    let body: ApiErrorBody | null = null;
     try {
-      const body = (await res.json()) as { message?: string };
-      if (body?.message) message = body.message;
+      body = (await res.json()) as ApiErrorBody;
     } catch {
       // corpo não-JSON
     }
-    throw new Error(message);
+    throw new Error(messageFromApiError(res.status, body));
   }
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
@@ -47,6 +47,13 @@ export interface Account {
   color: string | null;
   institution: string | null;
   archived: boolean;
+}
+
+/** Saldo no fim de cada mês — `GET /accounts/:id/balance-evolution`. */
+export interface BalancePoint {
+  /** "yyyy-MM" no fuso de São Paulo. */
+  month: string;
+  balanceCents: string;
 }
 
 export interface Category {

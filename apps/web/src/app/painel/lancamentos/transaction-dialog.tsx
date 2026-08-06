@@ -1,6 +1,7 @@
 'use client';
 
 import { TRANSACTION_STATUSES, type TransactionStatus, formatInSaoPaulo } from '@cifrao/shared';
+import Link from 'next/link';
 import { type FormEvent, type ReactNode, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -64,9 +65,10 @@ export function TransactionDialog({
   const [fromAccountId, setFromAccountId] = useState(
     transaction?.fromAccount?.id ?? accounts[0]?.id ?? '',
   );
-  const [toAccountId, setToAccountId] = useState(
-    transaction?.toAccount?.id ?? accounts[1]?.id ?? '',
-  );
+  // Sem segunda conta, começa vazio E o campo mostra "Selecione…": antes o
+  // select exibia a primeira conta enquanto o estado seguia em branco, e o
+  // envio morria no servidor com "Dados inválidos".
+  const [toAccountId, setToAccountId] = useState(transaction?.toAccount?.id ?? '');
   const [categoryId, setCategoryId] = useState(transaction?.category?.id ?? '');
   const [notes, setNotes] = useState(transaction?.notes ?? '');
   const [isReimbursable, setIsReimbursable] = useState(transaction?.isReimbursable ?? false);
@@ -203,33 +205,75 @@ export function TransactionDialog({
           </div>
 
           {type === 'TRANSFER' && !editing ? (
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label htmlFor="tx-from">De</Label>
-                <Select id="tx-from" value={fromAccountId} onChange={(e) => setFromAccountId(e.target.value)}>
-                  {accounts.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.name}
-                    </option>
-                  ))}
-                </Select>
+            <div className="space-y-2">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label htmlFor="tx-from">De</Label>
+                  <Select
+                    id="tx-from"
+                    required
+                    value={fromAccountId}
+                    onChange={(e) => {
+                      setFromAccountId(e.target.value);
+                      // Escolher como origem a conta que estava no destino
+                      // deixaria o destino apontando para uma opção que sumiu.
+                      if (e.target.value === toAccountId) setToAccountId('');
+                    }}
+                  >
+                    <option value="">Selecione…</option>
+                    {accounts.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.name}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="tx-to">Para</Label>
+                  <Select
+                    id="tx-to"
+                    required
+                    value={toAccountId}
+                    onChange={(e) => setToAccountId(e.target.value)}
+                  >
+                    <option value="">Selecione…</option>
+                    {/* A conta de origem sai da lista: origem = destino é
+                        recusado pelo schema, então nem chega a ser oferecido. */}
+                    {accounts
+                      .filter((a) => a.id !== fromAccountId)
+                      .map((a) => (
+                        <option key={a.id} value={a.id}>
+                          {a.name}
+                        </option>
+                      ))}
+                  </Select>
+                </div>
               </div>
-              <div className="space-y-1">
-                <Label htmlFor="tx-to">Para</Label>
-                <Select id="tx-to" value={toAccountId} onChange={(e) => setToAccountId(e.target.value)}>
-                  {accounts.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.name}
-                    </option>
-                  ))}
-                </Select>
-              </div>
+              {accounts.length < 2 && (
+                <p className="rounded-[12px] bg-surface-2 px-3 py-2 text-xs text-ink-2">
+                  Transferência move dinheiro entre duas contas suas, e você tem{' '}
+                  {accounts.length === 1 ? 'só uma' : 'nenhuma'} cadastrada. Crie a outra em{' '}
+                  <Link href="/painel/contas" className="font-medium text-primary hover:underline">
+                    Contas
+                  </Link>
+                  .
+                </p>
+              )}
             </div>
           ) : (
             !editing && (
               <div className="space-y-1">
                 <Label htmlFor="tx-account">Conta</Label>
-                <Select id="tx-account" value={accountId} onChange={(e) => setAccountId(e.target.value)}>
+                <Select
+                  id="tx-account"
+                  required
+                  value={accountId}
+                  onChange={(e) => setAccountId(e.target.value)}
+                >
+                  {/* Placeholder explícito: se o estado estiver vazio (contas
+                      ainda carregando, por exemplo), o campo diz isso em vez de
+                      mostrar a primeira conta e mandar vazio para o servidor. */}
+                  <option value="">Selecione…</option>
                   {accounts.map((a) => (
                     <option key={a.id} value={a.id}>
                       {a.name}

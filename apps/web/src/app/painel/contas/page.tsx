@@ -1,22 +1,13 @@
 'use client';
 
-import { ACCOUNT_TYPES, type AccountType } from '@cifrao/shared';
-import { Pencil, Plus, SlidersHorizontal } from 'lucide-react';
-import { type FormEvent, type ReactNode, useCallback, useEffect, useState } from 'react';
+import { ArrowLeftRight, ChevronRight, Plus } from 'lucide-react';
+import Link from 'next/link';
+import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { Dialog, DialogClose, DialogContent, DialogTrigger } from '@/components/ui/dialog';
-import { Input, Label, Select } from '@/components/ui/input';
 import { type Account, api } from '@/lib/api';
-import { brl, centsFromInput } from '@/lib/format';
-
-const TYPE_LABEL: Record<AccountType, string> = {
-  CHECKING: 'Conta corrente',
-  SAVINGS: 'Poupança',
-  WALLET: 'Carteira',
-  INVESTMENT: 'Investimento',
-};
+import { ACCOUNT_TYPE_LABEL, accountBalanceColor, accountMark, accountTypeColor } from '@/lib/accounts';
+import { brl, splitBrl } from '@/lib/format';
+import { AccountDialog } from './account-dialog';
 
 export default function ContasPage() {
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -37,253 +28,105 @@ export default function ContasPage() {
   }, [load]);
 
   const total = accounts.reduce((acc, a) => acc + Number(a.balanceCents), 0);
+  const parts = splitBrl(total);
 
   return (
-    <div className="space-y-5">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-extrabold tracking-tight text-ink">Contas</h1>
-          <p className="text-sm text-ink-2">
-            Saldo somado:{' '}
-            <span className="font-semibold text-ink tabular-nums">{brl(total)}</span>
-          </p>
-        </div>
-        <AccountDialog onSaved={load}>
-          <Button>
-            <Plus className="h-4 w-4" /> Nova conta
-          </Button>
-        </AccountDialog>
+    <div>
+      <div className="flex items-center justify-between gap-3 px-0.5 pt-1">
+        <h1 className="font-manrope text-[26px] font-bold tracking-[-0.015em] text-ink">Contas</h1>
+        <Link
+          href="/painel/contas/transferir"
+          className="inline-flex h-11 shrink-0 items-center gap-[7px] rounded-full border border-line bg-surface pl-[15px] pr-[18px] text-sm font-semibold text-ink transition-colors hover:bg-surface-2"
+        >
+          <ArrowLeftRight className="h-[17px] w-[17px]" strokeWidth={1.85} />
+          Transferir
+        </Link>
       </div>
 
-      {loading ? (
-        <p className="text-sm text-ink-2">Carregando…</p>
-      ) : accounts.length === 0 ? (
-        <Card className="text-center text-sm text-ink-2">
-          Nenhuma conta ainda. Crie a primeira.
-        </Card>
-      ) : (
-        <div className="grid gap-4 sm:grid-cols-2">
-          {accounts.map((a) => (
-            <Card key={a.id} className="space-y-3">
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-2">
-                  <span
-                    className="mt-1 h-3 w-3 rounded-full"
-                    style={{ background: a.color ?? 'var(--primary)' }}
-                  />
-                  <div>
-                    <p className="font-semibold text-ink">{a.name}</p>
-                    <p className="text-xs text-ink-2">
-                      {TYPE_LABEL[a.type]}
-                      {a.institution ? ` · ${a.institution}` : ''}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex gap-1">
-                  <AdjustDialog account={a} onSaved={load}>
-                    <Button variant="ghost" size="icon" title="Ajustar saldo">
-                      <SlidersHorizontal className="h-4 w-4" />
-                    </Button>
-                  </AdjustDialog>
-                  <AccountDialog account={a} onSaved={load}>
-                    <Button variant="ghost" size="icon" title="Editar">
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                  </AccountDialog>
-                </div>
-              </div>
-              <p className="font-manrope text-2xl font-bold tabular-nums text-ink">
-                {brl(a.balanceCents)}
-              </p>
-            </Card>
-          ))}
+      {/* Patrimônio consolidado. O degradê sai de --primary para que a cor de
+          acento escolhida nas Configurações (Fase 9) valha aqui também. */}
+      <div
+        className="relative mt-[18px] overflow-hidden rounded-[20px] px-[26px] py-6 text-white"
+        style={{
+          background:
+            'linear-gradient(135deg, var(--primary), color-mix(in srgb, var(--primary) 72%, #000))',
+          boxShadow: '0 10px 26px color-mix(in srgb, var(--primary) 28%, transparent)',
+        }}
+      >
+        <span className="pointer-events-none absolute -right-10 -top-[50px] h-[170px] w-[170px] rounded-full bg-white/10" />
+        <div className="relative text-[13px] text-white/80">Patrimônio em contas</div>
+        <div className="relative mt-1.5 flex items-baseline font-manrope font-bold leading-none tracking-[-0.02em]">
+          {parts.sign && <span className="mr-1 text-[26px]">{parts.sign}</span>}
+          <span className="mr-[7px] text-[19px] font-semibold text-white/80">{parts.currency}</span>
+          <span className="text-[38px] tabular-nums">{parts.whole}</span>
+          <span className="text-[22px] tabular-nums opacity-70">{parts.fraction}</span>
         </div>
+        <div className="relative mt-2.5 text-[12.5px] text-white/70">
+          {loading
+            ? 'carregando…'
+            : `${accounts.length} ${accounts.length === 1 ? 'conta' : 'contas'} · atualizado agora`}
+        </div>
+      </div>
+
+      <div className="mt-4 flex flex-col gap-2.5">
+        {accounts.map((a) => (
+          <AccountRow key={a.id} account={a} />
+        ))}
+      </div>
+
+      {!loading && accounts.length === 0 && (
+        <p className="mt-4 px-1 text-center text-sm text-ink-2">
+          Nenhuma conta ainda. Crie a primeira para começar a lançar.
+        </p>
       )}
+
+      <AccountDialog onSaved={load}>
+        <button
+          type="button"
+          className="mt-3.5 inline-flex h-12 w-full items-center justify-center gap-2 rounded-[14px] border border-dashed border-line bg-transparent text-sm font-semibold text-primary transition-colors hover:border-primary hover:bg-primary-soft"
+        >
+          <Plus className="h-[17px] w-[17px]" strokeWidth={1.85} />
+          Nova conta
+        </button>
+      </AccountDialog>
     </div>
   );
 }
 
-function AccountDialog({
-  account,
-  onSaved,
-  children,
-}: {
-  account?: Account;
-  onSaved: () => void;
-  children: ReactNode;
-}) {
-  const editing = Boolean(account);
-  const [open, setOpen] = useState(false);
-  const [name, setName] = useState(account?.name ?? '');
-  const [type, setType] = useState<AccountType>(account?.type ?? 'CHECKING');
-  const [institution, setInstitution] = useState(account?.institution ?? '');
-  const [initial, setInitial] = useState('0');
-  const [color, setColor] = useState(account?.color ?? '#820AD1');
-  const [saving, setSaving] = useState(false);
-
-  async function submit(e: FormEvent) {
-    e.preventDefault();
-    setSaving(true);
-    try {
-      if (editing && account) {
-        await api(`/accounts/${account.id}`, {
-          method: 'PATCH',
-          body: JSON.stringify({ name, type, institution: institution || null, color }),
-        });
-        toast.success('Conta atualizada.');
-      } else {
-        await api('/accounts', {
-          method: 'POST',
-          body: JSON.stringify({
-            name,
-            type,
-            institution: institution || undefined,
-            color,
-            initialBalanceCents: centsFromInput(initial),
-          }),
-        });
-        toast.success('Conta criada.');
-      }
-      setOpen(false);
-      onSaved();
-    } catch (err) {
-      toast.error((err as Error).message);
-    } finally {
-      setSaving(false);
-    }
-  }
-
+function AccountRow({ account }: { account: Account }) {
+  const color = account.color ?? 'var(--primary)';
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent title={editing ? 'Editar conta' : 'Nova conta'}>
-        <form className="space-y-3" onSubmit={submit}>
-          <div className="space-y-1">
-            <Label htmlFor="acc-name">Nome</Label>
-            <Input id="acc-name" required value={name} onChange={(e) => setName(e.target.value)} />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="acc-type">Tipo</Label>
-            <Select
-              id="acc-type"
-              value={type}
-              onChange={(e) => setType(e.target.value as AccountType)}
-            >
-              {ACCOUNT_TYPES.map((t) => (
-                <option key={t} value={t}>
-                  {TYPE_LABEL[t]}
-                </option>
-              ))}
-            </Select>
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="acc-inst">Instituição (opcional)</Label>
-            <Input
-              id="acc-inst"
-              value={institution}
-              onChange={(e) => setInstitution(e.target.value)}
-            />
-          </div>
-          {!editing && (
-            <div className="space-y-1">
-              <Label htmlFor="acc-initial">Saldo inicial</Label>
-              <Input
-                id="acc-initial"
-                value={initial}
-                onChange={(e) => setInitial(e.target.value)}
-                placeholder="0,00"
-              />
-            </div>
-          )}
-          <div className="space-y-1">
-            <Label htmlFor="acc-color">Cor</Label>
-            <input
-              id="acc-color"
-              type="color"
-              value={color}
-              onChange={(e) => setColor(e.target.value)}
-              className="h-10 w-16 cursor-pointer rounded-[12px] border border-line bg-surface"
-            />
-          </div>
-          <div className="flex justify-end gap-2 pt-2">
-            <DialogClose asChild>
-              <Button type="button" variant="ghost">
-                Cancelar
-              </Button>
-            </DialogClose>
-            <Button type="submit" disabled={saving}>
-              {saving ? 'Salvando…' : 'Salvar'}
-            </Button>
-          </div>
-        </form>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function AdjustDialog({
-  account,
-  onSaved,
-  children,
-}: {
-  account: Account;
-  onSaved: () => void;
-  children: ReactNode;
-}) {
-  const [open, setOpen] = useState(false);
-  const [real, setReal] = useState('');
-  const [saving, setSaving] = useState(false);
-
-  async function submit(e: FormEvent) {
-    e.preventDefault();
-    setSaving(true);
-    try {
-      await api(`/accounts/${account.id}/adjust`, {
-        method: 'POST',
-        body: JSON.stringify({ realBalanceCents: centsFromInput(real) }),
-      });
-      toast.success('Saldo ajustado (lançamento de ajuste criado).');
-      setOpen(false);
-      onSaved();
-    } catch (err) {
-      toast.error((err as Error).message);
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent title={`Ajustar saldo · ${account.name}`}>
-        <p className="text-sm text-ink-2">
-          Saldo atual no sistema:{' '}
-          <span className="font-semibold text-ink tabular-nums">{brl(account.balanceCents)}</span>.
-          Informe o saldo real do banco; a diferença vira um lançamento de ajuste.
-        </p>
-        <form className="space-y-3" onSubmit={submit}>
-          <div className="space-y-1">
-            <Label htmlFor="adj-real">Saldo real</Label>
-            <Input
-              id="adj-real"
-              required
-              value={real}
-              onChange={(e) => setReal(e.target.value)}
-              placeholder="0,00"
-            />
-          </div>
-          <div className="flex justify-end gap-2 pt-2">
-            <DialogClose asChild>
-              <Button type="button" variant="ghost">
-                Cancelar
-              </Button>
-            </DialogClose>
-            <Button type="submit" disabled={saving}>
-              {saving ? 'Ajustando…' : 'Ajustar'}
-            </Button>
-          </div>
-        </form>
-      </DialogContent>
-    </Dialog>
+    <Link
+      href={`/painel/contas/${account.id}`}
+      className="flex items-center gap-3.5 rounded-[18px] border border-[var(--card-border)] bg-surface px-[18px] py-4 shadow-[var(--card-shadow)] transition-transform hover:-translate-y-0.5"
+    >
+      <span
+        className="flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-[13px] font-manrope text-lg font-extrabold text-white"
+        style={{ background: color }}
+      >
+        {accountMark(account.name, account.type)}
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="truncate font-manrope text-[15.5px] font-bold text-ink">{account.name}</div>
+        <div className="mt-[3px] inline-flex items-center gap-1.5 text-[12.5px] text-ink-2">
+          <span
+            className="h-1.5 w-1.5 rounded-[2px]"
+            style={{ background: accountTypeColor(account.type) }}
+          />
+          {ACCOUNT_TYPE_LABEL[account.type]}
+          {account.institution ? ` · ${account.institution}` : ''}
+        </div>
+      </div>
+      <div className="shrink-0 text-right">
+        <div
+          className="font-manrope text-base font-bold tabular-nums"
+          style={{ color: accountBalanceColor(account.type, account.balanceCents) }}
+        >
+          {brl(account.balanceCents)}
+        </div>
+        <div className="mt-0.5 text-[11.5px] text-ink-2">saldo atual</div>
+      </div>
+      <ChevronRight className="h-[18px] w-[18px] shrink-0 text-ink-2" />
+    </Link>
   );
 }

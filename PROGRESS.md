@@ -628,6 +628,82 @@ Antes de começar, o dono perguntou sobre trocar o Postgres pelo **Turso** e se 
 
 ---
 
+## Pós-fases — revisão tela a tela contra o design
+
+Depois das 10 fases, o dono passou a revisar o app **uma tela por vez** contra os
+protótipos em [design/](design/). Não é fase nova: é acerto de fidelidade e de
+uso, com o mesmo rito (teste para o que é regra, commit pequeno, parar).
+
+### Navegação — sidebar lateral
+
+As 14 seções viviam numa régua horizontal que só cabia rolando, escondendo
+metade do app. Viraram [app-shell.tsx](apps/web/src/components/app-shell.tsx):
+sidebar fixa de 264px a partir de `lg`, gaveta com overlay abaixo disso (fecha no
+Escape, na navegação e trava a rolagem do fundo), agrupada em Dia a dia / Onde
+está o dinheiro / Planejamento / Dados, com Configurações e Sair no rodapé.
+`isActiveNavLink` ([nav.ts](apps/web/src/lib/nav.ts)) está testado porque
+`/painel` casaria com todas as rotas filhas por prefixo.
+
+### Transferência que não saía — e o erro que mentia
+
+Bug relatado: "avisa data inválida". Não era a data. Em
+[transaction-dialog.tsx](apps/web/src/app/painel/lancamentos/transaction-dialog.tsx)
+o destino era inicializado com `accounts[1]`; com uma conta só, o estado nascia
+vazio enquanto o `<select>` **exibia** a primeira conta — ia `toAccountId: ""` no
+POST. E o cliente jogava fora as `issues` do Zod, então todo 400 virava "Dados
+inválidos", sem dizer o campo.
+
+Duas correções: os selects passaram a ter placeholder explícito e `required` (o
+destino não oferece a conta de origem, que o schema recusa de qualquer jeito), e
+[api-error.ts](apps/web/src/lib/api-error.ts) traduz as issues para
+`"Conta de destino: obrigatório"`. **Lição que vale para o resto do app: select
+controlado sem `<option value="">` mente para o usuário** — mostra a primeira
+opção e envia vazio.
+
+### Tela de Contas — fiel ao [design/Cifrao Contas.dc.html](design/Cifrao%20Contas.dc.html)
+
+O protótipo tem **três estados** e existia só um (grade de dois cards com botões
+de editar/ajustar em cima). Agora:
+
+- **Lista** ([contas/page.tsx](apps/web/src/app/painel/contas/page.tsx)) — título
+  em Manrope, pílula "Transferir", cartão de patrimônio em degradê com o valor
+  quebrado em três tamanhos, linhas de conta em coluna única (quadrado colorido
+  com a inicial, tipo com marcador, saldo e chevron) e "Nova conta" tracejado.
+- **Detalhe** ([contas/[id]/page.tsx](apps/web/src/app/painel/contas/%5Bid%5D/page.tsx))
+  — cabeçalho com marca e ações, saldo grande, variação do período e o gráfico de
+  6 meses que finalmente consome o `GET /accounts/:id/balance-evolution` escrito
+  na Fase 2 e nunca usado; abaixo, o extrato agrupado por dia com chips de
+  período, tipo, categoria e busca.
+- **Transferência** ([contas/transferir/page.tsx](apps/web/src/app/painel/contas/transferir/page.tsx))
+  — cartão de valor, De/Para com o botão de trocar entre eles e o aviso da regra
+  5.7. Os cartões De/Para são o visual do design com um `<select>` nativo
+  invisível por cima: no celular abre o seletor do sistema.
+
+Decisões deste acerto:
+
+1. **Degradê e sombras saem de `var(--primary)` por `color-mix`**, não do
+   `#820AD1` fixo do protótipo — senão a cor de acento da Fase 9 deixava de
+   valer justo na tela mais colorida.
+2. **A tela de transferência ganhou Data e Descrição**, que o design não previu:
+   `createTransferSchema` exige as duas. Ficaram num cartão discreto, com hoje e
+   "Transferência" já preenchidos.
+3. **`DialogContent` ganhou `sheet` e `hideClose`** (opcionais, ninguém mais
+   mudou): o modal de ajuste de saldo é bottom sheet no celular, como no design.
+4. **Rótulo de dia e de mês são escritos à mão**
+   ([dates.ts](apps/web/src/lib/dates.ts)) porque `formatInSaoPaulo` não recebe
+   locale — sairia "Fri" em vez de "Sex". O filtro de período converte horário de
+   parede de São Paulo para UTC, com teste: pedir "junho" tem que trazer o
+   lançamento do dia 30 às 22h, que em UTC já é 1º de julho (é a armadilha #4).
+5. **O extrato usa `accountDeltaCents` do `shared`**, o mesmo que o serviço usa
+   para manter saldo — assim transferência aparece com o sinal certo dos dois
+   lados, sem regra duplicada no front.
+
+Testes do acerto: `accounts.test.ts` (marca da conta, cor do saldo, prévia do
+ajuste da regra 5.8), `dates.test.ts` (fuso do período, rótulos) e
+`api-error.test.ts` — o web foi de 14 para **43 testes**.
+
+---
+
 ## Retomando o trabalho em outra sessão
 
 Estado atual: **as 10 fases (0 a 9) estão concluídas.** O app está inteiro:
