@@ -702,6 +702,52 @@ Testes do acerto: `accounts.test.ts` (marca da conta, cor do saldo, prévia do
 ajuste da regra 5.8), `dates.test.ts` (fuso do período, rótulos) e
 `api-error.test.ts` — o web foi de 14 para **43 testes**.
 
+### Tela de Cartões — fiel ao [design/Cifrao Cartoes.dc.html](design/Cifrao%20Cartoes.dc.html)
+
+O protótipo tem lista, detalhe com duas abas, formulário em tela cheia e o modal
+de pagamento. Existia uma grade de cards de texto e um detalhe com faturas em
+acordeão. Agora:
+
+- **Lista** ([cartoes/page.tsx](apps/web/src/app/painel/cartoes/page.tsx)) — o
+  "plástico" em degradê da cor do cartão, empilhado, com fatura atual e limite
+  disponível no rodapé de cada um; o cabeçalho soma a fatura aberta de todos.
+- **Detalhe** ([cartoes/[id]/page.tsx](apps/web/src/app/painel/cartoes/%5Bid%5D/page.tsx))
+  — plástico + cartão de limite lado a lado, com a **barra empilhada da regra
+  5.5** (fatura aberta sólida, parcelas futuras hachuradas, o resto é o
+  disponível de verdade). Abas Fatura / Parcelas futuras; régua de faturas com
+  setas; cabeçalho da fatura com estado, valor, fechamento, vencimento e o botão
+  de pagar; extrato por dia onde a parcela **abre o cronograma inteiro**.
+- **Formulário** ([cartoes/card-form.tsx](apps/web/src/app/painel/cartoes/card-form.tsx))
+  — tela cheia (`/novo` e `/[id]/editar`), com prévia ao vivo do plástico,
+  steppers de dia e o exemplo dinâmico de fechamento.
+- **Pagar fatura** ([pay-dialog.tsx](apps/web/src/app/painel/cartoes/%5Bid%5D/pay-dialog.tsx))
+  — sheet no celular, com o aviso da regra 5.6 ("é transferência, não despesa"),
+  escolha da conta e Total/Parcial.
+
+Decisões deste acerto:
+
+1. **Endpoint novo: `GET /purchases/:id`**
+   ([purchases.service.ts](apps/api/src/credit-cards/purchases.service.ts)). O
+   design mostra a parcela "3/6" abrindo as seis, com a fatura de cada uma e a
+   marca "esta fatura". Isso não dava para derivar no front: a partir de uma
+   parcela não se recupera o total sem ambiguidade de centavos, porque
+   `splitInstallments` distribui o resto. Testado com Prisma falso (3 testes).
+2. **A barra do limite tem um terceiro pedaço que o design não previu**: fatura
+   fechada e ainda não quitada. Só aparece quando é maior que zero — esconder
+   isso seria esconder dívida.
+3. **"Nova compra" ficou ao lado das abas.** O protótipo não tem esse botão em
+   lugar nenhum do detalhe, mas é daqui que se lança compra no cartão.
+4. **`···· 3921` usa a monoespaçada do sistema.** O design pede JetBrains Mono;
+   a Seção 4 fixa Inter e Manrope, e fonte nova é dependência nova (Seção 2).
+5. **O stepper de dia dá a volta em 28**, não em 31: dia 29 a 31 não existe em
+   todo mês e a fatura escorregaria — o `clampDay` do `card-logic` já trata, mas
+   é melhor não deixar escolher.
+
+Testes: `cards.test.ts` cobre o degradê, a barra da regra 5.5 (inclusive estouro
+de limite e cartão sem limite, que dividiria por zero) e o estado da fatura;
+`purchases.service.test.ts` cobre o cronograma da regra 5.4. Web em **53
+testes**, api em **113**.
+
 ---
 
 ## Retomando o trabalho em outra sessão

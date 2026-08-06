@@ -94,6 +94,8 @@ export interface Transaction {
   tags: { tag: Tag }[];
   creditCardId?: string | null;
   invoiceId?: string | null;
+  /** Compra pai do parcelamento (regra 5.4); abre o cronograma da parcela. */
+  purchaseId?: string | null;
   installmentNumber?: number | null;
   installmentTotal?: number | null;
 }
@@ -158,6 +160,30 @@ export interface CommitmentPoint {
   month: string;
   totalCents: string;
   remainingCents: string;
+}
+
+/** Uma parcela do cronograma de `GET /purchases/:id` (regra 5.4). */
+export interface PurchaseInstallment {
+  transactionId: string;
+  installmentNumber: number | null;
+  amountCents: string;
+  date: string;
+  status: TransactionStatus;
+  invoiceId: string | null;
+  /** "yyyy-MM" da fatura que recebeu esta parcela. */
+  referenceMonth: string | null;
+  dueDate: string | null;
+  invoicePaid: boolean;
+}
+
+export interface PurchaseDetail {
+  id: string;
+  description: string;
+  totalCents: string;
+  installmentTotal: number;
+  purchaseDate: string;
+  category: (TransactionRef & { icon: string | null }) | null;
+  installments: PurchaseInstallment[];
 }
 
 // ─── Dashboard (Fase 4) ────────────────────────────────────────────────────────

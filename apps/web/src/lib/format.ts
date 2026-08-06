@@ -11,6 +11,15 @@ export function centsFromInput(input: string): number {
   return Number(toCents(input));
 }
 
+/**
+ * BRL sem os centavos, para rótulo de gráfico onde o espaço é curto e o centavo
+ * não muda a leitura ("R$ 1.844").
+ */
+export function brlShort(cents: string | number | bigint): string {
+  const value = typeof cents === 'string' ? Number(cents) : Number(cents);
+  return `R$ ${Math.round(value / 100).toLocaleString('pt-BR')}`;
+}
+
 export interface BrlParts {
   /** '−' quando negativo (sinal tipográfico, não hífen); vazio quando positivo. */
   sign: string;
