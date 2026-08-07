@@ -1,7 +1,6 @@
 'use client';
 
-import { PAYMENT_METHODS, TRANSACTION_STATUSES, TRANSACTION_TYPES } from '@cifrao/shared';
-import { CalendarDays, Check, Plus, Search, Tag as TagIcon, Trash2, X } from 'lucide-react';
+import { CalendarDays, Check, Plus, Search, SlidersHorizontal, Tag as TagIcon, Trash2, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { CategoryBadge } from '@/components/category-icon';
@@ -26,13 +25,14 @@ import {
 } from '@/lib/transactions';
 import { cn } from '@/lib/utils';
 import { BulkCategoryDialog, BulkTagDialog } from './bulk-dialogs';
+import {
+  EMPTY_PANEL,
+  FiltersSheet,
+  type PanelFilters,
+  STATUS_LABEL,
+  countPanelFilters,
+} from './filters-sheet';
 import { TransactionSheet } from './transaction-sheet';
-
-const STATUS_LABEL: Record<string, string> = {
-  PENDING: 'Pendente',
-  CLEARED: 'Efetivado',
-  FORECAST: 'Previsto',
-};
 
 const PERIODS: { value: PeriodKey; label: string }[] = [
   { value: 'month', label: 'Este mês' },
@@ -42,26 +42,12 @@ const PERIODS: { value: PeriodKey; label: string }[] = [
   { value: 'all', label: 'Tudo' },
 ];
 
-interface Filters {
+/** Período e busca ficam sempre à vista; o resto mora no painel de filtros. */
+interface Filters extends PanelFilters {
   period: PeriodKey;
-  type: string;
-  source: string;
-  categoryId: string;
-  tagId: string;
-  status: string;
-  paymentMethod: string;
   search: string;
 }
-const EMPTY: Filters = {
-  period: 'month',
-  type: '',
-  source: '',
-  categoryId: '',
-  tagId: '',
-  status: '',
-  paymentMethod: '',
-  search: '',
-};
+const EMPTY: Filters = { ...EMPTY_PANEL, period: 'month', search: '' };
 
 /** "conta:ID" ou "cartao:ID" — um seletor só para conta e cartão, como no design. */
 function sourceParam(source: string): { key: 'accountId' | 'creditCardId'; id: string } | null {
@@ -82,6 +68,7 @@ export default function LancamentosPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [editing, setEditing] = useState<Transaction | null>(null);
   const [creating, setCreating] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -215,6 +202,7 @@ export default function LancamentosPage() {
   }
 
   const chips = activeChips(filters, { accounts, cards, categories, tags });
+  const panelCount = countPanelFilters(filters);
   const count = data?.total ?? 0;
   const totalPages = data ? Math.max(1, Math.ceil(data.total / data.pageSize)) : 1;
 
@@ -248,70 +236,52 @@ export default function LancamentosPage() {
 
       {/* Barra de filtros: gruda no topo ao rolar, abaixo do cabeçalho do app. */}
       <div className="sticky top-[57px] z-20 bg-bg pb-2.5 pt-3">
-        <div className="flex gap-2 overflow-x-auto pb-0.5">
+        {/* Data e busca sempre à vista; o resto atrás de um botão só. */}
+        <div className="flex flex-wrap gap-2">
           <ChipSelect
             icon={<CalendarDays className="h-[15px] w-[15px] text-ink-2" strokeWidth={1.75} />}
             value={filters.period}
             onChange={(v) => setFilter('period', v as PeriodKey)}
             options={PERIODS}
           />
-          <ChipSelect
-            value={filters.type}
-            onChange={(v) => setFilter('type', v)}
-            options={[
-              { value: '', label: 'Tipo' },
-              ...TRANSACTION_TYPES.map((t) => ({ value: t, label: TYPE_LABEL[t] })),
-            ]}
-          />
-          <ChipSelect
-            value={filters.source}
-            onChange={(v) => setFilter('source', v)}
-            options={[
-              { value: '', label: 'Conta / cartão' },
-              ...accounts.map((a) => ({ value: `conta:${a.id}`, label: a.name })),
-              ...cards.map((c) => ({ value: `cartao:${c.id}`, label: c.nickname })),
-            ]}
-          />
-          <ChipSelect
-            value={filters.categoryId}
-            onChange={(v) => setFilter('categoryId', v)}
-            options={[
-              { value: '', label: 'Categoria' },
-              ...categories.map((c) => ({ value: c.id, label: c.name })),
-            ]}
-          />
-          <ChipSelect
-            value={filters.tagId}
-            onChange={(v) => setFilter('tagId', v)}
-            options={[
-              { value: '', label: 'Tag' },
-              ...tags.map((t) => ({ value: t.id, label: t.name })),
-            ]}
-          />
-          <ChipSelect
-            value={filters.status}
-            onChange={(v) => setFilter('status', v)}
-            options={[
-              { value: '', label: 'Status' },
-              ...TRANSACTION_STATUSES.map((s) => ({ value: s, label: STATUS_LABEL[s] })),
-            ]}
-          />
-          <ChipSelect
-            value={filters.paymentMethod}
-            onChange={(v) => setFilter('paymentMethod', v)}
-            options={[
-              { value: '', label: 'Forma' },
-              ...PAYMENT_METHODS.map((m) => ({ value: m, label: PAYMENT_METHOD_LABEL[m] })),
-            ]}
-          />
-          <label className="inline-flex h-[38px] min-w-[150px] shrink-0 items-center gap-[7px] rounded-[12px] border border-line bg-surface px-3.5 text-[13px] text-ink-2 focus-within:border-primary">
+
+          <button
+            type="button"
+            onClick={() => setFiltersOpen(true)}
+            className="inline-flex h-[38px] shrink-0 items-center gap-[7px] rounded-[12px] border bg-surface px-3 text-[13px] font-medium text-ink transition-colors hover:border-primary/50"
+            style={{ borderColor: panelCount > 0 ? 'var(--primary)' : 'var(--line)' }}
+          >
+            <SlidersHorizontal
+              className="h-[15px] w-[15px]"
+              strokeWidth={1.75}
+              style={{ color: panelCount > 0 ? 'var(--primary)' : 'var(--ink-2)' }}
+            />
+            Filtros
+            {panelCount > 0 && (
+              <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 font-manrope text-[11px] font-bold text-white">
+                {panelCount}
+              </span>
+            )}
+          </button>
+
+          <label className="inline-flex h-[38px] min-w-[150px] flex-1 items-center gap-[7px] rounded-[12px] border border-line bg-surface px-3.5 text-[13px] text-ink-2 transition-colors focus-within:border-primary">
             <Search className="h-[15px] w-[15px] shrink-0" strokeWidth={1.75} />
             <input
               value={filters.search}
               onChange={(e) => setFilter('search', e.target.value)}
-              placeholder="Buscar"
-              className="w-full bg-transparent text-ink outline-none placeholder:text-ink-2"
+              placeholder="Buscar por descrição"
+              className="w-full min-w-0 bg-transparent text-ink outline-none placeholder:text-ink-2"
             />
+            {filters.search && (
+              <button
+                type="button"
+                aria-label="Limpar busca"
+                onClick={() => setFilter('search', '')}
+                className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-ink-2 transition-colors hover:bg-surface-2 hover:text-ink"
+              >
+                <X className="h-3.5 w-3.5" strokeWidth={2.2} />
+              </button>
+            )}
           </label>
         </div>
 
@@ -337,7 +307,8 @@ export default function LancamentosPage() {
               type="button"
               onClick={() => {
                 setPage(1);
-                setFilters(EMPTY);
+                // Limpa só o que está nos chips; período e busca são do usuário.
+                setFilters((f) => ({ ...f, ...EMPTY_PANEL }));
               }}
               className="h-8 rounded-full px-3 text-[13px] font-medium text-ink-2 transition-colors hover:text-ink"
             >
@@ -483,6 +454,25 @@ export default function LancamentosPage() {
         </button>
       )}
 
+      {filtersOpen && (
+        <FiltersSheet
+          filters={filters}
+          onChange={(key, value) => setFilter(key, value)}
+          onClear={() => {
+            setPage(1);
+            // Só o painel: período e busca estão à vista e são do usuário.
+            setFilters((f) => ({ ...f, ...EMPTY_PANEL }));
+          }}
+          onClose={() => setFiltersOpen(false)}
+          accounts={accounts}
+          cards={cards}
+          categories={categories}
+          tags={tags}
+          resultCount={count}
+          loading={loading}
+        />
+      )}
+
       {(creating || editing) && (
         <TransactionSheet
           transaction={editing ?? undefined}
@@ -508,19 +498,15 @@ interface ActiveChip {
   reset: string;
 }
 
-/** Filtros ligados agora, para o usuário ver e desligar um a um. */
+/**
+ * O que o botão "Filtros" está escondendo, para desligar um a um sem reabrir o
+ * painel. Período e busca ficam de fora: já estão à vista com o próprio valor.
+ */
 function activeChips(
   filters: Filters,
   data: { accounts: Account[]; cards: CreditCard[]; categories: Category[]; tags: Tag[] },
 ): ActiveChip[] {
   const chips: ActiveChip[] = [];
-  if (filters.period !== 'month') {
-    chips.push({
-      key: 'period',
-      label: PERIODS.find((p) => p.value === filters.period)?.label ?? '',
-      reset: 'month',
-    });
-  }
   if (filters.type) chips.push({ key: 'type', label: TYPE_LABEL[filters.type as 'EXPENSE'], reset: '' });
   const source = sourceParam(filters.source);
   if (source) {
@@ -547,9 +533,6 @@ function activeChips(
       label: PAYMENT_METHOD_LABEL[filters.paymentMethod as 'PIX'],
       reset: '',
     });
-  }
-  if (filters.search.trim()) {
-    chips.push({ key: 'search', label: `"${filters.search.trim()}"`, reset: '' });
   }
   return chips;
 }
