@@ -21,8 +21,9 @@ import { type Dashboard, type DashboardCategorySpend, api } from '@/lib/api';
 import { brl } from '@/lib/format';
 import { monthLong, monthRange } from '@/lib/month';
 import { cn } from '@/lib/utils';
+import { ReviewNudge } from './review-nudge';
 
-const PALETTE = ['#820AD1', '#00A868', '#F5A524', '#E5484D', '#0F9B8E', '#A855F7', '#6B08AD', '#22C3B0'];
+const PALETTE =['#820AD1', '#00A868', '#F5A524', '#E5484D', '#0F9B8E', '#A855F7', '#6B08AD', '#22C3B0'];
 
 export default function PainelPage() {
   const [data, setData] = useState<Dashboard | null>(null);
@@ -48,6 +49,9 @@ export default function PainelPage() {
         <h1 className="text-2xl font-extrabold tracking-tight text-ink">Visão geral</h1>
         <p className="text-sm capitalize text-ink-2">{monthLong(data.month)}</p>
       </div>
+
+      {/* Só aparece nos primeiros dias do mês, e some depois de vista. */}
+      <ReviewNudge />
 
       {/* Hero: disponível de verdade até o fim do mês (regra 5.11) */}
       <div className="grid gap-4 lg:grid-cols-3">

@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { AppShell } from '@/components/app-shell';
 import { auth } from '@/lib/auth';
+import { OnboardingGate } from './onboarding-gate';
 import { ThemeSync } from './theme-sync';
 import { TokenSync } from './token-sync';
 
@@ -16,6 +17,7 @@ export default async function PainelLayout({ children }: { children: ReactNode }
     <AppShell>
       <TokenSync />
       <ThemeSync />
+      <OnboardingGate />
       {children}
     </AppShell>
   );

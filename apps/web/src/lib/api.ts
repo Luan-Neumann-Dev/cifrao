@@ -105,6 +105,36 @@ export interface Transaction {
   installmentTotal?: number | null;
 }
 
+/** `GET /settings/onboarding` — primeiros passos e retrospectiva pendente. */
+export interface OnboardingStatus {
+  onboardingDoneAt: string | null;
+  needsOnboarding: boolean;
+  counts: { accounts: number; cards: number; transactions: number };
+  /** "yyyy-MM" da retrospectiva a oferecer agora, ou null. */
+  reviewMonth: string | null;
+}
+
+/** `GET /reports/revisao` — a retrospectiva do mês. */
+export interface MonthReview {
+  month: string;
+  incomeCents: string;
+  expenseCents: string;
+  leftoverCents: string;
+  spentPercent: number | null;
+  comparison: { months: number; avgIncomeCents: string; avgExpenseCents: string };
+  topCategories: {
+    category: { id: string; name: string; color: string | null; icon: string | null };
+    totalCents: string;
+  }[];
+  budgets: {
+    category: { id: string; name: string; color: string | null; icon: string | null };
+    limitCents: string;
+    spentCents: string;
+    exceeded: boolean;
+  }[];
+  empty: boolean;
+}
+
 /** `GET /categories/sugestao` — categoria provável para a descrição digitada. */
 export interface CategorySuggestion {
   categoryId: string;

@@ -53,6 +53,12 @@ model User {
   /// Antecedência, em dias, para avisar de vencimento e de previsto.
   notifyDaysBefore     Int     @default(3)
 
+  /// Quando os primeiros passos foram concluídos (ou pulados). Nulo = ainda não
+  /// viu; é o que manda o painel desviar para as boas-vindas.
+  onboardingDoneAt DateTime?
+  /// Último mês ("yyyy-MM") cuja retrospectiva já foi vista — o aviso some.
+  lastReviewSeenMonth String?
+
   sessions   Session[]
   accounts   AuthAccount[]
   twofactors TwoFactor[]

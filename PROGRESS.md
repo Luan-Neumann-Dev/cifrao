@@ -804,6 +804,58 @@ regras 5.7 e 5.13; `splits.service.test.ts` (9) cobre a soma que tem que fechar,
 inclusive o centavo a mais e a menos; `category-suggestion.service.test.ts` (5)
 cobre a precedência regra > histórico. **Web 65 testes, api 127.**
 
+Depois, os filtros foram reestruturados a pedido do dono: sete chips numa régua
+rolante escondiam metade deles — o mesmo problema que a sidebar resolveu no
+menu. Ficou **período + botão "Filtros" (com o número do que está ligado) +
+busca ocupando o resto da linha**. O resto mora num painel que aplica na hora e
+mostra o resultado no rodapé antes de fechar; tipo, situação, tag e forma viraram
+pílulas, conta e categoria seguem em select (aguentam lista longa). Os chips
+abaixo passaram a listar só o que o botão esconde.
+
+### Primeiros passos e retrospectiva — as duas telas que faltavam
+
+Estavam em [design/Cifrao Complementares.dc.html](design/Cifrao%20Complementares.dc.html)
+mas **nenhuma fase do CLAUDE.md as pediu**, então nunca foram construídas. O dono
+percebeu ao criar a conta pela primeira vez.
+
+Migração `20260807003010_primeiros_passos_e_retrospectiva`: `onboardingDoneAt` e
+`lastReviewSeenMonth` no `User`.
+
+- **`/bem-vindo`** ([bem-vindo/page.tsx](apps/web/src/app/bem-vindo/page.tsx)) —
+  quatro passos: primeira conta (com os bancos comuns já listados), cartão com
+  prévia ao vivo, trazer lançamentos e as categorias. Fica **fora do `/painel`**:
+  sem sidebar nem cabeçalho, porque quem chega aqui ainda não tem o que navegar.
+- **`/painel/revisao`** ([revisao/page.tsx](apps/web/src/app/painel/revisao/page.tsx))
+  — retrospectiva em slides de tela cheia, uma cor por capítulo: entrou, para
+  onde foi, onde mais gastou e se o orçamento segurou.
+- **`GET /reports/revisao`**
+  ([month-review.service.ts](apps/api/src/reports/month-review.service.ts)) —
+  compõe `netIncomeCents` e `netExpenseByCategory`, os mesmos agregados dos
+  relatórios e do orçamento. Assim "estourou" na retrospectiva e "estourou" no
+  orçamento dizem a mesma coisa.
+
+Decisões deste acerto (confirmadas com o dono):
+
+1. **O onboarding desvia, mas deixa pular** (`OnboardingGate` no layout do
+   painel). E **só desvia quem não tem nenhuma conta cadastrada** — quem
+   restaurou um backup tem dados mas nunca viu os primeiros passos, e seria
+   absurdo jogá-lo lá.
+2. **A retrospectiva avisa nos 7 primeiros dias do mês** e depois some; a rota
+   fica sempre acessível (com `?mes=`), e agora também no menu. O mês visto é
+   guardado no servidor, então o aviso não reaparece em outro dispositivo.
+3. **"Conectar Open Finance" do protótipo virou "Importar extrato"**: sincronizar
+   banco é integração externa que este app não tem. Ficaram as duas portas que
+   existem de verdade — importar (Fase 6) e lançar na mão.
+4. **Slide sem dado não entra.** Mês sem orçamento não mostra o slide de
+   orçamento; mês sem nada mostra uma tela explicando, não quatro slides
+   zerados.
+5. **Gasto sem categoria aparece no "onde mais gastou"**, com esse nome. Escondê-lo
+   daria um slide que não fecha com o total de saídas do slide anterior.
+
+Testes: `onboarding.service.test.ts` (9) cobre o desvio, o caso do backup
+restaurado e a janela do aviso — inclusive a virada de dia em São Paulo e a
+retrospectiva de dezembro pedida em janeiro. **Api 136 testes.**
+
 ---
 
 ## Retomando o trabalho em outra sessão

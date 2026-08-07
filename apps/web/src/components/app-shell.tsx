@@ -15,6 +15,7 @@ import {
   Repeat,
   Settings,
   SlidersHorizontal,
+  Sparkles,
   Target,
   TrendingUp,
   Wallet,
@@ -71,6 +72,7 @@ const GROUPS: { title: string; links: NavLink[] }[] = [
     title: 'Dados',
     links: [
       { href: '/painel/relatorios', label: 'Relatórios', icon: BarChart3 },
+      { href: '/painel/revisao', label: 'Retrospectiva', icon: Sparkles },
       { href: '/painel/importar', label: 'Importar', icon: FileUp },
       { href: '/painel/regras', label: 'Regras', icon: SlidersHorizontal },
     ],

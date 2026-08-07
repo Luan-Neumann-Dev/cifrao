@@ -1,7 +1,19 @@
-import { Body, Controller, Delete, Get, Param, Patch, Req, UseGuards } from '@nestjs/common';
 import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
+import {
+  type RequiredMonthInput,
   type UpdateNotificationPrefsInput,
   type UpdateProfileInput,
+  requiredMonthSchema,
   updateNotificationPrefsSchema,
   updateProfileSchema,
 } from '@cifrao/shared';
@@ -12,16 +24,40 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import type { AuthUser } from '../auth/jwt-verifier';
 import { ZodValidationPipe } from '../common/zod-validation.pipe';
 import { NotificationsService } from './notifications.service';
+import { OnboardingService } from './onboarding.service';
 import { SettingsService } from './settings.service';
 
 @Controller('settings')
 @UseGuards(JwtAuthGuard)
 export class SettingsController {
-  constructor(private readonly service: SettingsService) {}
+  constructor(
+    private readonly service: SettingsService,
+    private readonly onboarding: OnboardingService,
+  ) {}
 
   @Get()
   profile(@CurrentUser() user: AuthUser) {
     return this.service.profile(user.id);
+  }
+
+  /** Primeiros passos pendentes e retrospectiva a oferecer. */
+  @Get('onboarding')
+  onboardingStatus(@CurrentUser() user: AuthUser) {
+    return this.onboarding.status(user.id);
+  }
+
+  @Post('onboarding/concluir')
+  finishOnboarding(@CurrentUser() user: AuthUser) {
+    return this.onboarding.finishOnboarding(user.id);
+  }
+
+  /** Marca a retrospectiva do mês como vista, para o aviso sumir do painel. */
+  @Post('revisao-vista')
+  markReviewSeen(
+    @CurrentUser() user: AuthUser,
+    @Body(new ZodValidationPipe(requiredMonthSchema)) dto: RequiredMonthInput,
+  ) {
+    return this.onboarding.markReviewSeen(user.id, dto.month);
   }
 
   @Patch('profile')

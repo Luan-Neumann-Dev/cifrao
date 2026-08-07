@@ -507,6 +507,10 @@ export type UpsertBudgetInput = z.infer<typeof upsertBudgetSchema>;
 export const monthQuerySchema = z.object({ month: monthKeySchema.optional() });
 export type MonthQuery = z.infer<typeof monthQuerySchema>;
 
+/** Mês obrigatório — retrospectiva sempre é de um mês específico. */
+export const requiredMonthSchema = z.object({ month: monthKeySchema });
+export type RequiredMonthInput = z.infer<typeof requiredMonthSchema>;
+
 export const applySuggestionsSchema = z.object({
   month: monthKeySchema,
   /** Se omitido, aplica a sugestão de todas as categorias com histórico. */
