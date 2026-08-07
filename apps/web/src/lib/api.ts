@@ -315,6 +315,8 @@ export interface Dashboard {
   balances: {
     availableTodayCents: string;
     netWorthCents: string;
+    /** Carteira a preço de mercado (Fase 8), já dentro do patrimônio. */
+    portfolioValueCents: string;
     availableEndOfMonthCents: string;
     accounts: DashboardAccount[];
   };
@@ -326,6 +328,15 @@ export interface Dashboard {
     resultCents: string;
   };
   monthTotals: { incomeCents: string; expenseCents: string; netCents: string };
+  /** Últimos 6 meses, o de referência por último — a faísca dos cartões. */
+  monthlyTrend: {
+    month: string;
+    incomeCents: string;
+    expenseCents: string;
+    netCents: string;
+  }[];
+  /** Lançamentos ainda em PENDING, esperando confirmação. */
+  pendingCount: number;
   openInvoices: DashboardInvoice[];
   categorySpending: DashboardCategorySpend[];
   budgetSummary: DashboardBudgetSummary;

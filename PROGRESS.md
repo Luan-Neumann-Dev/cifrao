@@ -856,6 +856,43 @@ Testes: `onboarding.service.test.ts` (9) cobre o desvio, o caso do backup
 restaurado e a janela do aviso — inclusive a virada de dia em São Paulo e a
 retrospectiva de dezembro pedida em janeiro. **Api 136 testes.**
 
+### Painel — fiel ao [design/Cifrao Dashboard.dc.html](design/Cifrao%20Dashboard.dc.html), com modo privacidade
+
+O painel tinha os dados certos numa estrutura que não era a desenhada. Agora
+segue o protótipo: saudação com **navegador de mês** (‹ agosto ›), saldo de hoje
+em tamanhos escalonados com o "disponível de verdade" destacado dentro dele, a
+**régua do mês**, três cartões de estatística com faísca, faixa de pendentes, e
+o corpo em duas colunas (faturas, rosca de categorias, orçamento e últimos
+lançamentos à esquerda; patrimônio e insight à direita).
+
+- **Régua do mês** ([month-ruler.tsx](apps/web/src/app/painel/month-ruler.tsx))
+  — a peça de assinatura: o que já passou fica abaixo da linha em cinza, o que
+  vem fica acima e colorido, e o marcador de HOJE separa os dois. A haste é
+  proporcional ao valor, então o que pesa mais salta aos olhos.
+- **Modo privacidade** ([privacy.tsx](apps/web/src/lib/privacy.tsx)) — o olho no
+  cabeçalho troca todo valor por `••••`.
+
+Decisões deste acerto:
+
+1. **A privacidade fica no `localStorage`, não no servidor.** É decisão do
+   momento e do aparelho — esconder valores no ônibus não deveria esconder no
+   computador de casa. Por isso não entrou no `User` como as outras
+   preferências da Fase 9.
+2. **O sinal de negativo sobrevive ao mascaramento** (`-R$ ••••`). Esconder
+   quanto é uma coisa; esconder que está no vermelho é outra.
+3. **Dois campos novos no `/dashboard`**: `monthlyTrend` (6 meses, para a
+   variação e a faísca dos cartões) e `pendingCount`. A tendência sai de **uma
+   consulta cobrindo a janela inteira**, não uma por mês (armadilha #5), e
+   respeita a regra 5.13 — estorno abate o gasto em vez de virar receita.
+4. **A rosca de categorias é SVG à mão, não Recharts.** São seis fatias com
+   clique; o gráfico completo custaria mais peso do que entrega. Recharts
+   continua nos gráficos de verdade (evolução, comprometimento, relatórios).
+5. **"Conectar Open Finance" e a barra de progresso animada do protótipo ficaram
+   de fora** — a primeira não existe no app, a segunda é enfeite.
+
+Testes: `privacy.test.ts` (5) cobre o mascaramento, inclusive a preservação do
+`R$` e do sinal negativo. **Web 70 testes.**
+
 ---
 
 ## Retomando o trabalho em outra sessão

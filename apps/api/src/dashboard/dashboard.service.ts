@@ -9,6 +9,7 @@ import {
   deriveInvoiceStatus,
   monthKeyInSaoPaulo,
   pickTopInsight,
+  recentMonthKeys,
   saoPauloDateParts,
   saoPauloWallClockToUtc,
 } from '@cifrao/shared';
@@ -28,6 +29,9 @@ const recentInclude = {
 function sumBigint(rows: { _sum: { amountCents: bigint | null } }[]): bigint {
   return rows.reduce((acc, r) => acc + (r._sum.amountCents ?? 0n), 0n);
 }
+
+/** Meses na faísca dos cartões de entradas/saídas/sobra. */
+const TREND_MONTHS = 6;
 
 @Injectable()
 export class DashboardService {
@@ -63,6 +67,8 @@ export class DashboardService {
       recent,
       budgets,
       portfolioValueCents,
+      pendingCount,
+      monthlyTrend,
     ] = await Promise.all([
       db.account.findMany({ where: { archived: false }, orderBy: { createdAt: 'asc' } }),
       db.invoice.findMany({ include: { creditCard: { select: { id: true, nickname: true, color: true } } } }),
@@ -114,6 +120,9 @@ export class DashboardService {
       // Carteira a preço de mercado (Fase 8). Aportar tira o dinheiro da conta,
       // então somar contas + carteira não conta o mesmo real duas vezes.
       currentPortfolioValueCents(db),
+      // Quanto ainda espera confirmação — a faixa "aguardando revisão".
+      db.transaction.count({ where: { status: 'PENDING' } }),
+      this.monthlyTrend(monthKey),
     ]);
 
     // ── Saldos e patrimônio ───────────────────────────────────────────────────
@@ -277,6 +286,9 @@ export class DashboardService {
         resultCents: availableEndOfMonthCents,
       },
       monthTotals: { incomeCents, expenseCents, netCents: incomeCents - expenseCents },
+      /** Últimos 6 meses (o corrente por último) — os três cartões com faísca. */
+      monthlyTrend,
+      pendingCount,
       openInvoices: openInvoicesTop,
       categorySpending,
       budgetSummary,
@@ -284,5 +296,51 @@ export class DashboardService {
       timeline,
       recent,
     };
+  }
+
+  /**
+   * Entradas, saídas e sobra dos últimos 6 meses (o de referência por último).
+   * Duas agregações no banco cobrindo a janela inteira, não uma por mês — a
+   * armadilha #5 vale aqui também.
+   */
+  private async monthlyTrend(monthKey: string) {
+    const keys = recentMonthKeys(TREND_MONTHS, monthKey);
+    const [firstYear, firstMonth] = keys[0].split('-').map(Number);
+    const [lastYear, lastMonth] = keys[keys.length - 1].split('-').map(Number);
+    const from = saoPauloWallClockToUtc(firstYear, firstMonth, 1, '00:00:00');
+    const afterLast = addMonths(lastYear, lastMonth, 1);
+    const to = saoPauloWallClockToUtc(afterLast.year, afterLast.month, 1, '00:00:00');
+
+    const rows = await this.prisma.client.transaction.findMany({
+      where: {
+        type: { in: ['EXPENSE', 'INCOME'] },
+        status: { not: 'FORECAST' },
+        date: { gte: from, lt: to },
+      },
+      select: { type: true, amountCents: true, date: true, reimbursesTransactionId: true },
+    });
+
+    const byMonth = new Map(keys.map((k) => [k, { incomeCents: 0n, expenseCents: 0n }]));
+    for (const row of rows) {
+      const bucket = byMonth.get(monthKeyInSaoPaulo(row.date));
+      if (!bucket) continue;
+      // Regra 5.13: estorno abate o gasto em vez de virar receita.
+      if (row.type === 'INCOME') {
+        if (row.reimbursesTransactionId) bucket.expenseCents -= row.amountCents;
+        else bucket.incomeCents += row.amountCents;
+      } else {
+        bucket.expenseCents += row.amountCents;
+      }
+    }
+
+    return keys.map((month) => {
+      const b = byMonth.get(month) ?? { incomeCents: 0n, expenseCents: 0n };
+      return {
+        month,
+        incomeCents: b.incomeCents,
+        expenseCents: b.expenseCents,
+        netCents: b.incomeCents - b.expenseCents,
+      };
+    });
   }
 }

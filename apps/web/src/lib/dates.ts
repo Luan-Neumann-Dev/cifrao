@@ -27,6 +27,17 @@ export function dayKeyInSaoPaulo(iso: string): string {
   return formatInSaoPaulo(new Date(iso), 'yyyy-MM-dd');
 }
 
+/** Dia do mês (no fuso de SP) de um instante UTC. */
+export function dayOfMonthInSaoPaulo(iso: string): number {
+  return Number(formatInSaoPaulo(new Date(iso), 'dd'));
+}
+
+/** Quantos dias tem o mês "yyyy-MM". */
+export function daysInMonthOf(monthKey: string): number {
+  const [year, month] = monthKey.split('-').map(Number);
+  return new Date(Date.UTC(year, month, 0)).getUTCDate();
+}
+
 /** "2026-06-12" -> "Qua, 12 jun". */
 export function dayGroupLabel(dayKey: string): string {
   const [year, month, day] = dayKey.split('-').map(Number);

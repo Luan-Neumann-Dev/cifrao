@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { AppShell } from '@/components/app-shell';
 import { auth } from '@/lib/auth';
+import { PrivacyProvider } from '@/lib/privacy';
 import { OnboardingGate } from './onboarding-gate';
 import { ThemeSync } from './theme-sync';
 import { TokenSync } from './token-sync';
@@ -14,11 +15,13 @@ export default async function PainelLayout({ children }: { children: ReactNode }
     redirect('/login');
   }
   return (
-    <AppShell>
-      <TokenSync />
-      <ThemeSync />
-      <OnboardingGate />
-      {children}
-    </AppShell>
+    <PrivacyProvider>
+      <AppShell>
+        <TokenSync />
+        <ThemeSync />
+        <OnboardingGate />
+        {children}
+      </AppShell>
+    </PrivacyProvider>
   );
 }
