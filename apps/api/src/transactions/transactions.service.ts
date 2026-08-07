@@ -14,6 +14,8 @@ const txInclude = {
   account: { select: { id: true, name: true, color: true } },
   fromAccount: { select: { id: true, name: true, color: true } },
   toAccount: { select: { id: true, name: true, color: true } },
+  // A lista mostra "onde saiu": compra de cartão precisa do apelido do cartão.
+  creditCard: { select: { id: true, nickname: true, color: true } },
   category: { select: { id: true, name: true, color: true, icon: true } },
   tags: { include: { tag: true } },
 } satisfies Prisma.TransactionInclude;
@@ -38,6 +40,8 @@ export class TransactionsService {
     if (filter.status) where.status = filter.status;
     if (filter.categoryId) where.categoryId = filter.categoryId;
     if (filter.tagId) where.tags = { some: { tagId: filter.tagId } };
+    if (filter.creditCardId) where.creditCardId = filter.creditCardId;
+    if (filter.paymentMethod) where.paymentMethod = filter.paymentMethod;
     if (filter.accountId) {
       where.OR = [
         { accountId: filter.accountId },
@@ -95,6 +99,7 @@ export class TransactionsService {
           isReimbursable: input.isReimbursable,
           accountId: input.accountId,
           categoryId: input.categoryId ?? undefined,
+          paymentMethod: input.paymentMethod ?? undefined,
           tags: input.tagIds?.length ? { create: input.tagIds.map((tagId) => ({ tagId })) } : undefined,
         };
       }
@@ -119,6 +124,7 @@ export class TransactionsService {
       if (input.categoryId !== undefined) data.categoryId = input.categoryId;
       if (input.isReimbursable !== undefined) data.isReimbursable = input.isReimbursable;
       if (input.reimbursedAt !== undefined) data.reimbursedAt = input.reimbursedAt;
+      if (input.paymentMethod !== undefined) data.paymentMethod = input.paymentMethod;
       if (input.tagIds) {
         data.tags = { deleteMany: {}, create: input.tagIds.map((tagId) => ({ tagId })) };
       }

@@ -748,6 +748,62 @@ de limite e cartão sem limite, que dividiria por zero) e o estado da fatura;
 `purchases.service.test.ts` cobre o cronograma da regra 5.4. Web em **53
 testes**, api em **113**.
 
+### Tela de Lançamentos — fiel ao [design/Cifrao Lancamentos.dc.html](design/Cifrao%20Lancamentos.dc.html)
+
+Esta foi a maior: o formulário do protótipo pedia **quatro coisas que não
+existiam no modelo de dados**. O dono decidiu construir as quatro.
+
+**Backend novo (migração `20260806234004_forma_de_pagamento`):**
+
+1. **`paymentMethod` no Transaction** (`PIX`, `DEBIT`, `CREDIT`, `CASH`,
+   `BOLETO`, opcional). Os chips do design agora guardam de verdade, e o filtro
+   da lista aceita a forma. **`CREDIT` é recusado em `POST /transactions`**: a
+   compra no crédito passa por fatura e parcelamento (5.3 e 5.4), então entra por
+   `POST /credit-cards/:id/purchases`, que grava a forma sozinho.
+2. **`GET /categories/sugestao`**
+   ([category-suggestion.service.ts](apps/api/src/categories/category-suggestion.service.ts))
+   — a etiqueta "sugerido" da grade. Primeiro tenta as `CategoryRule` da Fase 6
+   (escolha explícita do usuário, confiança 1); sem regra, soma a semelhança das
+   descrições do histórico por categoria. Cinco acertos medianos valem mais que
+   um isolado.
+3. **`PUT /transactions/:id/splits`**
+   ([splits.service.ts](apps/api/src/transactions/splits.service.ts)) — o
+   `TransactionSplit` existia no Prisma desde a Fase 0 e nenhuma API o usava. A
+   soma das partes tem que fechar **exatamente** com o valor; a categoria única
+   passa a ser a da maior parte, para as telas que ainda não leem divisão.
+   Transferência não se divide (5.7).
+4. **Repetir** liga o formulário no `RecurringRule` da Fase 5.
+
+**Front:** a lista virou grupos por dia com total, filtros em chips grudados no
+topo, chips do que está filtrado (com × para desligar um a um), rodapé com total
+filtrado e entradas/saídas, FAB no celular e a barra escura de seleção múltipla.
+Previsto sai com a borda tracejada e opacidade do design, num grupo "Próximos"
+no fim. O formulário virou sheet com valor grande, teclado numérico **só no
+celular**, chips de data, forma de pagamento, bloco de crédito com a fatura de
+destino e as parcelas, e grade de categorias com a sugerida em primeiro.
+
+Decisões deste acerto:
+
+1. **Os totais do rodapé usam `sumIncomeCents`/`sumExpenseCents` do `shared`** —
+   as mesmas funções dos relatórios. Assim os números batem entre as telas por
+   construção: transferência fora (5.7), estorno abatendo o gasto (5.13),
+   previsto fora do realizado.
+2. **Despesa não é vermelha na lista**, é tinta normal, como no protótipo. Lista
+   toda vermelha não destaca nada; o vermelho fica para o que exige ação.
+3. **Teclado numérico só abaixo de `sm`** (decisão do dono): no desktop o campo
+   aceita digitação direta, com o mesmo visual.
+4. **Editar não troca conta nem tipo** — isso é excluir e lançar de novo, e o
+   formulário diz isso. Trocar a conta de um lançamento salvo exigiria desfazer
+   e refazer saldo nas duas pontas.
+5. **`vitest.config.ts` do web ganhou o alias `@/`**: sem ele, um helper que
+   importa outro por `@/` quebrava só no teste.
+
+Testes: `transactions.test.ts` (12) cobre o agrupamento por dia com fuso, o
+rótulo Hoje/Ontem, os previstos em grupo próprio e os totais do rodapé com as
+regras 5.7 e 5.13; `splits.service.test.ts` (9) cobre a soma que tem que fechar,
+inclusive o centavo a mais e a menos; `category-suggestion.service.test.ts` (5)
+cobre a precedência regra > histórico. **Web 65 testes, api 127.**
+
 ---
 
 ## Retomando o trabalho em outra sessão

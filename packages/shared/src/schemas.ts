@@ -5,6 +5,7 @@ import {
   importFormatSchema,
   importRowStatusSchema,
   investmentClassSchema,
+  paymentMethodSchema,
   recurrenceFrequencySchema,
   transactionStatusSchema,
   transactionTypeSchema,
@@ -131,6 +132,13 @@ export type PayInvoiceInput = z.infer<typeof payInvoiceSchema>;
 
 // ─── Lançamentos ───────────────────────────────────────────────────────────────
 
+/**
+ * CREDIT fica de fora aqui de propósito: compra no crédito passa pela fatura e
+ * pelo parcelamento (regras 5.3 e 5.4), então entra por
+ * `POST /credit-cards/:id/purchases`, que grava a forma sozinho.
+ */
+const accountPaymentMethodSchema = z.enum(['PIX', 'DEBIT', 'CASH', 'BOLETO']);
+
 const cashflowBase = {
   amountCents: positiveCents,
   date: z.coerce.date(),
@@ -140,6 +148,7 @@ const cashflowBase = {
   isReimbursable: z.boolean().default(false),
   categoryId: z.string().min(1).optional().nullable(),
   tagIds: z.array(z.string().min(1)).optional(),
+  paymentMethod: accountPaymentMethodSchema.optional().nullable(),
 };
 
 const createExpenseSchema = z.object({
@@ -187,6 +196,8 @@ export const updateTransactionSchema = z.object({
   isReimbursable: z.boolean().optional(),
   reimbursedAt: z.coerce.date().optional().nullable(),
   tagIds: z.array(z.string().min(1)).optional(),
+  /** Aceita CREDIT na edição: corrigir a forma de uma compra antiga é legítimo. */
+  paymentMethod: paymentMethodSchema.optional().nullable(),
 });
 export type UpdateTransactionInput = z.infer<typeof updateTransactionSchema>;
 
@@ -371,14 +382,39 @@ export const transactionFilterSchema = z.object({
   to: z.coerce.date().optional(),
   type: transactionTypeSchema.optional(),
   accountId: z.string().min(1).optional(),
+  creditCardId: z.string().min(1).optional(),
   categoryId: z.string().min(1).optional(),
   tagId: z.string().min(1).optional(),
   status: transactionStatusSchema.optional(),
+  paymentMethod: paymentMethodSchema.optional(),
   search: z.string().max(120).optional(),
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(200).default(50),
 });
 export type TransactionFilter = z.infer<typeof transactionFilterSchema>;
+
+/**
+ * Divisão de um lançamento entre categorias. A soma das partes tem que fechar
+ * com o valor do lançamento — meio real perdido aqui vira relatório errado.
+ */
+export const setSplitsSchema = z.object({
+  splits: z
+    .array(
+      z.object({
+        categoryId: z.string().min(1),
+        amountCents: positiveCents,
+      }),
+    )
+    .max(20),
+});
+export type SetSplitsInput = z.infer<typeof setSplitsSchema>;
+
+/** Sugestão de categoria a partir do que o usuário está digitando. */
+export const suggestCategoryQuerySchema = z.object({
+  description: z.string().min(1).max(200),
+  amountCents: z.coerce.number().int().optional(),
+});
+export type SuggestCategoryQuery = z.infer<typeof suggestCategoryQuerySchema>;
 
 // ─── Dashboard ──────────────────────────────────────────────────────────────
 

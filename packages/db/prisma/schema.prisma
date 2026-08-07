@@ -141,6 +141,17 @@ enum TransactionStatus {
   FORECAST
 }
 
+/// Como o dinheiro saiu (ou entrou). CREDIT implica cartão e fatura; os demais
+/// saem direto da conta. É informativo para relatório — quem manda no saldo
+/// continua sendo `accountId`/`creditCardId`.
+enum PaymentMethod {
+  PIX
+  DEBIT
+  CREDIT
+  CASH
+  BOLETO
+}
+
 model Account {
   id           String      @id @default(cuid())
   name         String
@@ -205,6 +216,8 @@ model Transaction {
   notes               String?
   isReimbursable      Boolean           @default(false)
   reimbursedAt        DateTime?
+  /// Opcional: lançamento antigo e importação não têm essa informação.
+  paymentMethod       PaymentMethod?
 
   accountId String?
   account   Account? @relation("AccountTransactions", fields: [accountId], references: [id])

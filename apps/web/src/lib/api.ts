@@ -7,6 +7,7 @@ import type {
   InvestmentClass,
   InvoiceStatus,
   NotificationKind,
+  PaymentMethod,
   RecurrenceFrequency,
   StatementDateFormat,
   TransactionStatus,
@@ -87,9 +88,13 @@ export interface Transaction {
   notes: string | null;
   isReimbursable: boolean;
   reimbursedAt: string | null;
+  /** Regra 5.13: preenchido quando este lançamento é o estorno de um gasto. */
+  reimbursesTransactionId?: string | null;
+  paymentMethod?: PaymentMethod | null;
   account: TransactionRef | null;
   fromAccount: TransactionRef | null;
   toAccount: TransactionRef | null;
+  creditCard?: { id: string; nickname: string; color: string | null } | null;
   category: (TransactionRef & { icon: string | null }) | null;
   tags: { tag: Tag }[];
   creditCardId?: string | null;
@@ -98,6 +103,23 @@ export interface Transaction {
   purchaseId?: string | null;
   installmentNumber?: number | null;
   installmentTotal?: number | null;
+}
+
+/** `GET /categories/sugestao` — categoria provável para a descrição digitada. */
+export interface CategorySuggestion {
+  categoryId: string;
+  source: 'rule' | 'history';
+  ruleId?: string;
+  confidence: number;
+}
+
+export interface SplitsResponse {
+  transactionId: string;
+  splits: {
+    id: string;
+    amountCents: string;
+    category: { id: string; name: string; color: string | null; icon: string | null };
+  }[];
 }
 
 export interface Paginated<T> {
