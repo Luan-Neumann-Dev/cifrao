@@ -699,3 +699,180 @@ pnpm dev                     # sobe banco + api (3001) + web (3000)
 > **5432/5433** (Postgres) já estavam ocupadas por outros serviços. O
 > `docker-compose` publica o Postgres em **55432**; se a **3000** estiver ocupada
 > ao rodar `pnpm dev`, libere-a ou ajuste a porta do web.
+
+---
+
+## Abertura para múltiplos usuários — em andamento (branch `dev`)
+
+> Trabalho iniciado em 30/09/2026, quando o dono decidiu **tornar o app
+> público**. Está na branch `dev`, saída da `main`, e **não está terminado**:
+> falta a bateria de teste cruzado antes de abrir o registro. Leia a seção
+> "O que falta" no fim.
+
+### Por que isso virou um projeto, e não uma linha
+
+Abrir o registro é uma linha em `apps/web/src/lib/registration.ts`. O problema é
+que **o app não tinha isolamento por usuário**: `userId` existia só nos três
+models de autenticação (`Session`, `AuthAccount`, `TwoFactor`) e **nenhum dos 20
+models de domínio tinha dono**. Os services não filtravam por usuário em nenhuma
+das ~131 chamadas ao Prisma.
+
+Isso era coerente com a Seção 1 do CLAUDE.md ("uso individual, não é SaaS"), mas
+significa que abrir o registro sem mais nada faria todo usuário novo ver, editar
+e apagar o dado financeiro de todos — e a zona de risco apagaria o banco inteiro
+de todo mundo.
+
+### Etapa 1 — `userId` no schema + migração (commit `e60b6cf`)
+
+`userId` em 15 models, `Cascade` a partir de `User`, índices de `Transaction`
+liderados por `userId`.
+
+**Cinco colisões que quebrariam no SEGUNDO usuário**, não numa tela distante:
+
+| O que era | Por que quebraria |
+|---|---|
+| `Tag.name @unique` global | ninguém mais poderia ter a tag "viagem" |
+| `Investment.ticker @unique` global | ninguém mais poderia ter PETR4 |
+| `Budget(categoryId, month)` | dois usuários orçando a mesma categoria no mesmo mês |
+| `CategoryRule(pattern, categoryId)` | mesma regra para dois usuários |
+| `AllocationTarget` com `class` como **PK** | uma linha de alvo no banco inteiro |
+
+A migração é **escrita à mão** (coluna `NOT NULL` em tabela populada exige
+backfill): nullable → backfill → `NOT NULL` → índices → FK. Tem uma **trava que
+aborta** se houver dado de domínio com um número de usuários diferente de 1 —
+chutar o dono de lançamento financeiro é pior que falhar.
+
+Validada em três bancos descartáveis antes do dev: cópia do dump, a trava com 2
+usuários (erro claro e rollback limpo em transação) e banco vazio migrando do
+zero. Soma dos saldos idêntica antes e depois.
+
+### Categorias universais — decisão do dono
+
+`Category.userId` é **NULLABLE**: `NULL` = categoria universal, compartilhada por
+todos. O dono recusou duplicar as 48 padrão por usuário ("evitar centenas de
+repetições"), então o seed continua global e um usuário novo já entra com a
+árvore inteira.
+
+Consequências:
+
+1. Categoria universal é **somente-leitura** — apagar uma derrubaria orçamento e
+   regra de todos, via `onDelete: Cascade`.
+2. **Mesclar tem direção**: a própria PARA uma universal é permitido (é o caso
+   útil); o contrário, não.
+3. `GET /categories/uso` conta só os lançamentos do requisitante — o total
+   vazaria o quanto os outros usam.
+4. Renomear ou recolorir uma categoria padrão **deixou de ser possível**. A
+   alternativa (copy-on-write: editar uma global forka uma cópia sua) ficou
+   como refinamento futuro.
+
+### Etapa 2 — escopo nas queries (commit `5da8d84`)
+
+Cada service recebe o `userId` do `@CurrentUser()`; toda query carrega o dono.
+Escopo **explícito e grepável** em vez de Prisma Client Extension: a mágica não
+cobriria as 3 queries cruas e o código do projeto é explícito em todo lugar.
+
+**O compilador só apontou as 70 escritas. As 61 LEITURAS compilavam perfeitas e
+devolviam o dado de todos** — era ali o vazamento: `dashboard` fazia
+`invoice.findMany({})` **sem `where` nenhum**, e os "8 lançamentos recentes"
+vinham do banco inteiro. Mesma história em `calendar`, `reports`,
+`notifications` e `receivables`.
+
+E seis escritas atravessavam o dono:
+
+- `transactions.bulk` — os ids vêm do corpo da requisição: bastava passar o id de
+  outra pessoa para recategorizar ou **apagar** o lançamento dela;
+- `ensureAccounts` — dava para lançar na conta de outro usuário;
+- `investments.setTargets` — `deleteMany({})` limpava o alvo de todos;
+- `backup.wipeMovements` e `deleteAccount` — `deleteMany({})` apagava o **banco
+  inteiro, de todos**, na zona de risco de um só;
+- `backup.processor` — `user.updateMany` sem `where` reescrevia o perfil de todos;
+- `POST /recurring-rules/generate` rodava a geração nas regras de todos.
+
+Decisões:
+
+1. **`findFirst({ id, userId })` no lugar de `findUnique({ id })`**: id que existe
+   mas é de outro dono responde 404, em vez de entregar o registro.
+2. **Cron e jobs derivam o dono da PRÓPRIA entidade** (regra, lote, job), não de
+   um JWT — é o que deixa o cron rodar para todos e o job de importação seguir
+   com uma linha só no payload.
+3. **Na restauração, o `userId` de toda linha é reescrito para quem restaurou**:
+   um arquivo não pode gravar dado no nome de outro. Efeito assumido: categoria
+   universal do arquivo vira cópia pessoal de quem restaurou.
+4. Os quatro models sem `userId` próprio (`transactionSplit`, `transactionTag`,
+   `investmentTransaction`, `priceHistory`) filtram pela relação com o pai.
+
+Varredura das 131 chamadas ao Prisma: sobraram 23 sem `userId` literal, todas
+conferidas uma a uma — recebem o `where` já escopado por parâmetro
+(`liquidDeltaSum`, `topTransactions`, `netExpenseByCategory`) ou derivam o dono
+da entidade.
+
+### Rate limit em login, cadastro e 2FA (commit `13d06db`)
+
+O limitador embutido do Better Auth não protegia nada com o padrão dele: **100
+requisições por 10 segundos** (600 tentativas de senha por minuto) e **desligado
+em desenvolvimento**.
+
+| Rota | Limite |
+|---|---|
+| `/sign-in/email` | 10 por 5 min |
+| `/sign-up/email` | 5 por hora |
+| `/two-factor/verify-totp` · `verify-otp` · `verify-backup-code` | 5 por 5 min |
+
+O 2FA entrou junto do que foi pedido: quem chega ali já acertou a senha e são 6
+dígitos — limitar o login e deixar essa rota aberta seria trancar a porta e
+esquecer a janela. O padrão global segue folgado (é por onde passa o
+`get-session`), e o balde é por rota.
+
+**Armadilha do IP atrás de proxy — leia antes de subir.** O Better Auth resolve o
+cliente pelo `X-Forwarded-For` e, sem `trustedProxies`, só aceita o cabeçalho com
+UMA entrada; quando não resolve, **todos caem num balde compartilhado**. Atrás do
+Coolify, um `X-Forwarded-For` falsificado faz o proxy repassar dois saltos, o IP
+fica irresolvível e o limite passa a valer para o conjunto — **negação de serviço
+contra os próprios usuários**. Por isso `TRUSTED_PROXIES` entra no
+`docker-compose.prod.yml` com a faixa da rede Docker. **Confira a faixa do seu
+proxy ao subir.**
+
+Storage em **memória**: reiniciar zera os contadores. Basta para a instância
+única do alvo; com réplica, precisaria de `storage: 'database'` e model novo.
+
+Verificado contra o servidor no ar: login 401×10 e **429 na 11ª**; cadastro para
+na 6ª; 2FA na 6ª; `get-session` segue 200 com as outras duas travadas; 429 responde
+com `x-retry-after`.
+
+### Verificado
+
+- **CI**: lint 4/4, typecheck, `pnpm test` (**347**: shared 203, api 110, web 34)
+  e build 4/4 — verdes.
+- A API sobe com os 3 workers do pg-boss e os endpoints devolvem 401 sem token.
+- Banco de dev migrado: 48 categorias universais, 21 pessoais (lixo de smoke
+  test), 1.205 lançamentos com dono, zero órfão.
+
+### O que falta — NÃO abra o registro antes disto
+
+1. **Bateria de teste cruzado (usuário A × usuário B)**, endpoint por endpoint,
+   provando que A não lê nem modifica dado de B. É ela a rede de segurança real:
+   o compilador não acusa leitura sem escopo, e a varredura de queries é
+   heurística.
+2. **Verificação de e-mail no cadastro** — sem ela, qualquer um se cadastra com o
+   e-mail de outra pessoa. Depende do **Resend** (provedor já decidido, ver
+   abaixo) com **domínio verificado**: o remetente de teste `onboarding@resend.dev`
+   só entrega para o endereço da própria conta e deixa de servir com registro
+   aberto.
+3. **Abrir o registro** (`apps/web/src/lib/registration.ts`).
+
+Pendências conhecidas que este trabalho criou ou deixou em aberto:
+
+- Renomear/recolorir categoria padrão deixou de existir (ver copy-on-write acima).
+- O export de backup inclui as categorias universais para as referências
+  resolverem; na restauração elas viram cópias pessoais de quem restaurou.
+- LGPD: guardar dado financeiro de terceiros é uma postura legal diferente de
+  manter o próprio caderno. Levantado com o dono, sem decisão ainda.
+
+### Decisão de e-mail (ainda não implementada)
+
+Provedor escolhido: **Resend**. Motivos específicos deste projeto: a API é um
+`POST` para `api.resend.com/emails`, que dá para fazer com `fetch` puro e **não
+adiciona dependência** (SMTP obrigaria `nodemailer`); free permanente sem cartão
+(3.000/mês, 100/dia). O único uso hoje seria a recuperação de senha, cujo
+callback `sendResetPassword` em `apps/web/src/lib/auth.ts` ainda só escreve o
+link no `console.log`.
