@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { type FormEvent, useState } from 'react';
 import { authClient } from '@/lib/auth-client';
 import { syncApiToken } from '@/lib/session-actions';
+import { authErrorMessage } from '@/lib/auth-error';
 
 export default function VerificarDoisFatoresPage() {
   const router = useRouter();
@@ -20,7 +21,7 @@ export default function VerificarDoisFatoresPage() {
       ? await authClient.twoFactor.verifyBackupCode({ code })
       : await authClient.twoFactor.verifyTotp({ code });
     if (err) {
-      setError(err.message ?? 'Código inválido.');
+      setError(authErrorMessage(err, 'Código inválido.'));
       setLoading(false);
       return;
     }

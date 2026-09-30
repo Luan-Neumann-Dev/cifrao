@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { type FormEvent, useState } from 'react';
+import { authErrorMessage } from '@/lib/auth-error';
 import { signIn } from '@/lib/auth-client';
 import { syncApiToken } from '@/lib/session-actions';
 
@@ -19,7 +20,7 @@ export default function LoginPage() {
     setLoading(true);
     const { data, error: err } = await signIn.email({ email, password });
     if (err) {
-      setError(err.message ?? 'Não foi possível entrar.');
+      setError(authErrorMessage(err, 'Não foi possível entrar.'));
       setLoading(false);
       return;
     }

@@ -3,6 +3,12 @@ import { betterAuth } from 'better-auth';
 import { APIError } from 'better-auth/api';
 import { prismaAdapter } from 'better-auth/adapters/prisma';
 import { jwt, twoFactor } from 'better-auth/plugins';
+import {
+  AUTH_RATE_DEFAULT,
+  AUTH_RATE_RULES,
+  parseTrustedProxies,
+  rateLimitEnabled,
+} from './rate-limit';
 import { isRegistrationAllowed } from './registration';
 
 /**
@@ -50,9 +56,25 @@ export const auth = betterAuth({
     expiresIn: 60 * 60 * 24 * 7, // 7 dias
     cookieCache: { enabled: true, maxAge: 5 * 60 },
   },
+  // Limite de tentativa nas rotas de autenticação (ver ./rate-limit.ts para o
+  // porquê dos números e para a armadilha do IP atrás de proxy).
+  rateLimit: {
+    enabled: rateLimitEnabled(process.env.AUTH_RATE_LIMIT),
+    ...AUTH_RATE_DEFAULT,
+    customRules: AUTH_RATE_RULES,
+    // Memória: basta para a instância única do alvo de deploy. Se um dia houver
+    // réplica, cada uma teria seu próprio balde — aí vale `storage: 'database'`
+    // (que exige um model `rateLimit` no schema).
+    storage: 'memory',
+  },
   advanced: {
     cookiePrefix: 'cifrao',
     defaultCookieAttributes: { sameSite: 'lax', httpOnly: true },
+    ipAddress: {
+      // Sem isto, atrás de proxy, um `X-Forwarded-For` falsificado derruba a
+      // resolução do IP e o limite passa a valer para todos juntos.
+      trustedProxies: parseTrustedProxies(process.env.TRUSTED_PROXIES),
+    },
   },
   databaseHooks: {
     user: {

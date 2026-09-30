@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { type FormEvent, useState } from 'react';
+import { authErrorMessage } from '@/lib/auth-error';
 import { signUp } from '@/lib/auth-client';
 import { syncApiToken } from '@/lib/session-actions';
 
@@ -29,7 +30,7 @@ export default function CriarContaPage() {
     setLoading(true);
     const { error: err } = await signUp.email({ name, email, password });
     if (err) {
-      setError(err.message ?? 'Não foi possível criar a conta.');
+      setError(authErrorMessage(err, 'Não foi possível criar a conta.'));
       setLoading(false);
       return;
     }
