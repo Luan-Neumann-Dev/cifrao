@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { InvoicesService } from './invoices.service';
 import type { PrismaService } from '../prisma/prisma.service';
 
+/** Dono fixo dos testes: todo service agora recebe o userId. */
+const USER = 'user-1';
+
 /**
  * Regra 5.6: pagar fatura é TRANSFERÊNCIA, não despesa. O teste usa um Prisma
  * falso e verifica que o pagamento (a) cria uma TRANSFER e nunca uma EXPENSE,
@@ -14,7 +17,7 @@ function fakePrismaForPay(opts: { totalCents: bigint; paidCents: bigint }) {
 
   const tx = {
     invoice: {
-      findUnique: async () => ({
+      findFirst: async () => ({
         id: 'inv1',
         referenceMonth: '2025-08',
         paidCents: opts.paidCents,
@@ -27,7 +30,7 @@ function fakePrismaForPay(opts: { totalCents: bigint; paidCents: bigint }) {
       },
     },
     account: {
-      findUnique: async () => ({ id: 'acc1', balanceCents: 500000n }),
+      findFirst: async () => ({ id: 'acc1', balanceCents: 500000n }),
       update: async (args: { data: { balanceCents: { increment: bigint } } }) => {
         accountUpdates.push(args);
         return { id: 'acc1' };
@@ -58,7 +61,7 @@ describe('regra 5.6 — pagamento de fatura é transferência, não despesa', ()
     });
     const service = new InvoicesService(prisma);
 
-    const res = await service.pay('inv1', { accountId: 'acc1', amountCents: 30000 });
+    const res = await service.pay(USER, 'inv1', { accountId: 'acc1', amountCents: 30000 });
 
     expect(created).toHaveLength(1);
     // NUNCA vira despesa — é uma transferência com invoiceId
@@ -82,7 +85,7 @@ describe('regra 5.6 — pagamento de fatura é transferência, não despesa', ()
     const { prisma, created, invoiceUpdates } = fakePrismaForPay({ totalCents: 30000n, paidCents: 0n });
     const service = new InvoicesService(prisma);
 
-    const res = await service.pay('inv1', { accountId: 'acc1', amountCents: 10000 });
+    const res = await service.pay(USER, 'inv1', { accountId: 'acc1', amountCents: 10000 });
 
     expect(created[0].type).toBe('TRANSFER');
     expect(invoiceUpdates[0].data.paidCents).toBe(10000n);
@@ -93,12 +96,12 @@ describe('regra 5.6 — pagamento de fatura é transferência, não despesa', ()
   it('recusa pagamento acima do restante', async () => {
     const { prisma } = fakePrismaForPay({ totalCents: 30000n, paidCents: 25000n });
     const service = new InvoicesService(prisma);
-    await expect(service.pay('inv1', { accountId: 'acc1', amountCents: 10000 })).rejects.toThrow();
+    await expect(service.pay(USER, 'inv1', { accountId: 'acc1', amountCents: 10000 })).rejects.toThrow();
   });
 
   it('recusa pagamento de fatura já quitada', async () => {
     const { prisma } = fakePrismaForPay({ totalCents: 30000n, paidCents: 30000n });
     const service = new InvoicesService(prisma);
-    await expect(service.pay('inv1', { accountId: 'acc1', amountCents: 1000 })).rejects.toThrow();
+    await expect(service.pay(USER, 'inv1', { accountId: 'acc1', amountCents: 1000 })).rejects.toThrow();
   });
 });

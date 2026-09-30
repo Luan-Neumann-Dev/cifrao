@@ -2,6 +2,9 @@ import { describe, expect, it, vi } from 'vitest';
 import { PrismaService } from '../prisma/prisma.service';
 import { GoalsService } from './goals.service';
 
+/** Dono fixo dos testes: todo service agora recebe o userId. */
+const USER = 'user-1';
+
 /**
  * Aceite da Fase 5: "meta nunca cria saldo novo". O fake abaixo grita se o
  * serviço tentar criar/alterar lançamento ou mexer em saldo de conta (regra 5.9).
@@ -18,13 +21,13 @@ function makePrisma(options: {
   const client = {
     goal: {
       findMany: vi.fn(async () => options.goals),
-      findUnique: vi.fn(async () => options.goals[0] ?? null),
+      findFirst: vi.fn(async () => options.goals[0] ?? null),
       create: vi.fn(async (args: { data: Record<string, unknown> }) => args.data),
       update: vi.fn(async (args: { data: Record<string, unknown> }) => args.data),
       delete: vi.fn(async () => ({})),
     },
     account: {
-      findUnique: vi.fn(async () => ({ id: 'acc-1', balanceCents: 250_000n })),
+      findFirst: vi.fn(async () => ({ id: 'acc-1', balanceCents: 250_000n })),
       // Qualquer escrita em conta é violação da regra 5.9.
       update: vi.fn(proibido('atualizar saldo de conta')),
       updateMany: vi.fn(proibido('atualizar saldo de conta')),
@@ -61,7 +64,7 @@ const meta = {
 describe('GoalsService (regra 5.9)', () => {
   it('aceite: lê o progresso do saldo vinculado e não cria saldo novo', async () => {
     const { service, client } = makePrisma({ goals: [meta] });
-    const [out] = await service.list();
+    const [out] = await service.list(USER);
 
     expect(out.currentCents).toBe(250_000n); // exatamente o saldo da conta
     expect(out.targetCents).toBe(1_000_000n);
@@ -77,15 +80,15 @@ describe('GoalsService (regra 5.9)', () => {
   it('criar, editar e excluir meta não tocam em saldo nem em lançamento', async () => {
     const { service, client } = makePrisma({ goals: [meta] });
 
-    await service.create({
+    await service.create(USER, {
       name: 'Viagem',
       targetCents: 500_000,
       linkedAccountId: 'acc-1',
       deadline: null,
       monthlyContributionCents: 50_000,
     });
-    await service.update('goal-1', { targetCents: 800_000 });
-    await service.remove('goal-1');
+    await service.update(USER, 'goal-1', { targetCents: 800_000 });
+    await service.remove(USER, 'goal-1');
 
     expect(client.account.update).not.toHaveBeenCalled();
     expect(client.account.updateMany).not.toHaveBeenCalled();
@@ -107,7 +110,7 @@ describe('GoalsService (regra 5.9)', () => {
       ],
     });
 
-    const [out] = await service.list();
+    const [out] = await service.list(USER);
     expect(out.paceSource).toBe('history');
     expect(out.paceCents).toBe(200_000n);
     expect(out.etaMonths).toBe(4); // faltam 750.000 => 3,75 => 4 meses
@@ -118,7 +121,7 @@ describe('GoalsService (regra 5.9)', () => {
     const { service } = makePrisma({
       goals: [{ ...meta, monthlyContributionCents: 150_000n }],
     });
-    const [out] = await service.list();
+    const [out] = await service.list(USER);
     expect(out.paceSource).toBe('contribution');
     expect(out.etaMonths).toBe(5); // 750.000 / 150.000
   });
@@ -128,7 +131,7 @@ describe('GoalsService (regra 5.9)', () => {
       goals: [meta],
       groupBy: [[], [], [{ toAccountId: 'acc-1', _sum: { amountCents: 600_000n } }]],
     });
-    const [out] = await service.list();
+    const [out] = await service.list(USER);
     expect(out.paceCents).toBe(200_000n);
     expect(out.paceSource).toBe('history');
   });

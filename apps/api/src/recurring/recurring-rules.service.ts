@@ -51,8 +51,9 @@ export class RecurringRulesService {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  async list() {
+  async list(userId: string) {
     const rules = await this.prisma.client.recurringRule.findMany({
+      where: { userId },
       orderBy: [{ active: 'desc' }, { createdAt: 'desc' }],
       include: ruleInclude,
     });
@@ -64,17 +65,18 @@ export class RecurringRulesService {
     }));
   }
 
-  async get(id: string) {
-    const rule = await this.prisma.client.recurringRule.findUnique({
-      where: { id },
+  async get(userId: string, id: string) {
+    const rule = await this.prisma.client.recurringRule.findFirst({
+      where: { id, userId },
       include: ruleInclude,
     });
     if (!rule) throw new NotFoundException('Recorrência não encontrada');
     return rule;
   }
 
-  async create(input: CreateRecurringRuleInput) {
+  async create(userId: string, input: CreateRecurringRuleInput) {
     const data: Prisma.RecurringRuleUncheckedCreateInput = {
+      userId,
       description: input.description,
       type: input.type,
       amountCents: BigInt(input.amountCents),
@@ -89,14 +91,16 @@ export class RecurringRulesService {
       toAccountId: input.type === 'TRANSFER' ? input.toAccountId : null,
       categoryId: input.type === 'TRANSFER' ? null : (input.categoryId ?? null),
     };
-    await this.ensureAccounts(data);
+    await this.ensureAccounts(userId, data);
+    if (data.categoryId) await this.ensureCategory(userId, data.categoryId);
     const rule = await this.prisma.client.recurringRule.create({ data });
     const generated = await this.generateForRule(rule.id);
-    return { ...(await this.get(rule.id)), generated };
+    return { ...(await this.get(userId, rule.id)), generated };
   }
 
-  async update(id: string, input: UpdateRecurringRuleInput) {
-    await this.get(id);
+  async update(userId: string, id: string, input: UpdateRecurringRuleInput) {
+    await this.get(userId, id);
+    if (input.categoryId) await this.ensureCategory(userId, input.categoryId);
     const data: Prisma.RecurringRuleUncheckedUpdateInput = {};
     if (input.description !== undefined) data.description = input.description;
     if (input.amountCents !== undefined) data.amountCents = BigInt(input.amountCents);
@@ -111,23 +115,38 @@ export class RecurringRulesService {
     await this.prisma.client.recurringRule.update({ where: { id }, data });
     // Editar a regra reescreve os previstos futuros — o que já foi efetivado fica.
     const generated = await this.generateForRule(id);
-    return { ...(await this.get(id)), generated };
+    return { ...(await this.get(userId, id)), generated };
   }
 
   /**
    * Apagar a regra remove os previstos futuros ainda não confirmados. O que já
    * virou lançamento efetivado permanece (o campo vira null por SetNull).
    */
-  async remove(id: string) {
-    await this.get(id);
+  async remove(userId: string, id: string) {
+    await this.get(userId, id);
     const { count } = await this.prisma.client.transaction.deleteMany({
-      where: { recurringRuleId: id, status: 'FORECAST' },
+      where: { userId, recurringRuleId: id, status: 'FORECAST' },
     });
     await this.prisma.client.recurringRule.delete({ where: { id } });
     return { ok: true, forecastsRemoved: count };
   }
 
-  /** Roda para todas as regras ativas (usado pelo cron diário). */
+  /**
+   * Só para o usuário que pediu. O caminho HTTP nunca pode disparar geração na
+   * regra de outra pessoa — `generateAll` (cron) roda para todos de propósito.
+   */
+  async generateAllForUser(userId: string, now = new Date()) {
+    const rules = await this.prisma.client.recurringRule.findMany({
+      where: { userId, active: true },
+    });
+    let created = 0;
+    for (const rule of rules) {
+      created += await this.generateForRule(rule.id, now);
+    }
+    return { rules: rules.length, created };
+  }
+
+  /** Roda para todas as regras ativas de TODOS os usuários (cron diário). */
   async generateAll(now = new Date()) {
     const rules = await this.prisma.client.recurringRule.findMany({ where: { active: true } });
     let created = 0;
@@ -146,13 +165,15 @@ export class RecurringRulesService {
   async generateForRule(ruleId: string, now = new Date()): Promise<number> {
     const rule = await this.prisma.client.recurringRule.findUnique({ where: { id: ruleId } });
     if (!rule) throw new NotFoundException('Recorrência não encontrada');
+    // O dono sai da própria regra: o cron roda para todos, sem JWT na mão.
+    const userId = rule.userId;
 
     const today = saoPauloDateParts(now);
     const startOfToday = saoPauloWallClockToUtc(today.year, today.month, today.day, '00:00:00');
 
     // Limpa só o que será reescrito: previstos de hoje em diante desta regra.
     await this.prisma.client.transaction.deleteMany({
-      where: { recurringRuleId: ruleId, status: 'FORECAST', date: { gte: startOfToday } },
+      where: { userId, recurringRuleId: ruleId, status: 'FORECAST', date: { gte: startOfToday } },
     });
 
     if (!rule.active) {
@@ -165,7 +186,12 @@ export class RecurringRulesService {
 
     // Datas já confirmadas (previsto que virou efetivado) não são recriadas.
     const confirmed = await this.prisma.client.transaction.findMany({
-      where: { recurringRuleId: ruleId, status: { not: 'FORECAST' }, date: { gte: startOfToday } },
+      where: {
+        userId,
+        recurringRuleId: ruleId,
+        status: { not: 'FORECAST' },
+        date: { gte: startOfToday },
+      },
       select: { date: true },
     });
     const takenDays = new Set(confirmed.map((t) => dateKeyFromParts(saoPauloDateParts(t.date))));
@@ -184,6 +210,7 @@ export class RecurringRulesService {
     if (occurrences.length > 0) {
       await this.prisma.client.transaction.createMany({
         data: occurrences.map((p) => ({
+          userId,
           type: rule.type,
           amountCents: rule.amountCents,
           date: saoPauloWallClockToUtc(p.year, p.month, p.day, FORECAST_TIME),
@@ -207,12 +234,13 @@ export class RecurringRulesService {
   }
 
   /** Previstos gerados por regras, do dia de hoje em diante. */
-  async forecasts(ruleId?: string) {
+  async forecasts(userId: string, ruleId?: string) {
     const now = new Date();
     const today = saoPauloDateParts(now);
     const startOfToday = saoPauloWallClockToUtc(today.year, today.month, today.day, '00:00:00');
     return this.prisma.client.transaction.findMany({
       where: {
+        userId,
         status: 'FORECAST',
         date: { gte: startOfToday },
         ...(ruleId ? { recurringRuleId: ruleId } : { recurringRuleId: { not: null } }),
@@ -237,12 +265,25 @@ export class RecurringRulesService {
     };
   }
 
-  private async ensureAccounts(data: Prisma.RecurringRuleUncheckedCreateInput) {
+  private async ensureAccounts(userId: string, data: Prisma.RecurringRuleUncheckedCreateInput) {
     const ids = [data.accountId, data.fromAccountId, data.toAccountId].filter(
       (v): v is string => typeof v === 'string',
     );
     if (ids.length === 0) return;
-    const found = await this.prisma.client.account.count({ where: { id: { in: ids } } });
+    const found = await this.prisma.client.account.count({ where: { userId, id: { in: ids } } });
     if (found !== new Set(ids).size) throw new NotFoundException('Conta informada não existe');
+  }
+
+  private async ensureCategory(userId: string, categoryId: string) {
+    const found = await this.prisma.client.category.count({
+      where: { id: categoryId, OR: [{ userId }, { userId: null }] },
+    });
+    if (found === 0) throw new NotFoundException('Categoria informada não existe');
+  }
+
+  /** Caminho HTTP: confere o dono antes de deixar (re)gerar. */
+  async generateForRuleAsUser(userId: string, ruleId: string, now = new Date()) {
+    await this.get(userId, ruleId);
+    return this.generateForRule(ruleId, now);
   }
 }

@@ -87,10 +87,13 @@ export class ImportsProcessor implements OnModuleInit {
       // Reprocessamento (troca de mapeamento) começa do zero.
       await db.importRow.deleteMany({ where: { batchId } });
 
+      // O dono vem do próprio lote: o job carrega só o batchId.
+      const userId = batch.userId;
+
       const [rules, existing, forecasts] = await Promise.all([
-        db.categoryRule.findMany({ where: { active: true } }),
-        this.existingForDedupe(batch.accountId, parsed.transactions),
-        this.forecastsForMatch(batch.accountId, parsed.transactions),
+        db.categoryRule.findMany({ where: { userId, active: true } }),
+        this.existingForDedupe(userId, batch.accountId, parsed.transactions),
+        this.forecastsForMatch(userId, batch.accountId, parsed.transactions),
       ]);
 
       let duplicates = 0;
@@ -191,6 +194,7 @@ export class ImportsProcessor implements OnModuleInit {
     }
 
     try {
+      const userId = batch.userId;
       const rows = await db.importRow.findMany({
         where: { batchId, status: 'PENDING' },
         orderBy: { lineNumber: 'asc' },
@@ -204,7 +208,7 @@ export class ImportsProcessor implements OnModuleInit {
         await db.$transaction(async (tx) => {
           for (const row of slice) {
             const forecast = row.matchedForecastId
-              ? await tx.transaction.findUnique({ where: { id: row.matchedForecastId } })
+              ? await tx.transaction.findFirst({ where: { id: row.matchedForecastId, userId } })
               : null;
 
             if (forecast && forecast.status === 'FORECAST') {
@@ -228,6 +232,7 @@ export class ImportsProcessor implements OnModuleInit {
             } else {
               const created = await tx.transaction.create({
                 data: {
+                  userId,
                   type: row.type,
                   amountCents: row.amountCents,
                   date: row.date,
@@ -263,8 +268,8 @@ export class ImportsProcessor implements OnModuleInit {
       });
       for (const row of applied) {
         if (!row.matchedRuleId) continue;
-        await db.categoryRule.update({
-          where: { id: row.matchedRuleId },
+        await db.categoryRule.updateMany({
+          where: { id: row.matchedRuleId, userId },
           data: { appliedCount: { increment: row._count._all } },
         });
       }
@@ -295,11 +300,16 @@ export class ImportsProcessor implements OnModuleInit {
    * Candidatos a duplicata: mesma conta, dentro da janela de datas do arquivo
    * (regra 5.12). Busca uma vez só — nada de uma query por linha.
    */
-  private async existingForDedupe(accountId: string | null, rows: ParsedTransaction[]) {
+  private async existingForDedupe(
+    userId: string,
+    accountId: string | null,
+    rows: ParsedTransaction[],
+  ) {
     if (!accountId || rows.length === 0) return [];
     const { from, to } = this.dateRange(rows);
     return this.prisma.client.transaction.findMany({
       where: {
+        userId,
         accountId,
         status: { not: 'FORECAST' },
         date: { gte: from, lte: to },
@@ -309,11 +319,15 @@ export class ImportsProcessor implements OnModuleInit {
   }
 
   /** Previstos da mesma conta na janela, para o match da regra 5.11. */
-  private async forecastsForMatch(accountId: string | null, rows: ParsedTransaction[]) {
+  private async forecastsForMatch(
+    userId: string,
+    accountId: string | null,
+    rows: ParsedTransaction[],
+  ) {
     if (!accountId || rows.length === 0) return [];
     const { from, to } = this.dateRange(rows);
     return this.prisma.client.transaction.findMany({
-      where: { accountId, status: 'FORECAST', date: { gte: from, lte: to } },
+      where: { userId, accountId, status: 'FORECAST', date: { gte: from, lte: to } },
       select: { id: true, date: true, amountCents: true, description: true, externalId: true },
     });
   }

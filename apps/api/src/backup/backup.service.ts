@@ -37,6 +37,34 @@ function delegate(db: PrismaClient, model: string): AnyDelegate {
 }
 
 /**
+ * Recorte do dono por model. Quatro dos 17 não têm `userId` próprio — são filhos
+ * e o dono vem pela relação.
+ *
+ * `scope` muda o caso da categoria, e a diferença é importante: no EXPORT as
+ * universais entram, para o arquivo ficar autossuficiente e as referências dos
+ * lançamentos resolverem; no DELETE elas ficam de fora, porque apagar uma
+ * universal derrubaria a categoria de todos os usuários.
+ */
+function ownerWhere(
+  model: string,
+  userId: string,
+  scope: 'export' | 'delete',
+): Record<string, unknown> {
+  switch (model) {
+    case 'transactionSplit':
+    case 'transactionTag':
+      return { transaction: { userId } };
+    case 'investmentTransaction':
+    case 'priceHistory':
+      return { investment: { userId } };
+    case 'category':
+      return scope === 'export' ? { OR: [{ userId }, { userId: null }] } : { userId };
+    default:
+      return { userId };
+  }
+}
+
+/**
  * Backup e zona de risco (Fase 9).
  *
  * Decisão do dono: **sem storage nesta fase**. O export sai como download e a
@@ -68,7 +96,9 @@ export class BackupService {
     // Sequencial de propósito: paralelizar 17 findMany só para esperar todos
     // abriria 17 conexões ao mesmo tempo (armadilha #1) sem ganhar nada aqui.
     for (const { model } of BACKUP_MODELS) {
-      data[model] = await delegate(db, model).findMany({});
+      data[model] = await delegate(db, model).findMany({
+        where: ownerWhere(model, userId, 'export'),
+      });
     }
 
     const user = await db.user.findUnique({
@@ -97,13 +127,13 @@ export class BackupService {
   }
 
   /** Contagem por seção, para a tela dizer o que vai no arquivo antes de baixar. */
-  async exportSummary() {
+  async exportSummary(userId: string) {
     const db = this.prisma.client;
     const sections: { model: string; label: string; count: number }[] = [];
     for (const { model, label } of BACKUP_MODELS) {
-      const count = await (db as unknown as Record<string, { count: () => Promise<number> }>)[
-        model
-      ].count();
+      const count = await (
+        db as unknown as Record<string, { count: (args?: unknown) => Promise<number> }>
+      )[model].count({ where: ownerWhere(model, userId, 'export') });
       sections.push({ model, label, count });
     }
     return { sections, totalRecords: sections.reduce((acc, s) => acc + s.count, 0) };
@@ -114,7 +144,10 @@ export class BackupService {
    * arquivo. Formato `;` + BOM, que é o que o Excel em pt-BR abre direto, e o
    * dinheiro vai em duas colunas — centavos para conferir a soma, BRL para ler.
    */
-  async exportCsv(query: BackupCsvQuery): Promise<{ filename: string; content: string }> {
+  async exportCsv(
+    userId: string,
+    query: BackupCsvQuery,
+  ): Promise<{ filename: string; content: string }> {
     const db = this.prisma.client;
     const hoje = formatInSaoPaulo(new Date(), 'yyyy-MM-dd');
     const file = (nome: string, content: string) => ({
@@ -125,6 +158,7 @@ export class BackupService {
     switch (query.section) {
       case 'lancamentos': {
         const rows = await db.transaction.findMany({
+          where: { userId },
           orderBy: { date: 'desc' },
           include: {
             category: { select: { name: true } },
@@ -168,7 +202,10 @@ export class BackupService {
       }
 
       case 'contas': {
-        const rows = await db.account.findMany({ orderBy: { name: 'asc' } });
+        const rows = await db.account.findMany({
+          where: { userId },
+          orderBy: { name: 'asc' },
+        });
         return file(
           'contas',
           toCsv(
@@ -186,7 +223,10 @@ export class BackupService {
       }
 
       case 'cartoes': {
-        const rows = await db.creditCard.findMany({ orderBy: { nickname: 'asc' } });
+        const rows = await db.creditCard.findMany({
+          where: { userId },
+          orderBy: { nickname: 'asc' },
+        });
         return file(
           'cartoes',
           toCsv(
@@ -206,6 +246,7 @@ export class BackupService {
 
       case 'faturas': {
         const rows = await db.invoice.findMany({
+          where: { userId },
           orderBy: { dueDate: 'desc' },
           include: { creditCard: { select: { nickname: true } } },
         });
@@ -228,6 +269,7 @@ export class BackupService {
 
       case 'categorias': {
         const rows = await db.category.findMany({
+          where: { OR: [{ userId }, { userId: null }] },
           orderBy: { name: 'asc' },
           include: { parent: { select: { name: true } } },
         });
@@ -242,6 +284,7 @@ export class BackupService {
 
       case 'orcamentos': {
         const rows = await db.budget.findMany({
+          where: { userId },
           orderBy: [{ month: 'desc' }],
           include: { category: { select: { name: true } } },
         });
@@ -256,6 +299,7 @@ export class BackupService {
 
       case 'metas': {
         const rows = await db.goal.findMany({
+          where: { userId },
           orderBy: { createdAt: 'asc' },
           include: { linkedAccount: { select: { name: true, balanceCents: true } } },
         });
@@ -277,6 +321,7 @@ export class BackupService {
 
       case 'recorrencias': {
         const rows = await db.recurringRule.findMany({
+          where: { userId },
           orderBy: { createdAt: 'asc' },
           include: { category: { select: { name: true } } },
         });
@@ -299,7 +344,10 @@ export class BackupService {
       }
 
       case 'investimentos': {
-        const rows = await db.investment.findMany({ orderBy: { ticker: 'asc' } });
+        const rows = await db.investment.findMany({
+          where: { userId },
+          orderBy: { ticker: 'asc' },
+        });
         return file(
           'investimentos',
           toCsv(
@@ -331,6 +379,7 @@ export class BackupService {
 
       case 'operacoes': {
         const rows = await db.investmentTransaction.findMany({
+          where: { investment: { userId } },
           orderBy: { date: 'desc' },
           include: {
             investment: { select: { ticker: true } },
@@ -364,7 +413,7 @@ export class BackupService {
    * Valida o arquivo ANTES de enfileirar. Se for lixo, o erro aparece na hora,
    * em vez de virar job que falha em silêncio.
    */
-  async enqueueRestore(input: RestoreBackupInput) {
+  async enqueueRestore(userId: string, input: RestoreBackupInput) {
     let parsed: unknown;
     try {
       parsed = JSON.parse(input.content);
@@ -379,6 +428,7 @@ export class BackupService {
 
     const job = await this.prisma.client.restoreJob.create({
       data: {
+        userId,
         mode: input.mode,
         totalRecords: check.totalRecords,
         content: input.content,
@@ -399,9 +449,9 @@ export class BackupService {
     return { job, check: { counts: check.counts, unknownModels: check.unknownModels } };
   }
 
-  async restoreStatus(jobId: string) {
-    const job = await this.prisma.client.restoreJob.findUnique({
-      where: { id: jobId },
+  async restoreStatus(userId: string, jobId: string) {
+    const job = await this.prisma.client.restoreJob.findFirst({
+      where: { id: jobId, userId },
       // `content` fica de fora: é o arquivo inteiro, não tem por que trafegar.
       select: {
         id: true,
@@ -428,7 +478,7 @@ export class BackupService {
    * O saldo das contas volta a zero junto: sem lançamento nenhum, um saldo
    * remanescente seria um número sem história por trás.
    */
-  async wipeMovements(confirm: string) {
+  async wipeMovements(userId: string, confirm: string) {
     if (confirm.trim().toUpperCase() !== WIPE_CONFIRMATION) {
       throw new BadRequestException(`Digite "${WIPE_CONFIRMATION}" para confirmar.`);
     }
@@ -437,10 +487,12 @@ export class BackupService {
       async (tx) => {
         const counts: Record<string, number> = {};
         for (const model of MOVEMENT_MODELS) {
-          const result = await delegate(tx as unknown as PrismaClient, model).deleteMany({});
+          const result = await delegate(tx as unknown as PrismaClient, model).deleteMany({
+            where: ownerWhere(model, userId, 'delete'),
+          });
           if (result.count > 0) counts[model] = result.count;
         }
-        await tx.account.updateMany({ data: { balanceCents: 0n } });
+        await tx.account.updateMany({ where: { userId }, data: { balanceCents: 0n } });
         return counts;
       },
       { timeout: 120_000 },
@@ -459,9 +511,11 @@ export class BackupService {
     await this.prisma.client.$transaction(
       async (tx) => {
         for (const model of fullWipeOrder()) {
-          await delegate(tx as unknown as PrismaClient, model).deleteMany({});
+          await delegate(tx as unknown as PrismaClient, model).deleteMany({
+            where: ownerWhere(model, userId, 'delete'),
+          });
         }
-        await tx.restoreJob.deleteMany({});
+        await tx.restoreJob.deleteMany({ where: { userId } });
         // Sessão, credencial e 2FA caem por cascade ao apagar o usuário.
         await tx.user.delete({ where: { id: userId } });
       },

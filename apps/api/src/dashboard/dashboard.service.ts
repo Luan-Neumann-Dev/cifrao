@@ -33,7 +33,7 @@ function sumBigint(rows: { _sum: { amountCents: bigint | null } }[]): bigint {
 export class DashboardService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async overview(query: DashboardQuery) {
+  async overview(userId: string, query: DashboardQuery) {
     const monthKey = query.month ?? monthKeyInSaoPaulo(new Date());
     const [year, month] = monthKey.split('-').map(Number);
 
@@ -64,17 +64,24 @@ export class DashboardService {
       budgets,
       portfolioValueCents,
     ] = await Promise.all([
-      db.account.findMany({ where: { archived: false }, orderBy: { createdAt: 'asc' } }),
-      db.invoice.findMany({ include: { creditCard: { select: { id: true, nickname: true, color: true } } } }),
+      db.account.findMany({ where: { userId, archived: false }, orderBy: { createdAt: 'asc' } }),
+      db.invoice.findMany({
+        where: { userId },
+        include: { creditCard: { select: { id: true, nickname: true, color: true } } },
+      }),
       db.transaction.groupBy({
         by: ['invoiceId'],
-        where: { invoiceId: { not: null }, type: 'EXPENSE', status: { not: 'FORECAST' } },
+        where: { userId, invoiceId: { not: null }, type: 'EXPENSE', status: { not: 'FORECAST' } },
         _sum: { amountCents: true },
       }),
-      db.category.findMany({ select: { id: true, name: true, color: true, icon: true } }),
+      db.category.findMany({
+        where: { OR: [{ userId }, { userId: null }] },
+        select: { id: true, name: true, color: true, icon: true },
+      }),
       // Gasto líquido de reembolso, no mês e na janela de 3 meses (regra 5.13).
-      netExpenseByCategory(db, { status: { not: 'FORECAST' }, date: monthRange }),
+      netExpenseByCategory(db, { userId, status: { not: 'FORECAST' }, date: monthRange }),
       netExpenseByCategory(db, {
+        userId,
         status: { not: 'FORECAST' },
         date: { gte: prev3Start, lt: monthStart },
       }),
@@ -82,6 +89,7 @@ export class DashboardService {
       db.transaction
         .aggregate({
           where: {
+            userId,
             type: 'INCOME',
             reimbursesTransactionId: null,
             status: { not: 'FORECAST' },
@@ -92,28 +100,39 @@ export class DashboardService {
         .then((agg) => agg._sum.amountCents ?? 0n),
       db.transaction.groupBy({
         by: ['type'],
-        where: { type: { in: ['EXPENSE', 'INCOME'] }, status: 'FORECAST', date: { lt: nextMonthStart } },
+        where: {
+          userId,
+          type: { in: ['EXPENSE', 'INCOME'] },
+          status: 'FORECAST',
+          date: { lt: nextMonthStart },
+        },
         _sum: { amountCents: true },
       }),
       db.transaction.findMany({
-        where: { status: 'FORECAST', date: { gte: startOfToday }, type: { in: ['EXPENSE', 'INCOME'] } },
+        where: {
+          userId,
+          status: 'FORECAST',
+          date: { gte: startOfToday },
+          type: { in: ['EXPENSE', 'INCOME'] },
+        },
         orderBy: { date: 'asc' },
         take: 12,
         include: { category: { select: { id: true, name: true, color: true, icon: true } } },
       }),
       db.transaction.findMany({
+        where: { userId },
         orderBy: [{ date: 'desc' }, { createdAt: 'desc' }],
         take: 8,
         include: recentInclude,
       }),
       // Orçamento do mês (Fase 5): reaproveita o groupBy de gastos por categoria.
       db.budget.findMany({
-        where: { month: monthKey },
+        where: { userId, month: monthKey },
         include: { category: { select: { id: true, name: true, color: true, icon: true } } },
       }),
       // Carteira a preço de mercado (Fase 8). Aportar tira o dinheiro da conta,
       // então somar contas + carteira não conta o mesmo real duas vezes.
-      currentPortfolioValueCents(db),
+      currentPortfolioValueCents(db, userId),
     ]);
 
     // ── Saldos e patrimônio ───────────────────────────────────────────────────

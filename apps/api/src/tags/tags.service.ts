@@ -6,16 +6,16 @@ import { PrismaService } from '../prisma/prisma.service';
 export class TagsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  list() {
-    return this.prisma.client.tag.findMany({ orderBy: { name: 'asc' } });
+  list(userId: string) {
+    return this.prisma.client.tag.findMany({ where: { userId }, orderBy: { name: 'asc' } });
   }
 
-  create(input: CreateTagInput) {
-    return this.prisma.client.tag.create({ data: input });
+  create(userId: string, input: CreateTagInput) {
+    return this.prisma.client.tag.create({ data: { ...input, userId } });
   }
 
-  async remove(id: string) {
-    const found = await this.prisma.client.tag.findUnique({ where: { id } });
+  async remove(userId: string, id: string) {
+    const found = await this.prisma.client.tag.findFirst({ where: { id, userId } });
     if (!found) throw new NotFoundException('Tag não encontrada');
     await this.prisma.client.tag.delete({ where: { id } });
     return { ok: true };

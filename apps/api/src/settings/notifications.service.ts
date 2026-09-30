@@ -35,10 +35,10 @@ export class NotificationsService {
     );
 
     const [invoices, budgets, goals, forecasts] = await Promise.all([
-      prefs.notifyInvoiceDue ? this.openInvoices(limite) : [],
-      prefs.notifyBudgetExceeded ? this.budgets() : [],
-      prefs.notifyGoalReached ? this.goals() : [],
-      prefs.notifyForecastDue ? this.forecasts(limite) : [],
+      prefs.notifyInvoiceDue ? this.openInvoices(userId, limite) : [],
+      prefs.notifyBudgetExceeded ? this.budgets(userId) : [],
+      prefs.notifyGoalReached ? this.goals(userId) : [],
+      prefs.notifyForecastDue ? this.forecasts(userId, limite) : [],
     ]);
 
     const notifications = buildNotifications({ today, prefs, invoices, budgets, goals, forecasts });
@@ -68,9 +68,9 @@ export class NotificationsService {
   }
 
   /** Fatura ainda devendo: o que falta é o total lançado menos o já pago. */
-  private async openInvoices(limite: Date) {
+  private async openInvoices(userId: string, limite: Date) {
     const invoices = await this.prisma.client.invoice.findMany({
-      where: { status: { in: ['OPEN', 'CLOSED', 'PARTIAL'] }, dueDate: { lte: limite } },
+      where: { userId, status: { in: ['OPEN', 'CLOSED', 'PARTIAL'] }, dueDate: { lte: limite } },
       select: {
         id: true,
         dueDate: true,
@@ -83,7 +83,7 @@ export class NotificationsService {
     // Soma no banco (armadilha #5), não em memória.
     const totals = await this.prisma.client.transaction.groupBy({
       by: ['invoiceId'],
-      where: { invoiceId: { in: invoices.map((i) => i.id) }, type: 'EXPENSE' },
+      where: { userId, invoiceId: { in: invoices.map((i) => i.id) }, type: 'EXPENSE' },
       _sum: { amountCents: true },
     });
     const totalById = new Map(totals.map((t) => [t.invoiceId, t._sum.amountCents ?? 0n]));
@@ -99,10 +99,10 @@ export class NotificationsService {
   }
 
   /** Orçamento do mês corrente, com gasto líquido de reembolso (regra 5.13). */
-  private async budgets() {
+  private async budgets(userId: string) {
     const month = monthKeyInSaoPaulo(new Date());
     const budgets = await this.prisma.client.budget.findMany({
-      where: { month },
+      where: { userId, month },
       select: { categoryId: true, limitCents: true, category: { select: { name: true } } },
     });
     if (budgets.length === 0) return [];
@@ -113,6 +113,7 @@ export class NotificationsService {
     const end = saoPauloWallClockToUtc(next.year, next.month, 1, '00:00:00');
 
     const spend = await netExpenseByCategory(this.prisma.client, {
+      userId,
       status: { not: 'FORECAST' },
       date: { gte: start, lt: end },
     });
@@ -126,9 +127,9 @@ export class NotificationsService {
   }
 
   /** Regra 5.9: progresso é o saldo vinculado, lido — nunca somado à parte. */
-  private async goals() {
+  private async goals(userId: string) {
     const goals = await this.prisma.client.goal.findMany({
-      where: { archived: false },
+      where: { userId, archived: false },
       select: {
         id: true,
         name: true,
@@ -145,9 +146,9 @@ export class NotificationsService {
   }
 
   /** Previstos da regra 5.11 que já dá para confirmar. */
-  private async forecasts(limite: Date) {
+  private async forecasts(userId: string, limite: Date) {
     const rows = await this.prisma.client.transaction.findMany({
-      where: { status: 'FORECAST', date: { lte: limite } },
+      where: { userId, status: 'FORECAST', date: { lte: limite } },
       orderBy: { date: 'asc' },
       take: 20,
       select: { id: true, description: true, date: true, amountCents: true, type: true },

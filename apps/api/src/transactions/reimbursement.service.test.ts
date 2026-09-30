@@ -2,6 +2,9 @@ import { describe, expect, it, vi } from 'vitest';
 import { PrismaService } from '../prisma/prisma.service';
 import { TransactionsService } from './transactions.service';
 
+/** Dono fixo dos testes: todo service agora recebe o userId. */
+const USER = 'user-1';
+
 /**
  * Regra 5.13 no serviço: "marcar como recebido" cria um estorno vinculado que
  * credita a conta escolhida, herda a categoria do gasto e suporta parcial.
@@ -15,7 +18,7 @@ function makePrisma(original: Record<string, unknown>) {
   const client = {
     $transaction: async (fn: (tx: unknown) => Promise<unknown>) => fn(client),
     transaction: {
-      findUnique: vi.fn(async () => ({ ...state, reimbursements: state.reimbursements ?? [] })),
+      findFirst: vi.fn(async () => ({ ...state, reimbursements: state.reimbursements ?? [] })),
       create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
         const row = { id: `refund-${created.length + 1}`, ...data };
         created.push(row);
@@ -31,7 +34,7 @@ function makePrisma(original: Record<string, unknown>) {
       delete: vi.fn(async () => ({})),
     },
     account: {
-      findUnique: vi.fn(async () => ({ id: 'acc-destino', balanceCents: 0n })),
+      findFirst: vi.fn(async () => ({ id: 'acc-destino', balanceCents: 0n })),
       update: vi.fn(async ({ where, data }: { where: { id: string }; data: { balanceCents: { increment: bigint } } }) => {
         balanceOps.push({ id: where.id, increment: data.balanceCents.increment });
         return {};
@@ -67,7 +70,7 @@ describe('TransactionsService.reimburse (regra 5.13)', () => {
   it('cria estorno vinculado, credita a conta e herda a categoria', async () => {
     const { service, created, balanceOps } = makePrisma(almoco);
 
-    const out = await service.reimburse('tx-almoco', { accountId: 'acc-destino' });
+    const out = await service.reimburse(USER, 'tx-almoco', { accountId: 'acc-destino' });
 
     expect(created).toHaveLength(1);
     const refund = created[0];
@@ -89,7 +92,7 @@ describe('TransactionsService.reimburse (regra 5.13)', () => {
       ...almoco,
       reimbursements: [{ amountCents: 5000n }],
     });
-    const out = await service.reimburse('tx-almoco', { accountId: 'acc-destino' });
+    const out = await service.reimburse(USER, 'tx-almoco', { accountId: 'acc-destino' });
     expect(created[0].amountCents).toBe(7000n);
     expect(out.reimbursedCents).toBe(12000n);
     expect(out.settled).toBe(true);
@@ -97,7 +100,7 @@ describe('TransactionsService.reimburse (regra 5.13)', () => {
 
   it('reembolso parcial mantém o gasto pendente', async () => {
     const { service, updates } = makePrisma(almoco);
-    const out = await service.reimburse('tx-almoco', {
+    const out = await service.reimburse(USER, 'tx-almoco', {
       accountId: 'acc-destino',
       amountCents: 10000,
     });
@@ -110,32 +113,32 @@ describe('TransactionsService.reimburse (regra 5.13)', () => {
   it('recusa valor acima do que falta', async () => {
     const { service } = makePrisma({ ...almoco, reimbursements: [{ amountCents: 10000n }] });
     await expect(
-      service.reimburse('tx-almoco', { accountId: 'acc-destino', amountCents: 5000 }),
+      service.reimburse(USER, 'tx-almoco', { accountId: 'acc-destino', amountCents: 5000 }),
     ).rejects.toThrow(/acima do que falta/i);
   });
 
   it('recusa gasto já totalmente reembolsado', async () => {
     const { service } = makePrisma({ ...almoco, reimbursements: [{ amountCents: 12000n }] });
-    await expect(service.reimburse('tx-almoco', { accountId: 'acc-destino' })).rejects.toThrow(
+    await expect(service.reimburse(USER, 'tx-almoco', { accountId: 'acc-destino' })).rejects.toThrow(
       /já foi totalmente reembolsado/i,
     );
   });
 
   it('recusa lançamento não marcado como reembolsável', async () => {
     const { service } = makePrisma({ ...almoco, isReimbursable: false });
-    await expect(service.reimburse('tx-almoco', { accountId: 'acc-destino' })).rejects.toThrow(
+    await expect(service.reimburse(USER, 'tx-almoco', { accountId: 'acc-destino' })).rejects.toThrow(
       /não está marcado como reembolsável/i,
     );
   });
 
   it('recusa reembolso de previsto e de receita', async () => {
     const previsto = makePrisma({ ...almoco, status: 'FORECAST' });
-    await expect(previsto.service.reimburse('tx-almoco', { accountId: 'acc-destino' })).rejects.toThrow(
+    await expect(previsto.service.reimburse(USER, 'tx-almoco', { accountId: 'acc-destino' })).rejects.toThrow(
       /Efetive o lançamento previsto/i,
     );
 
     const receita = makePrisma({ ...almoco, type: 'INCOME' });
-    await expect(receita.service.reimburse('tx-almoco', { accountId: 'acc-destino' })).rejects.toThrow(
+    await expect(receita.service.reimburse(USER, 'tx-almoco', { accountId: 'acc-destino' })).rejects.toThrow(
       /Só uma despesa pode ser reembolsada/i,
     );
   });
@@ -149,7 +152,7 @@ describe('TransactionsService.reimburse (regra 5.13)', () => {
       ],
     });
 
-    const out = await service.undoReimburse('tx-almoco');
+    const out = await service.undoReimburse(USER, 'tx-almoco');
 
     expect(out.removed).toBe(1);
     // Saldo revertido: o crédito do estorno sai da conta.

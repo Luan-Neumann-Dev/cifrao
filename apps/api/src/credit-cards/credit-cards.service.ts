@@ -24,18 +24,19 @@ export class CreditCardsService {
   constructor(private readonly prisma: PrismaService) {}
 
   /** Lista os cartões com o resumo de disponível de verdade (regra 5.5) de cada. */
-  async list() {
+  async list(userId: string) {
     const cards = await this.prisma.client.creditCard.findMany({
-      where: { archived: false },
+      where: { userId, archived: false },
       orderBy: { createdAt: 'asc' },
     });
     if (cards.length === 0) return [];
 
     const invoices = await this.prisma.client.invoice.findMany({
-      where: { creditCardId: { in: cards.map((c) => c.id) } },
+      where: { userId, creditCardId: { in: cards.map((c) => c.id) } },
     });
     const totals = await this.invoiceTotals(
       this.prisma.client,
+      userId,
       invoices.map((i) => i.id),
     );
     const now = new Date();
@@ -55,16 +56,17 @@ export class CreditCardsService {
     });
   }
 
-  async get(id: string) {
-    const card = await this.prisma.client.creditCard.findUnique({ where: { id } });
+  async get(userId: string, id: string) {
+    const card = await this.prisma.client.creditCard.findFirst({ where: { id, userId } });
     if (!card) throw new NotFoundException('Cartão não encontrado');
 
     const invoices = await this.prisma.client.invoice.findMany({
-      where: { creditCardId: id },
+      where: { userId, creditCardId: id },
       orderBy: { referenceMonth: 'desc' },
     });
     const totals = await this.invoiceTotals(
       this.prisma.client,
+      userId,
       invoices.map((i) => i.id),
     );
     const now = new Date();
@@ -97,9 +99,14 @@ export class CreditCardsService {
     return { ...card, availability, invoices: invoicesWithTotals };
   }
 
-  create(input: CreateCreditCardInput) {
+  async create(userId: string, input: CreateCreditCardInput) {
+    // Conta de pagamento padrão tem que ser do próprio usuário.
+    if (input.defaultPaymentAccountId) {
+      await this.ensureAccount(userId, input.defaultPaymentAccountId);
+    }
     return this.prisma.client.creditCard.create({
       data: {
+        userId,
         nickname: input.nickname,
         brand: input.brand,
         last4: input.last4,
@@ -112,8 +119,11 @@ export class CreditCardsService {
     });
   }
 
-  async update(id: string, input: UpdateCreditCardInput) {
-    await this.ensureExists(id);
+  async update(userId: string, id: string, input: UpdateCreditCardInput) {
+    await this.ensureExists(userId, id);
+    if (input.defaultPaymentAccountId) {
+      await this.ensureAccount(userId, input.defaultPaymentAccountId);
+    }
     const data: Prisma.CreditCardUncheckedUpdateInput = {};
     if (input.nickname !== undefined) data.nickname = input.nickname;
     if (input.brand !== undefined) data.brand = input.brand;
@@ -128,9 +138,11 @@ export class CreditCardsService {
     return this.prisma.client.creditCard.update({ where: { id }, data });
   }
 
-  async remove(id: string) {
-    await this.ensureExists(id);
-    const linked = await this.prisma.client.transaction.count({ where: { creditCardId: id } });
+  async remove(userId: string, id: string) {
+    await this.ensureExists(userId, id);
+    const linked = await this.prisma.client.transaction.count({
+      where: { userId, creditCardId: id },
+    });
     if (linked > 0) {
       throw new BadRequestException('Cartão possui lançamentos; arquive-o em vez de excluir.');
     }
@@ -142,10 +154,21 @@ export class CreditCardsService {
    * Regra 5.4: uma compra parcelada gera 1 Purchase pai e N Transaction filhas,
    * cada uma roteada para a fatura do mês correspondente (regra 5.3).
    */
-  async createPurchase(cardId: string, input: CreateCardPurchaseInput) {
+  async createPurchase(userId: string, cardId: string, input: CreateCardPurchaseInput) {
     return this.prisma.client.$transaction(async (tx) => {
-      const card = await tx.creditCard.findUnique({ where: { id: cardId } });
+      const card = await tx.creditCard.findFirst({ where: { id: cardId, userId } });
       if (!card) throw new NotFoundException('Cartão não encontrado');
+      if (input.categoryId) {
+        const cat = await tx.category.count({
+          where: { id: input.categoryId, OR: [{ userId }, { userId: null }] },
+        });
+        if (cat === 0) throw new NotFoundException('Categoria informada não existe');
+      }
+      if (input.tagIds?.length) {
+        const unique = [...new Set(input.tagIds)];
+        const tags = await tx.tag.count({ where: { userId, id: { in: unique } } });
+        if (tags !== unique.length) throw new NotFoundException('Tag informada não existe');
+      }
 
       const purchaseParts = saoPauloDateParts(input.date);
       const windows = installmentWindows(purchaseParts, card.closingDay, card.dueDay, input.installments);
@@ -156,6 +179,7 @@ export class CreditCardsService {
       if (parcelado) {
         const purchase = await tx.purchase.create({
           data: {
+            userId,
             creditCardId: cardId,
             description: input.description,
             totalCents: BigInt(input.amountCents),
@@ -169,7 +193,7 @@ export class CreditCardsService {
 
       const invoiceIds: string[] = [];
       for (let i = 0; i < input.installments; i++) {
-        const invoice = await this.getOrCreateInvoice(tx, cardId, windows[i]);
+        const invoice = await this.getOrCreateInvoice(tx, userId, cardId, windows[i]);
         invoiceIds.push(invoice.id);
 
         const dp = installmentDateParts(purchaseParts, i);
@@ -180,6 +204,7 @@ export class CreditCardsService {
 
         await tx.transaction.create({
           data: {
+            userId,
             type: 'EXPENSE',
             amountCents: amounts[i],
             date,
@@ -206,8 +231,8 @@ export class CreditCardsService {
   }
 
   /** Dados do gráfico de comprometimento nos próximos 12 meses (regra da Fase 3). */
-  async commitment(cardId: string) {
-    await this.ensureExists(cardId);
+  async commitment(userId: string, cardId: string) {
+    await this.ensureExists(userId, cardId);
     const [refY, refM] = monthKeyInSaoPaulo(new Date()).split('-').map(Number);
     const keys: string[] = [];
     for (let i = 0; i < 12; i++) {
@@ -216,10 +241,11 @@ export class CreditCardsService {
     }
 
     const invoices = await this.prisma.client.invoice.findMany({
-      where: { creditCardId: cardId, referenceMonth: { in: keys } },
+      where: { userId, creditCardId: cardId, referenceMonth: { in: keys } },
     });
     const totals = await this.invoiceTotals(
       this.prisma.client,
+      userId,
       invoices.map((i) => i.id),
     );
     const byMonth = new Map<string, { totalCents: bigint; paidCents: bigint }>();
@@ -242,21 +268,30 @@ export class CreditCardsService {
 
   // ── Internos ────────────────────────────────────────────────────────────────
 
-  private async getOrCreateInvoice(tx: Tx, cardId: string, w: InvoiceWindow): Promise<Invoice> {
+  private async getOrCreateInvoice(
+    tx: Tx,
+    userId: string,
+    cardId: string,
+    w: InvoiceWindow,
+  ): Promise<Invoice> {
     const closingDate = saoPauloWallClockToUtc(w.closing.year, w.closing.month, w.closing.day, '23:59:59');
     const dueDate = saoPauloWallClockToUtc(w.due.year, w.due.month, w.due.day);
     return tx.invoice.upsert({
       where: { creditCardId_referenceMonth: { creditCardId: cardId, referenceMonth: w.referenceMonth } },
-      create: { creditCardId: cardId, referenceMonth: w.referenceMonth, closingDate, dueDate },
+      create: { userId, creditCardId: cardId, referenceMonth: w.referenceMonth, closingDate, dueDate },
       update: {},
     });
   }
 
-  private async invoiceTotals(client: Tx, ids: string[]): Promise<Map<string, bigint>> {
+  private async invoiceTotals(
+    client: Tx,
+    userId: string,
+    ids: string[],
+  ): Promise<Map<string, bigint>> {
     if (ids.length === 0) return new Map();
     const grouped = await client.transaction.groupBy({
       by: ['invoiceId'],
-      where: { invoiceId: { in: ids }, type: 'EXPENSE', status: { not: 'FORECAST' } },
+      where: { userId, invoiceId: { in: ids }, type: 'EXPENSE', status: { not: 'FORECAST' } },
       _sum: { amountCents: true },
     });
     const map = new Map<string, bigint>();
@@ -266,8 +301,13 @@ export class CreditCardsService {
     return map;
   }
 
-  private async ensureExists(id: string) {
-    const found = await this.prisma.client.creditCard.findUnique({ where: { id } });
+  private async ensureExists(userId: string, id: string) {
+    const found = await this.prisma.client.creditCard.findFirst({ where: { id, userId } });
     if (!found) throw new NotFoundException('Cartão não encontrado');
+  }
+
+  private async ensureAccount(userId: string, accountId: string) {
+    const found = await this.prisma.client.account.count({ where: { id: accountId, userId } });
+    if (found === 0) throw new NotFoundException('Conta de pagamento não encontrada');
   }
 }

@@ -16,21 +16,25 @@ import { PrismaService } from '../prisma/prisma.service';
 export class CategoryRulesService {
   constructor(private readonly prisma: PrismaService) {}
 
-  list() {
+  list(userId: string) {
     return this.prisma.client.categoryRule.findMany({
+      where: { userId },
       orderBy: [{ active: 'desc' }, { appliedCount: 'desc' }, { createdAt: 'desc' }],
       include: { category: { select: { id: true, name: true, color: true, icon: true } } },
     });
   }
 
-  async create(input: CreateCategoryRuleInput) {
+  async create(userId: string, input: CreateCategoryRuleInput) {
     const pattern = normalizeDescription(input.pattern);
     if (!pattern) throw new BadRequestException('Padrão vazio depois de normalizado.');
-    await this.ensureCategory(input.categoryId);
+    await this.ensureCategory(userId, input.categoryId);
 
     return this.prisma.client.categoryRule.upsert({
-      where: { pattern_categoryId: { pattern, categoryId: input.categoryId } },
+      where: {
+        userId_pattern_categoryId: { userId, pattern, categoryId: input.categoryId },
+      },
       create: {
+        userId,
         pattern,
         categoryId: input.categoryId,
         minCents: input.minCents == null ? null : BigInt(input.minCents),
@@ -45,9 +49,9 @@ export class CategoryRulesService {
     });
   }
 
-  async update(id: string, input: UpdateCategoryRuleInput) {
-    await this.get(id);
-    if (input.categoryId) await this.ensureCategory(input.categoryId);
+  async update(userId: string, id: string, input: UpdateCategoryRuleInput) {
+    await this.get(userId, id);
+    if (input.categoryId) await this.ensureCategory(userId, input.categoryId);
 
     return this.prisma.client.categoryRule.update({
       where: { id },
@@ -66,36 +70,40 @@ export class CategoryRulesService {
     });
   }
 
-  async remove(id: string) {
-    await this.get(id);
+  async remove(userId: string, id: string) {
+    await this.get(userId, id);
     await this.prisma.client.categoryRule.delete({ where: { id } });
     return { ok: true };
   }
 
   /** Testa as regras contra uma descrição — o "por que veio assim" da UI. */
-  async test(description: string, amountCents: number) {
-    const rules = await this.prisma.client.categoryRule.findMany({ where: { active: true } });
+  async test(userId: string, description: string, amountCents: number) {
+    const rules = await this.prisma.client.categoryRule.findMany({
+      where: { userId, active: true },
+    });
     const match = matchCategoryRule(rules, {
       description,
       amountCents: BigInt(Math.round(amountCents || 0)),
     });
     if (!match) return { matched: null };
 
-    const category = await this.prisma.client.category.findUnique({
-      where: { id: match.categoryId },
+    const category = await this.prisma.client.category.findFirst({
+      where: { id: match.categoryId, OR: [{ userId }, { userId: null }] },
       select: { id: true, name: true, color: true, icon: true },
     });
     return { matched: { ruleId: match.ruleId, category } };
   }
 
-  private async get(id: string) {
-    const rule = await this.prisma.client.categoryRule.findUnique({ where: { id } });
+  private async get(userId: string, id: string) {
+    const rule = await this.prisma.client.categoryRule.findFirst({ where: { id, userId } });
     if (!rule) throw new NotFoundException('Regra não encontrada');
     return rule;
   }
 
-  private async ensureCategory(id: string) {
-    const category = await this.prisma.client.category.findUnique({ where: { id } });
+  private async ensureCategory(userId: string, id: string) {
+    const category = await this.prisma.client.category.findFirst({
+      where: { id, OR: [{ userId }, { userId: null }] },
+    });
     if (!category) throw new NotFoundException('Categoria não encontrada');
   }
 }

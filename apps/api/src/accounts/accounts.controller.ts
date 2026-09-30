@@ -16,7 +16,9 @@ import {
   createAccountSchema,
   updateAccountSchema,
 } from '@cifrao/shared';
+import { CurrentUser } from '../auth/current-user.decorator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import type { AuthUser } from '../auth/jwt-verifier';
 import { ZodValidationPipe } from '../common/zod-validation.pipe';
 import { AccountsService } from './accounts.service';
 
@@ -26,43 +28,48 @@ export class AccountsController {
   constructor(private readonly service: AccountsService) {}
 
   @Get()
-  list() {
-    return this.service.list();
+  list(@CurrentUser() user: AuthUser) {
+    return this.service.list(user.id);
   }
 
   @Get(':id')
-  get(@Param('id') id: string) {
-    return this.service.get(id);
+  get(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.service.get(user.id, id);
   }
 
   @Get(':id/balance-evolution')
-  balanceEvolution(@Param('id') id: string) {
-    return this.service.balanceEvolution(id);
+  balanceEvolution(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.service.balanceEvolution(user.id, id);
   }
 
   @Post()
-  create(@Body(new ZodValidationPipe(createAccountSchema)) dto: CreateAccountInput) {
-    return this.service.create(dto);
+  create(
+    @CurrentUser() user: AuthUser,
+    @Body(new ZodValidationPipe(createAccountSchema)) dto: CreateAccountInput,
+  ) {
+    return this.service.create(user.id, dto);
   }
 
   @Patch(':id')
   update(
+    @CurrentUser() user: AuthUser,
     @Param('id') id: string,
     @Body(new ZodValidationPipe(updateAccountSchema)) dto: UpdateAccountInput,
   ) {
-    return this.service.update(id, dto);
+    return this.service.update(user.id, id, dto);
   }
 
   @Post(':id/adjust')
   adjust(
+    @CurrentUser() user: AuthUser,
     @Param('id') id: string,
     @Body(new ZodValidationPipe(adjustBalanceSchema)) dto: AdjustBalanceInput,
   ) {
-    return this.service.adjustBalance(id, dto);
+    return this.service.adjustBalance(user.id, id, dto);
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.service.remove(id);
+  remove(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.service.remove(user.id, id);
   }
 }

@@ -33,18 +33,20 @@ import { PrismaService } from '../prisma/prisma.service';
 export class ReportsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async overview(query: ReportQuery) {
+  async overview(userId: string, query: ReportQuery) {
     const period = this.resolvePeriod(query);
     const previous = previousPeriod(period);
     const granularity = pickGranularity(period);
     const accountFilter = query.accountId ? { accountId: query.accountId } : {};
 
     const baseWhere: Prisma.TransactionWhereInput = {
+      userId,
       status: { not: 'FORECAST' },
       date: { gte: period.from, lte: period.to },
       ...accountFilter,
     };
     const previousWhere: Prisma.TransactionWhereInput = {
+      userId,
       status: { not: 'FORECAST' },
       date: { gte: previous.from, lte: previous.to },
       ...accountFilter,
@@ -66,12 +68,13 @@ export class ReportsService {
       netIncomeCents(this.prisma.client, baseWhere),
       netIncomeCents(this.prisma.client, previousWhere),
       this.prisma.client.category.findMany({
+        where: { OR: [{ userId }, { userId: null }] },
         select: { id: true, name: true, color: true, icon: true },
       }),
-      this.series(period, granularity, query.accountId),
+      this.series(userId, period, granularity, query.accountId),
       this.topTransactions(baseWhere),
-      this.topMerchants(period, query.accountId),
-      this.netWorthSeries(period),
+      this.topMerchants(userId, period, query.accountId),
+      this.netWorthSeries(userId, period),
     ]);
 
     const catById = new Map(categories.map((c) => [c.id, c]));
@@ -135,6 +138,7 @@ export class ReportsService {
    * o dinheiro voltou — mesma regra do orçamento (5.13).
    */
   private async series(
+    userId: string,
     period: { from: Date; to: Date },
     granularity: Granularity,
     accountId?: string,
@@ -153,7 +157,8 @@ export class ReportsService {
                    THEN t."amountCents" ELSE 0 END) AS income,
           SUM(CASE WHEN t."type" = 'EXPENSE' THEN t."amountCents" ELSE 0 END) AS expense
         FROM "Transaction" t
-        WHERE t."status" <> 'FORECAST'
+        WHERE t."userId" = ${userId}
+          AND t."status" <> 'FORECAST'
           AND t."date" >= ${period.from} AND t."date" <= ${period.to}
           AND (${account}::text IS NULL OR t."accountId" = ${account})
         GROUP BY 1
@@ -164,7 +169,8 @@ export class ReportsService {
           SUM(r."amountCents") AS refunded
         FROM "Transaction" r
         JOIN "Transaction" o ON o."id" = r."reimbursesTransactionId"
-        WHERE o."status" <> 'FORECAST' AND o."type" = 'EXPENSE'
+        WHERE o."userId" = ${userId}
+          AND o."status" <> 'FORECAST' AND o."type" = 'EXPENSE'
           AND o."date" >= ${period.from} AND o."date" <= ${period.to}
           AND (${account}::text IS NULL OR o."accountId" = ${account})
         GROUP BY 1
@@ -221,7 +227,11 @@ export class ReportsService {
    * grossa que a do `import-logic` (derruba todo dígito), porque aqui o objetivo
    * é juntar "IFOOD *PEDIDO 123" e "IFOOD *PEDIDO 987" no mesmo estabelecimento.
    */
-  private async topMerchants(period: { from: Date; to: Date }, accountId?: string) {
+  private async topMerchants(
+    userId: string,
+    period: { from: Date; to: Date },
+    accountId?: string,
+  ) {
     const account = accountId ?? null;
     const rows = await this.prisma.client.$queryRaw<
       { chave: string; exemplo: string; total: bigint; quantidade: bigint }[]
@@ -237,7 +247,8 @@ export class ReportsService {
         SUM(t."amountCents") AS total,
         COUNT(*) AS quantidade
       FROM "Transaction" t
-      WHERE t."status" <> 'FORECAST' AND t."type" = 'EXPENSE'
+      WHERE t."userId" = ${userId}
+        AND t."status" <> 'FORECAST' AND t."type" = 'EXPENSE'
         AND t."date" >= ${period.from} AND t."date" <= ${period.to}
         AND (${account}::text IS NULL OR t."accountId" = ${account})
       GROUP BY 1
@@ -269,7 +280,7 @@ export class ReportsService {
    * carteira é a quantidade que existia então × a cotação registrada no
    * `PriceHistory` até então (Fase 8).
    */
-  private async netWorthSeries(period: { from: Date; to: Date }) {
+  private async netWorthSeries(userId: string, period: { from: Date; to: Date }) {
     const today = saoPauloDateParts(new Date());
     const startKey = monthKeyInSaoPaulo(period.from);
     const [startYear, startMonth] = startKey.split('-').map(Number);
@@ -299,10 +310,10 @@ export class ReportsService {
     });
 
     const [accounts, cardDebtNow, deltas, portfolioByMonth] = await Promise.all([
-      this.prisma.client.account.aggregate({ _sum: { balanceCents: true } }),
-      this.currentCardDebt(),
-      this.monthlyDeltas(windowStart),
-      portfolioValueByMonth(this.prisma.client, monthEnds),
+      this.prisma.client.account.aggregate({ where: { userId }, _sum: { balanceCents: true } }),
+      this.currentCardDebt(userId),
+      this.monthlyDeltas(userId, windowStart),
+      portfolioValueByMonth(this.prisma.client, userId, monthEnds),
     ]);
 
     const accountsNow = accounts._sum.balanceCents ?? 0n;
@@ -342,14 +353,14 @@ export class ReportsService {
   }
 
   /** Compras de cartão lançadas menos pagamentos de fatura, até hoje. */
-  private async currentCardDebt(): Promise<bigint> {
+  private async currentCardDebt(userId: string): Promise<bigint> {
     const [purchases, payments] = await Promise.all([
       this.prisma.client.transaction.aggregate({
-        where: { creditCardId: { not: null }, type: 'EXPENSE', status: { not: 'FORECAST' } },
+        where: { userId, creditCardId: { not: null }, type: 'EXPENSE', status: { not: 'FORECAST' } },
         _sum: { amountCents: true },
       }),
       this.prisma.client.transaction.aggregate({
-        where: { invoiceId: { not: null }, type: 'TRANSFER', status: { not: 'FORECAST' } },
+        where: { userId, invoiceId: { not: null }, type: 'TRANSFER', status: { not: 'FORECAST' } },
         _sum: { amountCents: true },
       }),
     ]);
@@ -357,7 +368,7 @@ export class ReportsService {
   }
 
   /** Movimento de cada mês, agregado no banco, para reconstruir o histórico. */
-  private async monthlyDeltas(from: Date) {
+  private async monthlyDeltas(userId: string, from: Date) {
     const rows = await this.prisma.client.$queryRaw<
       { mes: string; conta: bigint | null; investimento: bigint | null; cartao: bigint | null }[]
     >`
@@ -390,7 +401,8 @@ export class ReportsService {
       LEFT JOIN "Account" a ON a."id" = t."accountId"
       LEFT JOIN "Account" origem ON origem."id" = t."fromAccountId"
       LEFT JOIN "Account" destino ON destino."id" = t."toAccountId"
-      WHERE t."status" <> 'FORECAST' AND t."date" >= ${from}
+      WHERE t."userId" = ${userId}
+        AND t."status" <> 'FORECAST' AND t."date" >= ${from}
       GROUP BY 1
       ORDER BY 1 ASC
     `;

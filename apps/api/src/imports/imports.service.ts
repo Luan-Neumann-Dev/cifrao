@@ -32,8 +32,9 @@ export class ImportsService {
     private readonly queue: QueueService,
   ) {}
 
-  async list() {
+  async list(userId: string) {
     return this.prisma.client.importBatch.findMany({
+      where: { userId },
       orderBy: { createdAt: 'desc' },
       take: 30,
       select: {
@@ -54,9 +55,9 @@ export class ImportsService {
   }
 
   /** Estado do lote + linhas em staging (paginado: um extrato pode ser grande). */
-  async get(id: string, page = 1, pageSize = 100) {
-    const batch = await this.prisma.client.importBatch.findUnique({
-      where: { id },
+  async get(userId: string, id: string, page = 1, pageSize = 100) {
+    const batch = await this.prisma.client.importBatch.findFirst({
+      where: { id, userId },
       include: { account: { select: { id: true, name: true, color: true } } },
     });
     if (!batch) throw new NotFoundException('Importação não encontrada');
@@ -95,7 +96,7 @@ export class ImportsService {
   }
 
   /** Upload: grava o arquivo e enfileira o parse. Nada é lido no request. */
-  async create(input: CreateImportInput) {
+  async create(userId: string, input: CreateImportInput) {
     const buffer = Buffer.from(input.contentBase64, 'base64');
     if (buffer.length === 0) throw new BadRequestException('Arquivo vazio.');
 
@@ -105,10 +106,11 @@ export class ImportsService {
       throw new BadRequestException('Não reconheci o formato: envie OFX, QIF ou CSV.');
     }
 
-    if (input.accountId) await this.ensureAccount(input.accountId);
+    if (input.accountId) await this.ensureAccount(userId, input.accountId);
 
     const batch = await this.prisma.client.importBatch.create({
       data: {
+        userId,
         filename: input.filename,
         format,
         rawContent: input.contentBase64,
@@ -123,9 +125,9 @@ export class ImportsService {
   }
 
   /** Define a conta de destino (a detecção do OFX é só uma sugestão). */
-  async setAccount(id: string, input: SetImportAccountInput) {
-    const batch = await this.requireBatch(id);
-    await this.ensureAccount(input.accountId);
+  async setAccount(userId: string, id: string, input: SetImportAccountInput) {
+    const batch = await this.requireBatch(userId, id);
+    await this.ensureAccount(userId, input.accountId);
     if (batch.status === 'CONFIRMED') {
       throw new BadRequestException('Esta importação já foi confirmada.');
     }
@@ -136,12 +138,12 @@ export class ImportsService {
     });
     // Duplicata depende da conta: com a conta trocada, o staging é refeito.
     if (batch.status === 'REVIEW') await this.enqueue(IMPORT_PROCESS_QUEUE, id);
-    return this.get(id);
+    return this.get(userId, id);
   }
 
   /** Só CSV: confirma o mapeamento de colunas e reprocessa. */
-  async setMapping(id: string, mapping: CsvMapping) {
-    const batch = await this.requireBatch(id);
+  async setMapping(userId: string, id: string, mapping: CsvMapping) {
+    const batch = await this.requireBatch(userId, id);
     if (batch.format !== 'CSV') {
       throw new BadRequestException('Mapeamento de colunas só se aplica a CSV.');
     }
@@ -163,9 +165,13 @@ export class ImportsService {
   }
 
   /** Revisão transação a transação: categorizar, ignorar, reincluir duplicata. */
-  async updateRow(id: string, rowId: string, input: UpdateImportRowInput) {
-    const row = await this.prisma.client.importRow.findFirst({ where: { id: rowId, batchId: id } });
+  async updateRow(userId: string, id: string, rowId: string, input: UpdateImportRowInput) {
+    // ImportRow não tem dono próprio: o filtro vai pelo lote.
+    const row = await this.prisma.client.importRow.findFirst({
+      where: { id: rowId, batchId: id, batch: { userId } },
+    });
     if (!row) throw new NotFoundException('Linha não encontrada');
+    if (input.categoryId) await this.ensureCategory(userId, input.categoryId);
     if (row.status === 'IMPORTED') {
       throw new BadRequestException('Esta linha já virou lançamento.');
     }
@@ -186,18 +192,18 @@ export class ImportsService {
    * Categoriza as linhas ainda não importadas que casam com o padrão e, por
    * padrão, aprende a `CategoryRule` para as próximas importações.
    */
-  async applyPattern(id: string, input: ApplyPatternInput) {
-    await this.requireBatch(id);
+  async applyPattern(userId: string, id: string, input: ApplyPatternInput) {
+    await this.requireBatch(userId, id);
     const pattern = normalizeDescription(input.pattern);
     if (!pattern) throw new BadRequestException('Padrão vazio depois de normalizado.');
 
-    const category = await this.prisma.client.category.findUnique({
-      where: { id: input.categoryId },
+    const category = await this.prisma.client.category.findFirst({
+      where: { id: input.categoryId, OR: [{ userId }, { userId: null }] },
     });
     if (!category) throw new NotFoundException('Categoria não encontrada');
 
     const rows = await this.prisma.client.importRow.findMany({
-      where: { batchId: id, status: { not: 'IMPORTED' } },
+      where: { batchId: id, batch: { userId }, status: { not: 'IMPORTED' } },
       select: { id: true, description: true, amountCents: true },
     });
 
@@ -212,7 +218,7 @@ export class ImportsService {
 
     if (targets.length > 0) {
       await this.prisma.client.importRow.updateMany({
-        where: { id: { in: targets.map((r) => r.id) } },
+        where: { id: { in: targets.map((r) => r.id) }, batch: { userId } },
         data: { categoryId: input.categoryId },
       });
     }
@@ -220,8 +226,10 @@ export class ImportsService {
     let rule = null;
     if (input.createRule) {
       rule = await this.prisma.client.categoryRule.upsert({
-        where: { pattern_categoryId: { pattern, categoryId: input.categoryId } },
-        create: { pattern, categoryId: input.categoryId, minCents: min, maxCents: max },
+        where: {
+          userId_pattern_categoryId: { userId, pattern, categoryId: input.categoryId },
+        },
+        create: { userId, pattern, categoryId: input.categoryId, minCents: min, maxCents: max },
         update: { minCents: min, maxCents: max, active: true },
       });
     }
@@ -230,9 +238,9 @@ export class ImportsService {
   }
 
   /** Quantas linhas casariam com o padrão — alimenta o "N" do botão na UI. */
-  async previewPattern(id: string, pattern: string) {
+  async previewPattern(userId: string, id: string, pattern: string) {
     const rows = await this.prisma.client.importRow.findMany({
-      where: { batchId: id, status: { not: 'IMPORTED' } },
+      where: { batchId: id, batch: { userId }, status: { not: 'IMPORTED' } },
       select: { description: true },
     });
     return { count: countMatchingPattern(pattern, rows), pattern: normalizeDescription(pattern) };
@@ -244,8 +252,8 @@ export class ImportsService {
   }
 
   /** Confirmação final: aqui, e só aqui, as linhas viram lançamento. */
-  async confirm(id: string) {
-    const batch = await this.requireBatch(id);
+  async confirm(userId: string, id: string) {
+    const batch = await this.requireBatch(userId, id);
     if (batch.status === 'CONFIRMED') {
       throw new BadRequestException('Esta importação já foi confirmada.');
     }
@@ -257,7 +265,7 @@ export class ImportsService {
     }
 
     const pending = await this.prisma.client.importRow.count({
-      where: { batchId: id, status: 'PENDING' },
+      where: { batchId: id, batch: { userId }, status: 'PENDING' },
     });
     if (pending === 0) {
       throw new BadRequestException('Nenhuma linha selecionada para importar.');
@@ -272,8 +280,8 @@ export class ImportsService {
   }
 
   /** Descarta o lote inteiro. Só é possível antes da confirmação. */
-  async remove(id: string) {
-    const batch = await this.requireBatch(id);
+  async remove(userId: string, id: string) {
+    const batch = await this.requireBatch(userId, id);
     if (batch.status === 'CONFIRMED') {
       throw new BadRequestException(
         'Importação já confirmada: exclua os lançamentos criados, se quiser desfazer.',
@@ -293,14 +301,21 @@ export class ImportsService {
     }
   }
 
-  private async requireBatch(id: string) {
-    const batch = await this.prisma.client.importBatch.findUnique({ where: { id } });
+  private async requireBatch(userId: string, id: string) {
+    const batch = await this.prisma.client.importBatch.findFirst({ where: { id, userId } });
     if (!batch) throw new NotFoundException('Importação não encontrada');
     return batch;
   }
 
-  private async ensureAccount(id: string) {
-    const account = await this.prisma.client.account.findUnique({ where: { id } });
+  private async ensureAccount(userId: string, id: string) {
+    const account = await this.prisma.client.account.findFirst({ where: { id, userId } });
     if (!account) throw new NotFoundException('Conta não encontrada');
+  }
+
+  private async ensureCategory(userId: string, id: string) {
+    const found = await this.prisma.client.category.count({
+      where: { id, OR: [{ userId }, { userId: null }] },
+    });
+    if (found === 0) throw new NotFoundException('Categoria não encontrada');
   }
 }

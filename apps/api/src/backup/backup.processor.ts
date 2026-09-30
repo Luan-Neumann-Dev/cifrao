@@ -24,6 +24,30 @@ type AnyDelegate = {
   update: (args: unknown) => Promise<unknown>;
 };
 
+/** Models sem `userId` próprio: o dono vem pela relação com o pai. */
+const OWNED_BY_PARENT = new Set([
+  'transactionSplit',
+  'transactionTag',
+  'investmentTransaction',
+  'priceHistory',
+]);
+
+/** Recorte do dono no `deleteMany` do modo `replace`. */
+function ownerWhere(model: string, userId: string): Record<string, unknown> {
+  switch (model) {
+    case 'transactionSplit':
+    case 'transactionTag':
+      return { transaction: { userId } };
+    case 'investmentTransaction':
+    case 'priceHistory':
+      return { investment: { userId } };
+    default:
+      // Categoria inclusive: o `replace` só apaga as do usuário, nunca as
+      // universais (userId null), que são de todo mundo.
+      return { userId };
+  }
+}
+
 function delegate(db: Prisma.TransactionClient, model: string): AnyDelegate {
   const found = (db as unknown as Record<string, AnyDelegate>)[model];
   if (!found) throw new Error(`Delegate não encontrado: ${model}`);
@@ -74,13 +98,14 @@ export class BackupProcessor implements OnModuleInit {
     try {
       const file = backupFileSchema.parse(JSON.parse(job.content));
       const replace = job.mode === 'replace';
+      const userId = job.userId;
       const restored: Record<string, number> = {};
 
       await db.$transaction(
         async (tx) => {
           if (replace) {
             for (const model of fullWipeOrder()) {
-              await delegate(tx, model).deleteMany({});
+              await delegate(tx, model).deleteMany({ where: ownerWhere(model, userId) });
             }
           }
 
@@ -92,7 +117,14 @@ export class BackupProcessor implements OnModuleInit {
             if (!Array.isArray(raw) || raw.length === 0) continue;
 
             // Só colunas que este schema conhece, com BigInt e Date de volta.
-            let rows = raw.map((row) => reviveRow(spec.model, row));
+            // O dono é SEMPRE reescrito para quem está restaurando: é o que
+            // impede um arquivo de gravar linha no nome de outro usuário. Efeito
+            // colateral assumido: categoria universal do arquivo vira uma cópia
+            // pessoal de quem restaurou, em vez de reescrever a de todos.
+            let rows = raw.map((row) => {
+              const revived = reviveRow(spec.model, row);
+              return OWNED_BY_PARENT.has(spec.model) ? revived : { ...revived, userId };
+            });
 
             // Categoria aponta para categoria: pai precisa existir antes.
             if (spec.model === 'category') {
@@ -131,6 +163,7 @@ export class BackupProcessor implements OnModuleInit {
           if (file.profile) {
             const { name, theme, accentColor, ...notify } = file.profile;
             await tx.user.updateMany({
+              where: { id: userId },
               data: {
                 ...(name ? { name } : {}),
                 ...(theme !== undefined ? { theme } : {}),

@@ -28,10 +28,11 @@ const include = {
 export class ReceivablesService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async list() {
+  async list(userId: string) {
     const [pendingRows, receivedRows] = await Promise.all([
       this.prisma.client.transaction.findMany({
         where: {
+          userId,
           isReimbursable: true,
           reimbursedAt: null,
           type: 'EXPENSE',
@@ -41,7 +42,7 @@ export class ReceivablesService {
         include,
       }),
       this.prisma.client.transaction.findMany({
-        where: { isReimbursable: true, reimbursedAt: { not: null } },
+        where: { userId, isReimbursable: true, reimbursedAt: { not: null } },
         orderBy: { reimbursedAt: 'desc' },
         take: 30,
         include,

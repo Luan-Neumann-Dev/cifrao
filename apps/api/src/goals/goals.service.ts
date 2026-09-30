@@ -23,9 +23,9 @@ export class GoalsService {
    * `Account.balanceCents`: nunca cria lançamento, nunca soma saldo paralelo.
    * Nenhum real é contado duas vezes.
    */
-  async list(includeArchived = false) {
+  async list(userId: string, includeArchived = false) {
     const goals = await this.prisma.client.goal.findMany({
-      where: includeArchived ? {} : { archived: false },
+      where: includeArchived ? { userId } : { userId, archived: false },
       orderBy: { createdAt: 'asc' },
       include: {
         linkedAccount: { select: { id: true, name: true, type: true, color: true, balanceCents: true } },
@@ -34,7 +34,7 @@ export class GoalsService {
     if (goals.length === 0) return [];
 
     const accountIds = [...new Set(goals.map((g) => g.linkedAccountId))];
-    const paceByAccount = await this.monthlyPaceByAccount(accountIds);
+    const paceByAccount = await this.monthlyPaceByAccount(userId, accountIds);
     const today = saoPauloDateParts(new Date());
 
     return goals.map((goal) => {
@@ -68,19 +68,20 @@ export class GoalsService {
     });
   }
 
-  async get(id: string) {
-    const goal = await this.prisma.client.goal.findUnique({
-      where: { id },
+  async get(userId: string, id: string) {
+    const goal = await this.prisma.client.goal.findFirst({
+      where: { id, userId },
       include: { linkedAccount: true },
     });
     if (!goal) throw new NotFoundException('Meta não encontrada');
     return goal;
   }
 
-  async create(input: CreateGoalInput) {
-    await this.ensureAccount(input.linkedAccountId);
+  async create(userId: string, input: CreateGoalInput) {
+    await this.ensureAccount(userId, input.linkedAccountId);
     return this.prisma.client.goal.create({
       data: {
+        userId,
         name: input.name,
         targetCents: BigInt(input.targetCents),
         deadline: input.deadline ?? null,
@@ -93,9 +94,9 @@ export class GoalsService {
     });
   }
 
-  async update(id: string, input: UpdateGoalInput) {
-    await this.get(id);
-    if (input.linkedAccountId) await this.ensureAccount(input.linkedAccountId);
+  async update(userId: string, id: string, input: UpdateGoalInput) {
+    await this.get(userId, id);
+    if (input.linkedAccountId) await this.ensureAccount(userId, input.linkedAccountId);
     return this.prisma.client.goal.update({
       where: { id },
       data: {
@@ -117,8 +118,8 @@ export class GoalsService {
   }
 
   /** Excluir a meta não mexe em saldo nenhum — ela nunca foi dona do dinheiro. */
-  async remove(id: string) {
-    await this.get(id);
+  async remove(userId: string, id: string) {
+    await this.get(userId, id);
     await this.prisma.client.goal.delete({ where: { id } });
     return { ok: true };
   }
@@ -128,7 +129,10 @@ export class GoalsService {
    * meses completos. Agregado no banco (armadilha #5) com o sinal de cada tipo:
    * receitas e ajustes entram, despesas saem, transferências movem os dois lados.
    */
-  private async monthlyPaceByAccount(accountIds: string[]): Promise<Map<string, bigint>> {
+  private async monthlyPaceByAccount(
+    userId: string,
+    accountIds: string[],
+  ): Promise<Map<string, bigint>> {
     const today = saoPauloDateParts(new Date());
     const monthStart = saoPauloWallClockToUtc(today.year, today.month, 1, '00:00:00');
     const windowStartMonth = addMonths(today.year, today.month, -PACE_MONTHS);
@@ -144,17 +148,17 @@ export class GoalsService {
     const [direct, transfersOut, transfersIn] = await Promise.all([
       this.prisma.client.transaction.groupBy({
         by: ['accountId', 'type'],
-        where: { accountId: { in: accountIds }, date: range, ...realized },
+        where: { userId, accountId: { in: accountIds }, date: range, ...realized },
         _sum: { amountCents: true },
       }),
       this.prisma.client.transaction.groupBy({
         by: ['fromAccountId'],
-        where: { fromAccountId: { in: accountIds }, type: 'TRANSFER', date: range, ...realized },
+        where: { userId, fromAccountId: { in: accountIds }, type: 'TRANSFER', date: range, ...realized },
         _sum: { amountCents: true },
       }),
       this.prisma.client.transaction.groupBy({
         by: ['toAccountId'],
-        where: { toAccountId: { in: accountIds }, type: 'TRANSFER', date: range, ...realized },
+        where: { userId, toAccountId: { in: accountIds }, type: 'TRANSFER', date: range, ...realized },
         _sum: { amountCents: true },
       }),
     ]);
@@ -180,8 +184,8 @@ export class GoalsService {
     return pace;
   }
 
-  private async ensureAccount(id: string) {
-    const account = await this.prisma.client.account.findUnique({ where: { id } });
+  private async ensureAccount(userId: string, id: string) {
+    const account = await this.prisma.client.account.findFirst({ where: { id, userId } });
     if (!account) throw new NotFoundException('Conta vinculada não existe');
     return account;
   }

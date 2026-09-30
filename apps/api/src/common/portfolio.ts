@@ -11,9 +11,9 @@ type Db = PrismaClient | Prisma.TransactionClient;
  * conta (o saldo cai) e o que passa a valer é a posição. Então somar contas +
  * carteira é correto — o real está num lugar só de cada vez.
  */
-export async function currentPortfolioValueCents(db: Db): Promise<bigint> {
+export async function currentPortfolioValueCents(db: Db, userId: string): Promise<bigint> {
   const positions = await db.investment.findMany({
-    where: { archived: false },
+    where: { userId, archived: false },
     select: { quantity: true, currentPriceCents: true },
   });
   return positions.reduce(
@@ -32,6 +32,7 @@ export async function currentPortfolioValueCents(db: Db): Promise<bigint> {
  */
 export async function portfolioValueByMonth(
   db: Db,
+  userId: string,
   monthEnds: { month: string; at: Date }[],
 ): Promise<Map<string, bigint>> {
   const result = new Map<string, bigint>();
@@ -40,14 +41,19 @@ export async function portfolioValueByMonth(
   const last = monthEnds[monthEnds.length - 1].at;
 
   const [investments, trades, prices] = await Promise.all([
-    db.investment.findMany({ select: { id: true, avgPriceCents: true, currentPriceCents: true } }),
+    db.investment.findMany({
+      where: { userId },
+      select: { id: true, avgPriceCents: true, currentPriceCents: true },
+    }),
+    // InvestmentTransaction e PriceHistory não têm dono próprio: filtram pela
+    // posição, que tem.
     db.investmentTransaction.findMany({
-      where: { date: { lte: last } },
+      where: { date: { lte: last }, investment: { userId } },
       select: { investmentId: true, type: true, quantity: true, date: true },
       orderBy: { date: 'asc' },
     }),
     db.priceHistory.findMany({
-      where: { date: { lte: last } },
+      where: { date: { lte: last }, investment: { userId } },
       select: { investmentId: true, date: true, priceCents: true },
       orderBy: { date: 'asc' },
     }),

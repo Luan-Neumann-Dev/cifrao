@@ -3,6 +3,9 @@ import { describe, expect, it, vi } from 'vitest';
 import { PrismaService } from '../prisma/prisma.service';
 import { CategoriesService } from './categories.service';
 
+/** Dono fixo dos testes: todo service agora recebe o userId. */
+const USER = 'user-1';
+
 /**
  * Mesclagem de categorias (Fase 9). O que precisa estar provado aqui é a decisão
  * do dono — **tudo migra e os limites de orçamento somam** — e as duas chaves
@@ -11,7 +14,10 @@ import { CategoriesService } from './categories.service';
  */
 
 interface Fixture {
-  categories: Record<string, { id: string; name: string; parentId: string | null }>;
+  categories: Record<
+    string,
+    { id: string; name: string; parentId: string | null; userId: string | null }
+  >;
   budgets: { id: string; categoryId: string; month: string; limitCents: bigint }[];
   rules: { id: string; categoryId: string; pattern: string; appliedCount: number }[];
 }
@@ -47,7 +53,8 @@ function makePrisma(fixture: Fixture) {
 
   const client = {
     category: {
-      findUnique: vi.fn(async (args: { where: { id: string } }) => fixture.categories[args.where.id] ?? null),
+      // O serviço usa findFirst (id + dono), não findUnique só por id.
+      findFirst: vi.fn(async (args: { where: { id: string } }) => fixture.categories[args.where.id] ?? null),
     },
     $transaction: vi.fn(async (fn: (t: typeof tx) => Promise<unknown>) => fn(tx)),
   };
@@ -57,8 +64,8 @@ function makePrisma(fixture: Fixture) {
 
 const base: Fixture = {
   categories: {
-    origem: { id: 'origem', name: 'Supermercado', parentId: null },
-    destino: { id: 'destino', name: 'Mercado', parentId: null },
+    origem: { id: 'origem', name: 'Supermercado', parentId: null, userId: USER },
+    destino: { id: 'destino', name: 'Mercado', parentId: null, userId: USER },
   },
   budgets: [],
   rules: [],
@@ -67,14 +74,20 @@ const base: Fixture = {
 describe('mesclar categorias', () => {
   it('migra lançamentos, divisões, compras, recorrências e linhas de importação', async () => {
     const { service, tx } = makePrisma(base);
-    const result = await service.merge('origem', 'destino');
+    const result = await service.merge(USER, 'origem', 'destino');
 
-    for (const tabela of ['transaction', 'transactionSplit', 'purchase', 'recurringRule'] as const) {
+    // A migração é escopada no dono. `transactionSplit` não tem `userId`
+    // próprio: é filho de `Transaction`, então filtra pela relação.
+    for (const tabela of ['transaction', 'purchase', 'recurringRule'] as const) {
       expect(tx[tabela].updateMany).toHaveBeenCalledWith({
-        where: { categoryId: 'origem' },
+        where: { userId: USER, categoryId: 'origem' },
         data: { categoryId: 'destino' },
       });
     }
+    expect(tx.transactionSplit.updateMany).toHaveBeenCalledWith({
+      where: { categoryId: 'origem', transaction: { userId: USER } },
+      data: { categoryId: 'destino' },
+    });
     // A linha em revisão migra tanto a categoria escolhida quanto a sugerida.
     expect(tx.importRow.updateMany).toHaveBeenCalledTimes(2);
     expect(result.merged).toEqual({ from: 'Supermercado', into: 'Mercado' });
@@ -82,22 +95,22 @@ describe('mesclar categorias', () => {
 
   it('apaga a categoria de origem no fim', async () => {
     const { service, tx } = makePrisma(base);
-    await service.merge('origem', 'destino');
+    await service.merge(USER, 'origem', 'destino');
     expect(tx.category.delete).toHaveBeenCalledWith({ where: { id: 'origem' } });
   });
 
   it('repende a subcategoria da origem no destino em vez de deixá-la órfã', async () => {
     const { service, tx } = makePrisma(base);
-    await service.merge('origem', 'destino');
+    await service.merge(USER, 'origem', 'destino');
     expect(tx.category.updateMany).toHaveBeenCalledWith({
-      where: { parentId: 'origem' },
+      where: { userId: USER, parentId: 'origem' },
       data: { parentId: 'destino' },
     });
   });
 
   it('roda tudo numa transação — ou migra inteiro, ou nada', async () => {
     const { service, client } = makePrisma(base);
-    await service.merge('origem', 'destino');
+    await service.merge(USER, 'origem', 'destino');
     expect(client.$transaction).toHaveBeenCalledTimes(1);
   });
 
@@ -111,7 +124,7 @@ describe('mesclar categorias', () => {
         ],
       });
 
-      const result = await service.merge('origem', 'destino');
+      const result = await service.merge(USER, 'origem', 'destino');
 
       expect(tx.budget.update).toHaveBeenCalledWith({
         where: { id: 'b-destino' },
@@ -127,7 +140,7 @@ describe('mesclar categorias', () => {
         budgets: [{ id: 'b-origem', categoryId: 'origem', month: '2026-07', limitCents: 20_000n }],
       });
 
-      const result = await service.merge('origem', 'destino');
+      const result = await service.merge(USER, 'origem', 'destino');
 
       expect(tx.budget.update).toHaveBeenCalledWith({
         where: { id: 'b-origem' },
@@ -149,7 +162,7 @@ describe('mesclar categorias', () => {
         ],
       });
 
-      const result = await service.merge('origem', 'destino');
+      const result = await service.merge(USER, 'origem', 'destino');
 
       expect(tx.categoryRule.update).toHaveBeenCalledWith({
         where: { id: 'r-destino' },
@@ -165,7 +178,7 @@ describe('mesclar categorias', () => {
         rules: [{ id: 'r-origem', categoryId: 'origem', pattern: 'ZAFFARI', appliedCount: 2 }],
       });
 
-      const result = await service.merge('origem', 'destino');
+      const result = await service.merge(USER, 'origem', 'destino');
 
       expect(tx.categoryRule.update).toHaveBeenCalledWith({
         where: { id: 'r-origem' },
@@ -178,24 +191,24 @@ describe('mesclar categorias', () => {
   describe('recusas', () => {
     it('não mescla uma categoria nela mesma', async () => {
       const { service } = makePrisma(base);
-      await expect(service.merge('origem', 'origem')).rejects.toBeInstanceOf(BadRequestException);
+      await expect(service.merge(USER, 'origem', 'origem')).rejects.toBeInstanceOf(BadRequestException);
     });
 
     it('reclama de categoria inexistente em vez de apagar a errada', async () => {
       const { service } = makePrisma(base);
-      await expect(service.merge('origem', 'fantasma')).rejects.toBeInstanceOf(NotFoundException);
-      await expect(service.merge('fantasma', 'destino')).rejects.toBeInstanceOf(NotFoundException);
+      await expect(service.merge(USER, 'origem', 'fantasma')).rejects.toBeInstanceOf(NotFoundException);
+      await expect(service.merge(USER, 'fantasma', 'destino')).rejects.toBeInstanceOf(NotFoundException);
     });
 
     it('não mescla numa subcategoria da própria origem (viraria ciclo)', async () => {
       const { service } = makePrisma({
         ...base,
         categories: {
-          origem: { id: 'origem', name: 'Casa', parentId: null },
-          destino: { id: 'destino', name: 'Casa > Luz', parentId: 'origem' },
+          origem: { id: 'origem', name: 'Casa', parentId: null, userId: USER },
+          destino: { id: 'destino', name: 'Casa > Luz', parentId: 'origem', userId: USER },
         },
       });
-      await expect(service.merge('origem', 'destino')).rejects.toBeInstanceOf(BadRequestException);
+      await expect(service.merge(USER, 'origem', 'destino')).rejects.toBeInstanceOf(BadRequestException);
     });
   });
 });

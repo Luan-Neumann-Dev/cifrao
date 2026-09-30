@@ -22,8 +22,8 @@ export class BackupController {
 
   /** O que vai no arquivo, para a tela mostrar antes de baixar. */
   @Get('resumo')
-  summary() {
-    return this.service.exportSummary();
+  summary(@CurrentUser() user: AuthUser) {
+    return this.service.exportSummary(user.id);
   }
 
   /**
@@ -42,10 +42,11 @@ export class BackupController {
 
   @Get('exportar.csv')
   async exportCsv(
+    @CurrentUser() user: AuthUser,
     @Query(new ZodValidationPipe(backupCsvSchema)) query: BackupCsvQuery,
     @Res() res: Response,
   ) {
-    const { filename, content } = await this.service.exportCsv(query);
+    const { filename, content } = await this.service.exportCsv(user.id, query);
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.send(content);
@@ -53,20 +54,26 @@ export class BackupController {
 
   /** Enfileira a restauração (armadilha #3: não roda no request). */
   @Post('restaurar')
-  restore(@Body(new ZodValidationPipe(restoreBackupSchema)) dto: RestoreBackupInput) {
-    return this.service.enqueueRestore(dto);
+  restore(
+    @CurrentUser() user: AuthUser,
+    @Body(new ZodValidationPipe(restoreBackupSchema)) dto: RestoreBackupInput,
+  ) {
+    return this.service.enqueueRestore(user.id, dto);
   }
 
   @Get('restaurar/:id')
-  restoreStatus(@Param('id') id: string) {
-    return this.service.restoreStatus(id);
+  restoreStatus(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.service.restoreStatus(user.id, id);
   }
 
   // ─── Zona de risco ──────────────────────────────────────────────────────────
 
   @Post('apagar-lancamentos')
-  wipe(@Body(new ZodValidationPipe(dangerZoneSchema)) dto: DangerZoneInput) {
-    return this.service.wipeMovements(dto.confirm);
+  wipe(
+    @CurrentUser() user: AuthUser,
+    @Body(new ZodValidationPipe(dangerZoneSchema)) dto: DangerZoneInput,
+  ) {
+    return this.service.wipeMovements(user.id, dto.confirm);
   }
 
   @Delete('conta')

@@ -3,6 +3,9 @@ import type { CreateCardPurchaseInput } from '@cifrao/shared';
 import { CreditCardsService } from './credit-cards.service';
 import type { PrismaService } from '../prisma/prisma.service';
 
+/** Dono fixo dos testes: todo service agora recebe o userId. */
+const USER = 'user-1';
+
 /**
  * Testa a orquestração da compra parcelada (regra 5.4) com um Prisma falso em
  * memória — sem tocar no banco. A matemática de janelas/parcelas já é coberta
@@ -14,7 +17,9 @@ function fakePrismaForPurchase(card: { closingDay: number; dueDay: number }) {
   const invoicesByRef = new Map<string, { id: string; referenceMonth: string }>();
 
   const tx = {
-    creditCard: { findUnique: async () => ({ id: 'card1', ...card }) },
+    creditCard: { findFirst: async () => ({ id: 'card1', ...card }) },
+    category: { count: async () => 1 },
+    tag: { count: async () => 0 },
     purchase: {
       create: async ({ data }: { data: Record<string, unknown> }) => {
         const p = { id: 'pur1', ...data };
@@ -70,7 +75,7 @@ describe('regra 5.4 — parcelamento gera 1 Purchase pai e N Transaction filhas'
     const { prisma, created, purchases } = fakePrismaForPurchase({ closingDay: 28, dueDay: 5 });
     const service = new CreditCardsService(prisma);
 
-    const res = await service.createPurchase('card1', basePurchase({ installments: 6 }));
+    const res = await service.createPurchase(USER, 'card1', basePurchase({ installments: 6 }));
 
     expect(res.installments).toBe(6);
     expect(created).toHaveLength(6);
@@ -110,7 +115,7 @@ describe('regra 5.4 — parcelamento gera 1 Purchase pai e N Transaction filhas'
     const { prisma, created, purchases } = fakePrismaForPurchase({ closingDay: 28, dueDay: 5 });
     const service = new CreditCardsService(prisma);
 
-    await service.createPurchase('card1', basePurchase({ amountCents: 5000, installments: 1 }));
+    await service.createPurchase(USER, 'card1', basePurchase({ amountCents: 5000, installments: 1 }));
 
     expect(created).toHaveLength(1);
     expect(purchases).toHaveLength(0);

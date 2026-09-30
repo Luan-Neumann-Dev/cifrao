@@ -3,6 +3,9 @@ import { describe, expect, it, vi } from 'vitest';
 import { PrismaService } from '../prisma/prisma.service';
 import { InvestmentsService } from './investments.service';
 
+/** Dono fixo dos testes: todo service agora recebe o userId. */
+const USER = 'user-1';
+
 /**
  * Fase 8, risco central: o mesmo real não pode existir na conta E na carteira.
  * Aqui se prova que aportar debita a conta, que o movimento é TRANSFER (nunca
@@ -17,7 +20,7 @@ function makePrisma(investment: Record<string, unknown>) {
   const client = {
     $transaction: async (fn: (tx: unknown) => Promise<unknown>) => fn(client),
     investment: {
-      findUnique: vi.fn(async () => ({ ...state })),
+      findFirst: vi.fn(async () => ({ ...state })),
       update: vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
         Object.assign(state, data);
         return state;
@@ -39,11 +42,11 @@ function makePrisma(investment: Record<string, unknown>) {
         created.push(row);
         return row;
       }),
-      findUnique: vi.fn(async () => created[0] ?? null),
+      findFirst: vi.fn(async () => created[0] ?? null),
       delete: vi.fn(async () => ({})),
     },
     account: {
-      findUnique: vi.fn(async () => ({ id: 'acc-1', balanceCents: 1_000_000n })),
+      findFirst: vi.fn(async () => ({ id: 'acc-1', balanceCents: 1_000_000n })),
       update: vi.fn(async ({ where, data }: { where: { id: string }; data: { balanceCents: { increment: bigint } } }) => {
         balanceOps.push({ id: where.id, increment: data.balanceCents.increment });
         return {};
@@ -81,7 +84,7 @@ describe('InvestmentsService — dinheiro não é contado duas vezes', () => {
   it('aporte com conta debita exatamente o valor pago', async () => {
     const { service, balanceOps } = makePrisma(posicao);
 
-    await service.contribute('inv-1', { ...aporte, accountId: 'acc-1' });
+    await service.contribute(USER, 'inv-1', { ...aporte, accountId: 'acc-1' });
 
     // 10 × R$ 20,00 = R$ 200,00 saem da conta.
     expect(balanceOps).toEqual([{ id: 'acc-1', increment: -20_000n }]);
@@ -90,7 +93,7 @@ describe('InvestmentsService — dinheiro não é contado duas vezes', () => {
   it('o movimento é TRANSFER, nunca despesa (regra 5.7)', async () => {
     const { service, created } = makePrisma(posicao);
 
-    await service.contribute('inv-1', { ...aporte, accountId: 'acc-1' });
+    await service.contribute(USER, 'inv-1', { ...aporte, accountId: 'acc-1' });
 
     expect(created).toHaveLength(1);
     expect(created[0].type).toBe('TRANSFER');
@@ -101,14 +104,14 @@ describe('InvestmentsService — dinheiro não é contado duas vezes', () => {
 
   it('taxas entram no que sai da conta', async () => {
     const { service, balanceOps } = makePrisma(posicao);
-    await service.contribute('inv-1', { ...aporte, feesCents: 500, accountId: 'acc-1' });
+    await service.contribute(USER, 'inv-1', { ...aporte, feesCents: 500, accountId: 'acc-1' });
     expect(balanceOps[0].increment).toBe(-20_500n);
   });
 
   it('aporte sem conta não mexe em saldo nenhum', async () => {
     const { service, balanceOps, created } = makePrisma(posicao);
 
-    await service.contribute('inv-1', { ...aporte, accountId: null });
+    await service.contribute(USER, 'inv-1', { ...aporte, accountId: null });
 
     expect(balanceOps).toEqual([]);
     expect(created).toEqual([]);
@@ -116,7 +119,7 @@ describe('InvestmentsService — dinheiro não é contado duas vezes', () => {
 
   it('a posição fica com o preço médio calculado', async () => {
     const { service, state } = makePrisma(posicao);
-    await service.contribute('inv-1', { ...aporte, accountId: null });
+    await service.contribute(USER, 'inv-1', { ...aporte, accountId: null });
     expect(state.quantity).toBe(toQuantity('10'));
     expect(state.investedCents).toBe(20_000n);
     expect(state.avgPriceCents).toBe(2000n);
@@ -130,7 +133,7 @@ describe('InvestmentsService — dinheiro não é contado duas vezes', () => {
       avgPriceCents: 2000n,
     });
 
-    await service.redeem('inv-1', {
+    await service.redeem(USER, 'inv-1', {
       quantity: '4',
       priceCents: 3000,
       feesCents: 0,
@@ -152,7 +155,7 @@ describe('InvestmentsService — dinheiro não é contado duas vezes', () => {
       avgPriceCents: 2000n,
     });
 
-    await service.redeem('inv-1', {
+    await service.redeem(USER, 'inv-1', {
       quantity: '4',
       priceCents: 3000,
       feesCents: 0,
@@ -172,7 +175,7 @@ describe('InvestmentsService — dinheiro não é contado duas vezes', () => {
     });
 
     await expect(
-      service.redeem('inv-1', {
+      service.redeem(USER, 'inv-1', {
         quantity: '5',
         priceCents: 3000,
         feesCents: 0,
@@ -185,16 +188,16 @@ describe('InvestmentsService — dinheiro não é contado duas vezes', () => {
   it('recusa quantidade inválida', async () => {
     const { service } = makePrisma(posicao);
     await expect(
-      service.contribute('inv-1', { ...aporte, quantity: 'abc', accountId: null }),
+      service.contribute(USER, 'inv-1', { ...aporte, quantity: 'abc', accountId: null }),
     ).rejects.toThrow(/inválida/i);
   });
 
   it('desfazer a operação devolve o dinheiro para a conta', async () => {
     const { service, balanceOps } = makePrisma(posicao);
-    await service.contribute('inv-1', { ...aporte, accountId: 'acc-1' });
+    await service.contribute(USER, 'inv-1', { ...aporte, accountId: 'acc-1' });
     balanceOps.length = 0;
 
-    await service.removeTrade('inv-1', 'trade-1');
+    await service.removeTrade(USER, 'inv-1', 'trade-1');
 
     // O débito do aporte volta como crédito.
     expect(balanceOps).toEqual([{ id: 'acc-1', increment: 20_000n }]);

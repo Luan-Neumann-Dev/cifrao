@@ -7,9 +7,9 @@ export class InvoicesService {
   constructor(private readonly prisma: PrismaService) {}
 
   /** Detalhe da fatura: cartão, lançamentos (compras) e total/restante/status. */
-  async get(id: string) {
-    const invoice = await this.prisma.client.invoice.findUnique({
-      where: { id },
+  async get(userId: string, id: string) {
+    const invoice = await this.prisma.client.invoice.findFirst({
+      where: { id, userId },
       include: {
         creditCard: { select: { id: true, nickname: true, color: true, limitCents: true } },
       },
@@ -17,7 +17,7 @@ export class InvoicesService {
     if (!invoice) throw new NotFoundException('Fatura não encontrada');
 
     const transactions = await this.prisma.client.transaction.findMany({
-      where: { invoiceId: id },
+      where: { userId, invoiceId: id },
       orderBy: [{ date: 'asc' }, { createdAt: 'asc' }],
       include: {
         category: { select: { id: true, name: true, color: true, icon: true } },
@@ -51,19 +51,19 @@ export class InvoicesService {
    * TRANSFER (fromAccountId + invoiceId), NUNCA uma despesa — os gastos já foram
    * contados quando lançados. Suporta pagamento total e parcial (PARTIAL).
    */
-  async pay(id: string, input: PayInvoiceInput) {
+  async pay(userId: string, id: string, input: PayInvoiceInput) {
     return this.prisma.client.$transaction(async (tx) => {
-      const invoice = await tx.invoice.findUnique({
-        where: { id },
+      const invoice = await tx.invoice.findFirst({
+        where: { id, userId },
         include: { creditCard: { select: { nickname: true } } },
       });
       if (!invoice) throw new NotFoundException('Fatura não encontrada');
 
-      const account = await tx.account.findUnique({ where: { id: input.accountId } });
+      const account = await tx.account.findFirst({ where: { id: input.accountId, userId } });
       if (!account) throw new NotFoundException('Conta de pagamento não encontrada');
 
       const agg = await tx.transaction.aggregate({
-        where: { invoiceId: id, type: 'EXPENSE', status: { not: 'FORECAST' } },
+        where: { userId, invoiceId: id, type: 'EXPENSE', status: { not: 'FORECAST' } },
         _sum: { amountCents: true },
       });
       const totalCents = agg._sum.amountCents ?? 0n;
@@ -77,6 +77,7 @@ export class InvoicesService {
 
       const payment = await tx.transaction.create({
         data: {
+          userId,
           type: 'TRANSFER',
           amountCents: amount,
           date: input.date ?? new Date(),

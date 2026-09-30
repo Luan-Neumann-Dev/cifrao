@@ -46,7 +46,7 @@ export class CalendarService {
    *    vencimento, como evento de fatura — nunca como despesa, regra 5.6);
    *  - nos dias passados o saldo é reconstruído para trás com os realizados.
    */
-  async month(query: MonthQuery) {
+  async month(userId: string, query: MonthQuery) {
     const month = query.month ?? monthKeyInSaoPaulo(new Date());
     const [year, monthNumber] = month.split('-').map(Number);
     const next = addMonths(year, monthNumber, 1);
@@ -60,11 +60,11 @@ export class CalendarService {
 
     const [accounts, transactions, invoices, invoiceTotals] = await Promise.all([
       this.prisma.client.account.findMany({
-        where: { archived: false, type: { not: 'INVESTMENT' } },
+        where: { userId, archived: false, type: { not: 'INVESTMENT' } },
         select: { id: true, balanceCents: true },
       }),
       this.prisma.client.transaction.findMany({
-        where: { date: { gte: start, lt: end } },
+        where: { userId, date: { gte: start, lt: end } },
         select: {
           id: true,
           type: true,
@@ -80,12 +80,12 @@ export class CalendarService {
         orderBy: { date: 'asc' },
       }),
       this.prisma.client.invoice.findMany({
-        where: { dueDate: { gte: start, lt: end } },
+        where: { userId, dueDate: { gte: start, lt: end } },
         include: { creditCard: { select: { nickname: true } } },
       }),
       this.prisma.client.transaction.groupBy({
         by: ['invoiceId'],
-        where: { invoiceId: { not: null }, type: 'EXPENSE', status: { not: 'FORECAST' } },
+        where: { userId, invoiceId: { not: null }, type: 'EXPENSE', status: { not: 'FORECAST' } },
         _sum: { amountCents: true },
       }),
     ]);
@@ -165,7 +165,7 @@ export class CalendarService {
       // Mês inteiramente no passado: desconta do saldo de hoje tudo que foi
       // realizado depois do fim do mês e caminha para trás.
       const after = await this.liquidDeltaSum(
-        { status: { not: 'FORECAST' }, date: { gte: end } },
+        { userId, status: { not: 'FORECAST' }, date: { gte: end } },
         liquidIds,
       );
       let running = balanceTodayCents - after;
@@ -176,10 +176,10 @@ export class CalendarService {
     } else if (todayKey < firstKey) {
       // Mês inteiramente no futuro: acumula o previsto entre hoje e o 1º dia.
       const before = await this.liquidDeltaSum(
-        { status: 'FORECAST', date: { gte: startOfToday, lt: start } },
+        { userId, status: 'FORECAST', date: { gte: startOfToday, lt: start } },
         liquidIds,
       );
-      const dueBefore = await this.invoiceDueSum(startOfToday, start);
+      const dueBefore = await this.invoiceDueSum(userId, startOfToday, start);
       let running = balanceTodayCents + before - dueBefore;
       for (const key of dayKeys) {
         running += projectedByDay.get(key) ?? 0n;
@@ -281,15 +281,16 @@ export class CalendarService {
   }
 
   /** Restante das faturas que vencem em [from, to). */
-  private async invoiceDueSum(from: Date, to: Date): Promise<bigint> {
+  private async invoiceDueSum(userId: string, from: Date, to: Date): Promise<bigint> {
     const invoices = await this.prisma.client.invoice.findMany({
-      where: { dueDate: { gte: from, lt: to } },
+      where: { userId, dueDate: { gte: from, lt: to } },
       select: { id: true, paidCents: true },
     });
     if (invoices.length === 0) return 0n;
     const totals = await this.prisma.client.transaction.groupBy({
       by: ['invoiceId'],
       where: {
+        userId,
         invoiceId: { in: invoices.map((i) => i.id) },
         type: 'EXPENSE',
         status: { not: 'FORECAST' },

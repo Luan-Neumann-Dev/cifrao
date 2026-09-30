@@ -11,8 +11,11 @@ import { ReportsService } from './reports.service';
 export class ReportsExportService {
   constructor(private readonly reports: ReportsService) {}
 
-  async toCsvFile(query: ReportExportQuery): Promise<{ filename: string; content: string }> {
-    const report = await this.reports.overview(query);
+  async toCsvFile(
+    userId: string,
+    query: ReportExportQuery,
+  ): Promise<{ filename: string; content: string }> {
+    const report = await this.reports.overview(userId, query);
     const inicio = formatInSaoPaulo(report.period.from, 'yyyy-MM-dd');
     const fim = formatInSaoPaulo(report.period.to, 'yyyy-MM-dd');
 

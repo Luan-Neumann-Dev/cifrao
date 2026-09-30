@@ -6,7 +6,9 @@ import {
   reportExportSchema,
   reportQuerySchema,
 } from '@cifrao/shared';
+import { CurrentUser } from '../auth/current-user.decorator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import type { AuthUser } from '../auth/jwt-verifier';
 import { ZodValidationPipe } from '../common/zod-validation.pipe';
 import { ReportsExportService } from './reports-export.service';
 import { ReportsService } from './reports.service';
@@ -20,18 +22,22 @@ export class ReportsController {
   ) {}
 
   @Get()
-  overview(@Query(new ZodValidationPipe(reportQuerySchema)) query: ReportQuery) {
-    return this.service.overview(query);
+  overview(
+    @CurrentUser() user: AuthUser,
+    @Query(new ZodValidationPipe(reportQuerySchema)) query: ReportQuery,
+  ) {
+    return this.service.overview(user.id, query);
   }
 
   /** CSV pronto para planilha. O PDF sai pela impressão do navegador. */
   @Get('export')
   @Header('Content-Type', 'text/csv; charset=utf-8')
   async export(
+    @CurrentUser() user: AuthUser,
     @Query(new ZodValidationPipe(reportExportSchema)) query: ReportExportQuery,
     @Res() res: Response,
   ): Promise<void> {
-    const { filename, content } = await this.exporter.toCsvFile(query);
+    const { filename, content } = await this.exporter.toCsvFile(user.id, query);
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.send(content);
   }

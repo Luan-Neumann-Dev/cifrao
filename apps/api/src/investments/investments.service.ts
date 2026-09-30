@@ -30,9 +30,9 @@ export class InvestmentsService {
 
   // ─── Leitura ────────────────────────────────────────────────────────────────
 
-  async list(includeArchived = false) {
+  async list(userId: string, includeArchived = false) {
     const investments = await this.prisma.client.investment.findMany({
-      where: includeArchived ? {} : { archived: false },
+      where: includeArchived ? { userId } : { userId, archived: false },
       orderBy: [{ class: 'asc' }, { ticker: 'asc' }],
     });
 
@@ -45,9 +45,9 @@ export class InvestmentsService {
     }));
   }
 
-  async get(id: string) {
-    const investment = await this.prisma.client.investment.findUnique({
-      where: { id },
+  async get(userId: string, id: string) {
+    const investment = await this.prisma.client.investment.findFirst({
+      where: { id, userId },
       include: {
         transactions: {
           orderBy: { date: 'desc' },
@@ -68,10 +68,10 @@ export class InvestmentsService {
   }
 
   /** Painel da carteira: totais, alocação por classe e evolução patrimonial. */
-  async overview() {
+  async overview(userId: string) {
     const [investments, targets] = await Promise.all([
-      this.prisma.client.investment.findMany({ where: { archived: false } }),
-      this.prisma.client.allocationTarget.findMany(),
+      this.prisma.client.investment.findMany({ where: { userId, archived: false } }),
+      this.prisma.client.allocationTarget.findMany({ where: { userId } }),
     ]);
 
     const positions = investments.map((investment) => ({
@@ -115,12 +115,12 @@ export class InvestmentsService {
         positions.map((p) => ({ class: p.class, marketValueCents: p.marketValueCents })),
         targetMap,
       ),
-      evolution: await this.evolution(),
+      evolution: await this.evolution(userId),
     };
   }
 
   /** Valor da carteira ao fim de cada um dos últimos 12 meses. */
-  async evolution() {
+  async evolution(userId: string) {
     const today = saoPauloDateParts(new Date());
     const monthEnds: { month: string; at: Date }[] = [];
 
@@ -136,21 +136,22 @@ export class InvestmentsService {
       });
     }
 
-    const byMonth = await portfolioValueByMonth(this.prisma.client, monthEnds);
+    const byMonth = await portfolioValueByMonth(this.prisma.client, userId, monthEnds);
     return monthEnds.map(({ month }) => ({ month, marketValueCents: byMonth.get(month) ?? 0n }));
   }
 
   // ─── Escrita ────────────────────────────────────────────────────────────────
 
-  async create(input: CreateInvestmentInput) {
-    const existing = await this.prisma.client.investment.findUnique({
-      where: { ticker: input.ticker },
+  async create(userId: string, input: CreateInvestmentInput) {
+    const existing = await this.prisma.client.investment.findFirst({
+      where: { userId, ticker: input.ticker },
     });
     if (existing) throw new BadRequestException(`Já existe uma posição para ${input.ticker}.`);
 
     const price = input.currentPriceCents === undefined ? 0n : BigInt(input.currentPriceCents);
     return this.prisma.client.investment.create({
       data: {
+        userId,
         ticker: input.ticker,
         name: input.name,
         class: input.class,
@@ -161,8 +162,8 @@ export class InvestmentsService {
     });
   }
 
-  async update(id: string, input: UpdateInvestmentInput) {
-    await this.get(id);
+  async update(userId: string, id: string, input: UpdateInvestmentInput) {
+    await this.get(userId, id);
     return this.prisma.client.investment.update({
       where: { id },
       data: {
@@ -175,16 +176,16 @@ export class InvestmentsService {
   }
 
   /** Excluir a posição desfaz os lançamentos de aporte/resgate e devolve o saldo. */
-  async remove(id: string) {
+  async remove(userId: string, id: string) {
     return this.prisma.client.$transaction(async (tx) => {
-      const investment = await tx.investment.findUnique({
-        where: { id },
+      const investment = await tx.investment.findFirst({
+        where: { id, userId },
         include: { transactions: true },
       });
       if (!investment) throw new NotFoundException('Investimento não encontrado');
 
       for (const trade of investment.transactions) {
-        if (trade.transactionId) await this.revertCashMovement(tx, trade.transactionId);
+        if (trade.transactionId) await this.revertCashMovement(tx, userId, trade.transactionId);
       }
       await tx.investment.delete({ where: { id } });
       return { ok: true };
@@ -196,20 +197,25 @@ export class InvestmentsService {
    * `Transaction` do tipo TRANSFER — comprar ativo não é despesa (regra 5.7), e
    * é isso que impede o mesmo real de ser contado na conta e na carteira.
    */
-  async contribute(id: string, input: InvestmentTradeInput) {
-    return this.trade(id, input, 'BUY');
+  async contribute(userId: string, id: string, input: InvestmentTradeInput) {
+    return this.trade(userId, id, input, 'BUY');
   }
 
   /** Resgate: o dinheiro volta para a conta (quando informada). */
-  async redeem(id: string, input: InvestmentTradeInput) {
-    return this.trade(id, input, 'SELL');
+  async redeem(userId: string, id: string, input: InvestmentTradeInput) {
+    return this.trade(userId, id, input, 'SELL');
   }
 
-  private async trade(id: string, input: InvestmentTradeInput, type: 'BUY' | 'SELL') {
+  private async trade(
+    userId: string,
+    id: string,
+    input: InvestmentTradeInput,
+    type: 'BUY' | 'SELL',
+  ) {
     const quantity = this.parseQuantity(input.quantity);
 
     return this.prisma.client.$transaction(async (tx) => {
-      const investment = await tx.investment.findUnique({ where: { id } });
+      const investment = await tx.investment.findFirst({ where: { id, userId } });
       if (!investment) throw new NotFoundException('Investimento não encontrado');
 
       const position = {
@@ -227,7 +233,7 @@ export class InvestmentsService {
 
       let transactionId: string | null = null;
       if (input.accountId) {
-        transactionId = await this.createCashMovement(tx, {
+        transactionId = await this.createCashMovement(tx, userId, {
           accountId: input.accountId,
           amountCents: result.totalCents,
           date: input.date,
@@ -273,17 +279,17 @@ export class InvestmentsService {
   }
 
   /** Desfaz um aporte/resgate: reverte o saldo e volta a posição ao estado anterior. */
-  async removeTrade(id: string, tradeId: string) {
+  async removeTrade(userId: string, id: string, tradeId: string) {
     return this.prisma.client.$transaction(async (tx) => {
       const trade = await tx.investmentTransaction.findFirst({
-        where: { id: tradeId, investmentId: id },
+        where: { id: tradeId, investmentId: id, investment: { userId } },
       });
       if (!trade) throw new NotFoundException('Operação não encontrada');
 
-      const investment = await tx.investment.findUnique({ where: { id } });
+      const investment = await tx.investment.findFirst({ where: { id, userId } });
       if (!investment) throw new NotFoundException('Investimento não encontrado');
 
-      if (trade.transactionId) await this.revertCashMovement(tx, trade.transactionId);
+      if (trade.transactionId) await this.revertCashMovement(tx, userId, trade.transactionId);
       await tx.investmentTransaction.delete({ where: { id: tradeId } });
 
       // Recalcula a posição do zero a partir das operações que sobraram: é mais
@@ -322,8 +328,8 @@ export class InvestmentsService {
   }
 
   /** Cotação manual: atualiza a posição e grava o ponto no histórico. */
-  async updatePrice(id: string, input: UpdatePriceInput) {
-    await this.get(id);
+  async updatePrice(userId: string, id: string, input: UpdatePriceInput) {
+    await this.get(userId, id);
     const date = input.date ?? new Date();
     const priceCents = BigInt(input.priceCents);
 
@@ -342,19 +348,22 @@ export class InvestmentsService {
     return investment;
   }
 
-  async setTargets(input: AllocationTargetsInput) {
+  async setTargets(userId: string, input: AllocationTargetsInput) {
     const total = input.targets.reduce((acc, target) => acc + target.targetPercent, 0);
     if (total > 100) {
       throw new BadRequestException(`A soma dos alvos é ${total}% — não pode passar de 100%.`);
     }
 
     await this.prisma.client.$transaction([
-      this.prisma.client.allocationTarget.deleteMany({}),
+      // Só os alvos DESTE usuário — `deleteMany({})` limparia os de todos.
+      this.prisma.client.allocationTarget.deleteMany({ where: { userId } }),
       this.prisma.client.allocationTarget.createMany({
-        data: input.targets.filter((target) => target.targetPercent > 0),
+        data: input.targets
+          .filter((target) => target.targetPercent > 0)
+          .map((target) => ({ ...target, userId })),
       }),
     ]);
-    return this.prisma.client.allocationTarget.findMany();
+    return this.prisma.client.allocationTarget.findMany({ where: { userId } });
   }
 
   // ─── Apoio ──────────────────────────────────────────────────────────────────
@@ -376,9 +385,10 @@ export class InvestmentsService {
    */
   private async createCashMovement(
     tx: Prisma.TransactionClient,
+    userId: string,
     input: { accountId: string; amountCents: bigint; date: Date; type: 'BUY' | 'SELL'; ticker: string },
   ): Promise<string> {
-    const account = await tx.account.findUnique({ where: { id: input.accountId } });
+    const account = await tx.account.findFirst({ where: { id: input.accountId, userId } });
     if (!account) throw new NotFoundException('Conta não encontrada');
     if (input.amountCents <= 0n) {
       throw new BadRequestException('O valor da operação precisa ser positivo.');
@@ -387,6 +397,7 @@ export class InvestmentsService {
     const buying = input.type === 'BUY';
     const created = await tx.transaction.create({
       data: {
+        userId,
         type: 'TRANSFER',
         amountCents: input.amountCents,
         date: input.date,
@@ -407,8 +418,12 @@ export class InvestmentsService {
   }
 
   /** Reverte o lançamento de caixa de uma operação desfeita. */
-  private async revertCashMovement(tx: Prisma.TransactionClient, transactionId: string) {
-    const movement = await tx.transaction.findUnique({ where: { id: transactionId } });
+  private async revertCashMovement(
+    tx: Prisma.TransactionClient,
+    userId: string,
+    transactionId: string,
+  ) {
+    const movement = await tx.transaction.findFirst({ where: { id: transactionId, userId } });
     if (!movement) return;
 
     const accountId = movement.fromAccountId ?? movement.toAccountId;

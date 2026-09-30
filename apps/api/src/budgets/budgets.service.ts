@@ -26,18 +26,19 @@ export class BudgetsService {
    * diária permitida no que resta do mês. Gasto vem de `groupBy` no banco
    * (armadilha #5) e ignora transferências/ajustes/previstos (regra 5.7).
    */
-  async list(query: MonthQuery) {
+  async list(userId: string, query: MonthQuery) {
     const month = query.month ?? monthKeyInSaoPaulo(new Date());
     const { start, end } = monthRange(month);
     const [year, monthNumber] = month.split('-').map(Number);
 
     const [budgets, spend] = await Promise.all([
       this.prisma.client.budget.findMany({
-        where: { month },
+        where: { userId, month },
         include: { category: { select: { id: true, name: true, color: true, icon: true } } },
       }),
       // Gasto líquido: reembolso recebido não consome orçamento (regra 5.13).
       netExpenseByCategory(this.prisma.client, {
+        userId,
         status: { not: 'FORECAST' },
         date: { gte: start, lt: end },
       }),
@@ -75,15 +76,23 @@ export class BudgetsService {
     };
   }
 
-  async upsert(input: UpsertBudgetInput) {
-    const category = await this.prisma.client.category.findUnique({
-      where: { id: input.categoryId },
+  async upsert(userId: string, input: UpsertBudgetInput) {
+    // Orçar uma categoria universal é permitido — o limite é do usuário.
+    const category = await this.prisma.client.category.findFirst({
+      where: { id: input.categoryId, OR: [{ userId }, { userId: null }] },
     });
     if (!category) throw new NotFoundException('Categoria não encontrada');
 
     return this.prisma.client.budget.upsert({
-      where: { categoryId_month: { categoryId: input.categoryId, month: input.month } },
+      where: {
+        userId_categoryId_month: {
+          userId,
+          categoryId: input.categoryId,
+          month: input.month,
+        },
+      },
       create: {
+        userId,
         categoryId: input.categoryId,
         month: input.month,
         limitCents: BigInt(input.limitCents),
@@ -93,8 +102,8 @@ export class BudgetsService {
     });
   }
 
-  async remove(id: string) {
-    const found = await this.prisma.client.budget.findUnique({ where: { id } });
+  async remove(userId: string, id: string) {
+    const found = await this.prisma.client.budget.findFirst({ where: { id, userId } });
     if (!found) throw new NotFoundException('Orçamento não encontrado');
     await this.prisma.client.budget.delete({ where: { id } });
     return { ok: true };
@@ -104,7 +113,7 @@ export class BudgetsService {
    * Regra 5.10 — "sugerir limites": média do gasto por categoria nos últimos 3
    * meses (os 3 meses ANTERIORES ao mês de referência, que ainda está correndo).
    */
-  async suggestions(query: MonthQuery) {
+  async suggestions(userId: string, query: MonthQuery) {
     const month = query.month ?? monthKeyInSaoPaulo(new Date());
     const { start: monthStart } = monthRange(month);
     const [year, monthNumber] = month.split('-').map(Number);
@@ -119,13 +128,15 @@ export class BudgetsService {
     const [history, categories, existing] = await Promise.all([
       // Média dos 3 meses também é líquida de reembolso (5.13).
       netExpenseByCategory(this.prisma.client, {
+        userId,
         status: { not: 'FORECAST' },
         date: { gte: windowStart, lt: monthStart },
       }),
       this.prisma.client.category.findMany({
+        where: { OR: [{ userId }, { userId: null }] },
         select: { id: true, name: true, color: true, icon: true },
       }),
-      this.prisma.client.budget.findMany({ where: { month } }),
+      this.prisma.client.budget.findMany({ where: { userId, month } }),
     ]);
 
     const catById = new Map(categories.map((c) => [c.id, c]));
@@ -154,16 +165,27 @@ export class BudgetsService {
   }
 
   /** Aplica as sugestões de uma vez (todas ou só as categorias informadas). */
-  async applySuggestions(input: ApplySuggestionsInput) {
-    const { items } = await this.suggestions({ month: input.month });
+  async applySuggestions(userId: string, input: ApplySuggestionsInput) {
+    const { items } = await this.suggestions(userId, { month: input.month });
     const wanted = input.categoryIds ? new Set(input.categoryIds) : null;
     const selected = items.filter((i) => !wanted || wanted.has(i.categoryId));
 
     await this.prisma.client.$transaction(
       selected.map((i) =>
         this.prisma.client.budget.upsert({
-          where: { categoryId_month: { categoryId: i.categoryId, month: input.month } },
-          create: { categoryId: i.categoryId, month: input.month, limitCents: i.suggestedCents },
+          where: {
+            userId_categoryId_month: {
+              userId,
+              categoryId: i.categoryId,
+              month: input.month,
+            },
+          },
+          create: {
+            userId,
+            categoryId: i.categoryId,
+            month: input.month,
+            limitCents: i.suggestedCents,
+          },
           update: { limitCents: i.suggestedCents },
         }),
       ),

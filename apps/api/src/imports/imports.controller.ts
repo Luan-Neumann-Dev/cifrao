@@ -21,7 +21,9 @@ import {
   setImportAccountSchema,
   updateImportRowSchema,
 } from '@cifrao/shared';
+import { CurrentUser } from '../auth/current-user.decorator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import type { AuthUser } from '../auth/jwt-verifier';
 import { ZodValidationPipe } from '../common/zod-validation.pipe';
 import { ImportsService } from './imports.service';
 
@@ -31,66 +33,82 @@ export class ImportsController {
   constructor(private readonly service: ImportsService) {}
 
   @Get()
-  list() {
-    return this.service.list();
+  list(@CurrentUser() user: AuthUser) {
+    return this.service.list(user.id);
   }
 
   @Get(':id')
-  get(@Param('id') id: string, @Query('page') page?: string, @Query('pageSize') pageSize?: string) {
-    return this.service.get(id, Number(page) || 1, Math.min(Number(pageSize) || 100, 500));
+  get(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+  ) {
+    return this.service.get(user.id, id, Number(page) || 1, Math.min(Number(pageSize) || 100, 500));
   }
 
   /** Quantas linhas casam com um padrão (o "N" do botão de aplicar a todos). */
   @Get(':id/pattern')
-  previewPattern(@Param('id') id: string, @Query('pattern') pattern = '') {
-    return this.service.previewPattern(id, pattern);
+  previewPattern(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Query('pattern') pattern = '',
+  ) {
+    return this.service.previewPattern(user.id, id, pattern);
   }
 
   @Post()
-  create(@Body(new ZodValidationPipe(createImportSchema)) dto: CreateImportInput) {
-    return this.service.create(dto);
+  create(
+    @CurrentUser() user: AuthUser,
+    @Body(new ZodValidationPipe(createImportSchema)) dto: CreateImportInput,
+  ) {
+    return this.service.create(user.id, dto);
   }
 
   @Patch(':id/account')
   setAccount(
+    @CurrentUser() user: AuthUser,
     @Param('id') id: string,
     @Body(new ZodValidationPipe(setImportAccountSchema)) dto: SetImportAccountInput,
   ) {
-    return this.service.setAccount(id, dto);
+    return this.service.setAccount(user.id, id, dto);
   }
 
   @Patch(':id/mapping')
   setMapping(
+    @CurrentUser() user: AuthUser,
     @Param('id') id: string,
     @Body(new ZodValidationPipe(csvMappingSchema)) dto: CsvMapping,
   ) {
-    return this.service.setMapping(id, dto);
+    return this.service.setMapping(user.id, id, dto);
   }
 
   @Patch(':id/rows/:rowId')
   updateRow(
+    @CurrentUser() user: AuthUser,
     @Param('id') id: string,
     @Param('rowId') rowId: string,
     @Body(new ZodValidationPipe(updateImportRowSchema)) dto: UpdateImportRowInput,
   ) {
-    return this.service.updateRow(id, rowId, dto);
+    return this.service.updateRow(user.id, id, rowId, dto);
   }
 
   @Post(':id/apply-pattern')
   applyPattern(
+    @CurrentUser() user: AuthUser,
     @Param('id') id: string,
     @Body(new ZodValidationPipe(applyPatternSchema)) dto: ApplyPatternInput,
   ) {
-    return this.service.applyPattern(id, dto);
+    return this.service.applyPattern(user.id, id, dto);
   }
 
   @Post(':id/confirm')
-  confirm(@Param('id') id: string) {
-    return this.service.confirm(id);
+  confirm(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.service.confirm(user.id, id);
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.service.remove(id);
+  remove(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.service.remove(user.id, id);
   }
 }

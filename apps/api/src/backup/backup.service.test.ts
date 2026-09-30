@@ -11,6 +11,9 @@ import { QueueService } from '../queue/queue.service';
 import { BackupService } from './backup.service';
 import { modelFields, reviveRow } from './model-fields';
 
+/** Dono fixo dos testes: todo service agora recebe o userId. */
+const USER = 'user-1';
+
 /**
  * Zona de risco e restauração (Fase 9). O que precisa estar provado é que nada
  * destrutivo acontece sem a frase exata, que "apagar lançamentos" preserva o que
@@ -100,18 +103,18 @@ function backupFile(data: Record<string, unknown[]>) {
 describe('zona de risco — apagar lançamentos', () => {
   it('exige a frase exata', async () => {
     const { service } = makeService();
-    await expect(service.wipeMovements('apagar')).rejects.toBeInstanceOf(BadRequestException);
-    await expect(service.wipeMovements('')).rejects.toBeInstanceOf(BadRequestException);
+    await expect(service.wipeMovements(USER, 'apagar')).rejects.toBeInstanceOf(BadRequestException);
+    await expect(service.wipeMovements(USER, '')).rejects.toBeInstanceOf(BadRequestException);
   });
 
   it('aceita a frase com espaço e caixa diferente', async () => {
     const { service } = makeService();
-    await expect(service.wipeMovements(`  ${WIPE_CONFIRMATION.toLowerCase()}  `)).resolves.toBeDefined();
+    await expect(service.wipeMovements(USER, `  ${WIPE_CONFIRMATION.toLowerCase()}  `)).resolves.toBeDefined();
   });
 
   it('apaga movimento, fatura, importação e carteira', async () => {
     const { service, deleted } = makeService();
-    await service.wipeMovements(WIPE_CONFIRMATION);
+    await service.wipeMovements(USER, WIPE_CONFIRMATION);
     for (const model of MODELOS_APAGADOS) {
       expect(deleted, `${model} deveria ser apagado`).toContain(model);
     }
@@ -119,7 +122,7 @@ describe('zona de risco — apagar lançamentos', () => {
 
   it('NÃO apaga conta, cartão, categoria, tag nem a configuração', async () => {
     const { service, deleted } = makeService();
-    await service.wipeMovements(WIPE_CONFIRMATION);
+    await service.wipeMovements(USER, WIPE_CONFIRMATION);
     for (const model of ['account', 'creditCard', 'category', 'tag', 'budget', 'goal', 'recurringRule', 'categoryRule']) {
       expect(deleted, `${model} deveria sobreviver`).not.toContain(model);
     }
@@ -127,15 +130,17 @@ describe('zona de risco — apagar lançamentos', () => {
 
   it('zera o saldo das contas — saldo sem lançamento seria número sem história', async () => {
     const { service, tx } = makeService();
-    await service.wipeMovements(WIPE_CONFIRMATION);
+    await service.wipeMovements(USER, WIPE_CONFIRMATION);
     expect((tx.account as { updateMany: ReturnType<typeof vi.fn> }).updateMany).toHaveBeenCalledWith({
+      // Zera só as contas DESTE usuário.
+      where: { userId: USER },
       data: { balanceCents: 0n },
     });
   });
 
   it('apaga o filho antes do pai (FK não perdoa)', async () => {
     const { service, deleted } = makeService();
-    await service.wipeMovements(WIPE_CONFIRMATION);
+    await service.wipeMovements(USER, WIPE_CONFIRMATION);
     expect(deleted.indexOf('transactionSplit')).toBeLessThan(deleted.indexOf('transaction'));
     expect(deleted.indexOf('transaction')).toBeLessThan(deleted.indexOf('invoice'));
     expect(deleted.indexOf('importRow')).toBeLessThan(deleted.indexOf('importBatch'));
@@ -143,7 +148,7 @@ describe('zona de risco — apagar lançamentos', () => {
 
   it('roda numa transação só', async () => {
     const { service, client } = makeService();
-    await service.wipeMovements(WIPE_CONFIRMATION);
+    await service.wipeMovements(USER, WIPE_CONFIRMATION);
     expect(client.$transaction).toHaveBeenCalledTimes(1);
   });
 });
@@ -173,14 +178,14 @@ describe('enfileirar restauração', () => {
   it('recusa arquivo que não é JSON', async () => {
     const { service } = makeService();
     await expect(
-      service.enqueueRestore({ content: 'isso não é json', mode: 'replace' }),
+      service.enqueueRestore(USER, { content: 'isso não é json', mode: 'replace' }),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
   it('recusa JSON que não é backup do Cifrão', async () => {
     const { service } = makeService();
     await expect(
-      service.enqueueRestore({ content: JSON.stringify({ oi: 1 }), mode: 'replace' }),
+      service.enqueueRestore(USER, { content: JSON.stringify({ oi: 1 }), mode: 'replace' }),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
@@ -192,7 +197,7 @@ describe('enfileirar restauração', () => {
       exportedAt: 'x',
       data: { account: [{ id: 'a' }] },
     });
-    await expect(service.enqueueRestore({ content: futuro, mode: 'replace' })).rejects.toBeInstanceOf(
+    await expect(service.enqueueRestore(USER, { content: futuro, mode: 'replace' })).rejects.toBeInstanceOf(
       BadRequestException,
     );
   });
@@ -201,7 +206,7 @@ describe('enfileirar restauração', () => {
     const { service, client, queue } = makeService();
     const content = backupFile({ account: [{ id: 'a1' }], transaction: [{ id: 't1' }] });
 
-    const result = await service.enqueueRestore({ content, mode: 'replace' });
+    const result = await service.enqueueRestore(USER, { content, mode: 'replace' });
 
     expect(client.restoreJob.create).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ mode: 'replace', totalRecords: 2 }) }),
@@ -220,7 +225,10 @@ describe('enfileirar restauração', () => {
     const quebrado = new BackupService({ client } as unknown as PrismaService, queueQuebrada);
 
     await expect(
-      quebrado.enqueueRestore({ content: backupFile({ account: [{ id: 'a' }] }), mode: 'replace' }),
+      quebrado.enqueueRestore(USER, {
+        content: backupFile({ account: [{ id: 'a' }] }),
+        mode: 'replace',
+      }),
     ).rejects.toBeInstanceOf(BadRequestException);
     expect(client.restoreJob.update).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ status: 'FAILED', content: null }) }),

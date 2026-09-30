@@ -7,7 +7,9 @@ import {
   monthQuerySchema,
   upsertBudgetSchema,
 } from '@cifrao/shared';
+import { CurrentUser } from '../auth/current-user.decorator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import type { AuthUser } from '../auth/jwt-verifier';
 import { ZodValidationPipe } from '../common/zod-validation.pipe';
 import { BudgetsService } from './budgets.service';
 
@@ -17,29 +19,39 @@ export class BudgetsController {
   constructor(private readonly service: BudgetsService) {}
 
   @Get()
-  list(@Query(new ZodValidationPipe(monthQuerySchema)) query: MonthQuery) {
-    return this.service.list(query);
+  list(
+    @CurrentUser() user: AuthUser,
+    @Query(new ZodValidationPipe(monthQuerySchema)) query: MonthQuery,
+  ) {
+    return this.service.list(user.id, query);
   }
 
   @Get('suggestions')
-  suggestions(@Query(new ZodValidationPipe(monthQuerySchema)) query: MonthQuery) {
-    return this.service.suggestions(query);
+  suggestions(
+    @CurrentUser() user: AuthUser,
+    @Query(new ZodValidationPipe(monthQuerySchema)) query: MonthQuery,
+  ) {
+    return this.service.suggestions(user.id, query);
   }
 
   @Put()
-  upsert(@Body(new ZodValidationPipe(upsertBudgetSchema)) dto: UpsertBudgetInput) {
-    return this.service.upsert(dto);
+  upsert(
+    @CurrentUser() user: AuthUser,
+    @Body(new ZodValidationPipe(upsertBudgetSchema)) dto: UpsertBudgetInput,
+  ) {
+    return this.service.upsert(user.id, dto);
   }
 
   @Post('apply-suggestions')
   applySuggestions(
+    @CurrentUser() user: AuthUser,
     @Body(new ZodValidationPipe(applySuggestionsSchema)) dto: ApplySuggestionsInput,
   ) {
-    return this.service.applySuggestions(dto);
+    return this.service.applySuggestions(user.id, dto);
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.service.remove(id);
+  remove(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.service.remove(user.id, id);
   }
 }

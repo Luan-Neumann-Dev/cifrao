@@ -32,8 +32,8 @@ type TxRow = {
 export class TransactionsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async list(filter: TransactionFilter) {
-    const where: Prisma.TransactionWhereInput = {};
+  async list(userId: string, filter: TransactionFilter) {
+    const where: Prisma.TransactionWhereInput = { userId };
     if (filter.type) where.type = filter.type;
     if (filter.status) where.status = filter.status;
     if (filter.categoryId) where.categoryId = filter.categoryId;
@@ -65,16 +65,21 @@ export class TransactionsService {
     return { items, total, page: filter.page, pageSize: filter.pageSize };
   }
 
-  get(id: string) {
-    return this.findByIdOrThrow(this.prisma.client, id);
+  get(userId: string, id: string) {
+    return this.findByIdOrThrow(this.prisma.client, userId, id);
   }
 
-  async create(input: CreateTransactionInput) {
+  async create(userId: string, input: CreateTransactionInput) {
     return this.prisma.client.$transaction(async (tx) => {
-      await this.ensureAccounts(tx, input);
+      await this.ensureAccounts(tx, userId, input);
+      if (input.type !== 'TRANSFER') {
+        if (input.categoryId) await this.ensureCategory(tx, userId, input.categoryId);
+        if (input.tagIds?.length) await this.ensureTags(tx, userId, input.tagIds);
+      }
       let data: Prisma.TransactionUncheckedCreateInput;
       if (input.type === 'TRANSFER') {
         data = {
+          userId,
           type: 'TRANSFER',
           amountCents: BigInt(input.amountCents),
           date: input.date,
@@ -86,6 +91,7 @@ export class TransactionsService {
         };
       } else {
         data = {
+          userId,
           type: input.type,
           amountCents: BigInt(input.amountCents),
           date: input.date,
@@ -100,14 +106,16 @@ export class TransactionsService {
       }
       const created = await tx.transaction.create({ data });
       await this.applyBalance(tx, created, 1);
-      return this.findByIdOrThrow(tx, created.id);
+      return this.findByIdOrThrow(tx, userId, created.id);
     });
   }
 
-  async update(id: string, input: UpdateTransactionInput) {
+  async update(userId: string, id: string, input: UpdateTransactionInput) {
     return this.prisma.client.$transaction(async (tx) => {
-      const old = await tx.transaction.findUnique({ where: { id } });
+      const old = await tx.transaction.findFirst({ where: { id, userId } });
       if (!old) throw new NotFoundException('Lançamento não encontrado');
+      if (input.categoryId) await this.ensureCategory(tx, userId, input.categoryId);
+      if (input.tagIds?.length) await this.ensureTags(tx, userId, input.tagIds);
       await this.applyBalance(tx, old, -1);
 
       const data: Prisma.TransactionUncheckedUpdateInput = {};
@@ -129,13 +137,13 @@ export class TransactionsService {
       if (old.reimbursesTransactionId) {
         await this.syncReimbursedAt(tx, old.reimbursesTransactionId);
       }
-      return this.findByIdOrThrow(tx, id);
+      return this.findByIdOrThrow(tx, userId, id);
     });
   }
 
-  async remove(id: string) {
+  async remove(userId: string, id: string) {
     return this.prisma.client.$transaction(async (tx) => {
-      const old = await tx.transaction.findUnique({ where: { id } });
+      const old = await tx.transaction.findFirst({ where: { id, userId } });
       if (!old) throw new NotFoundException('Lançamento não encontrado');
       await this.deleteWithRefunds(tx, old);
       return { ok: true };
@@ -148,10 +156,10 @@ export class TransactionsService {
    * categoria do gasto (para abatê-lo nos relatórios) e nunca conta como
    * receita. Sem `amountCents`, estorna o que falta — suporta reembolso parcial.
    */
-  async reimburse(id: string, input: ReimburseInput) {
+  async reimburse(userId: string, id: string, input: ReimburseInput) {
     return this.prisma.client.$transaction(async (tx) => {
-      const original = await tx.transaction.findUnique({
-        where: { id },
+      const original = await tx.transaction.findFirst({
+        where: { id, userId },
         include: { reimbursements: { select: { amountCents: true } } },
       });
       if (!original) throw new NotFoundException('Lançamento não encontrado');
@@ -174,12 +182,13 @@ export class TransactionsService {
         throw new BadRequestException('Valor acima do que falta reembolsar.');
       }
 
-      const account = await tx.account.findUnique({ where: { id: input.accountId } });
+      const account = await tx.account.findFirst({ where: { id: input.accountId, userId } });
       if (!account) throw new NotFoundException('Conta de recebimento não encontrada');
 
       const date = input.date ?? new Date();
       const refund = await tx.transaction.create({
         data: {
+          userId,
           type: 'INCOME',
           amountCents: amount,
           date,
@@ -201,7 +210,7 @@ export class TransactionsService {
 
       return {
         refund,
-        original: await this.findByIdOrThrow(tx, id),
+        original: await this.findByIdOrThrow(tx, userId, id),
         reimbursedCents,
         remainingCents: original.amountCents - reimbursedCents,
         settled,
@@ -210,10 +219,10 @@ export class TransactionsService {
   }
 
   /** Desfaz o recebimento: apaga os estornos do gasto e devolve o saldo. */
-  async undoReimburse(id: string) {
+  async undoReimburse(userId: string, id: string) {
     return this.prisma.client.$transaction(async (tx) => {
-      const original = await tx.transaction.findUnique({
-        where: { id },
+      const original = await tx.transaction.findFirst({
+        where: { id, userId },
         include: { reimbursements: true },
       });
       if (!original) throw new NotFoundException('Lançamento não encontrado');
@@ -221,30 +230,42 @@ export class TransactionsService {
       for (const refund of original.reimbursements) {
         await this.applyBalance(tx, refund, -1);
       }
-      await tx.transaction.deleteMany({ where: { reimbursesTransactionId: id } });
+      await tx.transaction.deleteMany({ where: { userId, reimbursesTransactionId: id } });
       await tx.transaction.update({ where: { id }, data: { reimbursedAt: null } });
       return { ok: true, removed: original.reimbursements.length };
     });
   }
 
-  async bulk(input: BulkActionInput) {
+  /**
+   * Ação em lote. Os ids vêm do cliente, então **nada** aqui pode confiar neles:
+   * todo filtro carrega `userId`, senão bastaria passar o id de outra pessoa no
+   * corpo da requisição para apagar ou recategorizar o lançamento dela.
+   */
+  async bulk(userId: string, input: BulkActionInput) {
     return this.prisma.client.$transaction(async (tx) => {
       if (input.action === 'categorize') {
+        await this.ensureCategory(tx, userId, input.categoryId);
         const r = await tx.transaction.updateMany({
-          where: { id: { in: input.ids } },
+          where: { userId, id: { in: input.ids } },
           data: { categoryId: input.categoryId },
         });
         return { count: r.count };
       }
       if (input.action === 'addTag') {
+        await this.ensureTags(tx, userId, [input.tagId]);
+        // Só os ids que são de fato do usuário viram vínculo.
+        const owned = await tx.transaction.findMany({
+          where: { userId, id: { in: input.ids } },
+          select: { id: true },
+        });
         await tx.transactionTag.createMany({
-          data: input.ids.map((transactionId) => ({ transactionId, tagId: input.tagId })),
+          data: owned.map((row) => ({ transactionId: row.id, tagId: input.tagId })),
           skipDuplicates: true,
         });
-        return { count: input.ids.length };
+        return { count: owned.length };
       }
       if (input.action === 'setStatus') {
-        const rows = await tx.transaction.findMany({ where: { id: { in: input.ids } } });
+        const rows = await tx.transaction.findMany({ where: { userId, id: { in: input.ids } } });
         for (const row of rows) {
           if (row.status === input.status) continue;
           await this.applyBalance(tx, row, -1);
@@ -254,7 +275,7 @@ export class TransactionsService {
         return { count: rows.length };
       }
       // delete
-      const rows = await tx.transaction.findMany({ where: { id: { in: input.ids } } });
+      const rows = await tx.transaction.findMany({ where: { userId, id: { in: input.ids } } });
       for (const row of rows) await this.deleteWithRefunds(tx, row);
       return { count: rows.length };
     });
@@ -266,12 +287,16 @@ export class TransactionsService {
    * banco. Se ele É um estorno, o gasto de origem volta a ficar pendente.
    */
   private async deleteWithRefunds(tx: TxClient, row: Prisma.TransactionGetPayload<object>) {
-    const refunds = await tx.transaction.findMany({ where: { reimbursesTransactionId: row.id } });
+    const refunds = await tx.transaction.findMany({
+      where: { userId: row.userId, reimbursesTransactionId: row.id },
+    });
     for (const refund of refunds) {
       await this.applyBalance(tx, refund, -1);
     }
     if (refunds.length > 0) {
-      await tx.transaction.deleteMany({ where: { reimbursesTransactionId: row.id } });
+      await tx.transaction.deleteMany({
+        where: { userId: row.userId, reimbursesTransactionId: row.id },
+      });
     }
     await this.applyBalance(tx, row, -1);
     await tx.transaction.delete({ where: { id: row.id } });
@@ -310,17 +335,40 @@ export class TransactionsService {
     }
   }
 
-  private async ensureAccounts(tx: TxClient, input: CreateTransactionInput) {
+  /**
+   * As contas informadas têm que ser do usuário. Sem o `userId` aqui, daria para
+   * lançar na conta de outra pessoa passando o id dela no corpo.
+   */
+  private async ensureAccounts(tx: TxClient, userId: string, input: CreateTransactionInput) {
     const ids =
       input.type === 'TRANSFER' ? [input.fromAccountId, input.toAccountId] : [input.accountId];
-    const found = await tx.account.count({ where: { id: { in: ids } } });
+    const found = await tx.account.count({ where: { userId, id: { in: ids } } });
     if (found !== new Set(ids).size) {
       throw new NotFoundException('Conta informada não existe');
     }
   }
 
-  private async findByIdOrThrow(tx: TxClient | PrismaService['client'], id: string) {
-    const found = await tx.transaction.findUnique({ where: { id }, include: txInclude });
+  /** Categoria tem que ser própria ou universal (`userId` null). */
+  private async ensureCategory(tx: TxClient, userId: string, categoryId: string) {
+    const found = await tx.category.count({
+      where: { id: categoryId, OR: [{ userId }, { userId: null }] },
+    });
+    if (found === 0) throw new NotFoundException('Categoria informada não existe');
+  }
+
+  /** Tag é sempre pessoal: nunca aceitar a de outro usuário. */
+  private async ensureTags(tx: TxClient, userId: string, tagIds: string[]) {
+    const unique = [...new Set(tagIds)];
+    const found = await tx.tag.count({ where: { userId, id: { in: unique } } });
+    if (found !== unique.length) throw new NotFoundException('Tag informada não existe');
+  }
+
+  private async findByIdOrThrow(
+    tx: TxClient | PrismaService['client'],
+    userId: string,
+    id: string,
+  ) {
+    const found = await tx.transaction.findFirst({ where: { id, userId }, include: txInclude });
     if (!found) throw new NotFoundException('Lançamento não encontrado');
     return found;
   }
