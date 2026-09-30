@@ -56,6 +56,24 @@ model User {
   sessions   Session[]
   accounts   AuthAccount[]
   twofactors TwoFactor[]
+
+  // Dados de domínio. Cascade: excluir a conta apaga tudo que é do usuário
+  // (a "zona de risco" da Fase 9 depende disso).
+  bankAccounts      Account[]
+  categories        Category[]
+  tags              Tag[]
+  transactions      Transaction[]
+  creditCards       CreditCard[]
+  invoices          Invoice[]
+  purchases         Purchase[]
+  recurringRules    RecurringRule[]
+  importBatches     ImportBatch[]
+  categoryRules     CategoryRule[]
+  budgets           Budget[]
+  investments       Investment[]
+  allocationTargets AllocationTarget[]
+  goals             Goal[]
+  restoreJobs       RestoreJob[]
 }
 
 model Session {
@@ -142,7 +160,10 @@ enum TransactionStatus {
 }
 
 model Account {
-  id           String      @id @default(cuid())
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   name         String
   type         AccountType
   balanceCents BigInt      @default(0)
@@ -152,21 +173,31 @@ model Account {
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
 
-  transactions  Transaction[] @relation("AccountTransactions")
-  transfersFrom Transaction[] @relation("TransferFrom")
-  transfersTo   Transaction[] @relation("TransferTo")
-  defaultForCards CreditCard[] @relation("CardDefaultPayment")
+  transactions    Transaction[] @relation("AccountTransactions")
+  transfersFrom   Transaction[] @relation("TransferFrom")
+  transfersTo     Transaction[] @relation("TransferTo")
+  defaultForCards CreditCard[]  @relation("CardDefaultPayment")
 
-  recurringRules     RecurringRule[] @relation("RecurringAccount")
-  recurringFrom      RecurringRule[] @relation("RecurringFrom")
-  recurringTo        RecurringRule[] @relation("RecurringTo")
-  goals              Goal[]          @relation("GoalAccount")
-  importBatches      ImportBatch[]
-  investmentMoves    InvestmentTransaction[]
+  recurringRules  RecurringRule[]         @relation("RecurringAccount")
+  recurringFrom   RecurringRule[]         @relation("RecurringFrom")
+  recurringTo     RecurringRule[]         @relation("RecurringTo")
+  goals           Goal[]                  @relation("GoalAccount")
+  importBatches   ImportBatch[]
+  investmentMoves InvestmentTransaction[]
+
+  @@index([userId])
+  @@index([userId, archived])
 }
 
 model Category {
-  id       String       @id @default(cuid())
+  id String @id @default(cuid())
+
+  /// NULL = categoria universal, compartilhada por todos os usuários (vem do
+  /// seed e é somente-leitura). Preenchido = categoria criada pelo usuário.
+  /// Decisão do dono: não duplicar as 49 padrão por usuário.
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   name     String
   icon     String?
   color    String?
@@ -175,27 +206,37 @@ model Category {
   parent   Category?    @relation("CategoryChildren", fields: [parentId], references: [id])
   children Category[]   @relation("CategoryChildren")
 
-  transactions Transaction[]
-  splits       TransactionSplit[]
-  purchases    Purchase[]
-  budgets      Budget[]
+  transactions   Transaction[]
+  splits         TransactionSplit[]
+  purchases      Purchase[]
+  budgets        Budget[]
   recurringRules RecurringRule[]
   importRows     ImportRow[]
   categoryRules  CategoryRule[]
 
   createdAt DateTime @default(now())
+
+  @@index([userId])
 }
 
 model Tag {
-  id           String           @id @default(cuid())
-  name         String           @unique
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name         String
   color        String?
   transactions TransactionTag[]
   createdAt    DateTime         @default(now())
+
+  @@unique([userId, name])
 }
 
 model Transaction {
-  id                  String            @id @default(cuid())
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   type                TransactionType
   amountCents         BigInt
   date                DateTime
@@ -244,9 +285,9 @@ model Transaction {
 
   // Importação (Fase 6). `externalId` guarda o FITID do OFX: quando o banco
   // fornece, a duplicata é detectada por igualdade exata, sem heurística.
-  externalId String?
-  importRows ImportRow[] @relation("ImportedTransaction")
-  duplicateOf ImportRow[] @relation("DuplicateMatch")
+  externalId      String?
+  importRows      ImportRow[] @relation("ImportedTransaction")
+  duplicateOf     ImportRow[] @relation("DuplicateMatch")
   forecastMatches ImportRow[] @relation("ForecastMatch")
 
   splits TransactionSplit[]
@@ -255,12 +296,12 @@ model Transaction {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([date])
-  @@index([accountId, date])
-  @@index([categoryId, date])
+  @@index([userId, date])
+  @@index([userId, accountId, date])
+  @@index([userId, categoryId, date])
   @@index([invoiceId])
-  @@index([recurringRuleId, date])
-  @@index([status, date])
+  @@index([userId, recurringRuleId, date])
+  @@index([userId, status, date])
   @@index([reimbursesTransactionId])
   @@index([externalId])
 }
@@ -275,17 +316,20 @@ enum InvoiceStatus {
 }
 
 model CreditCard {
-  id                      String   @id @default(cuid())
-  nickname                String
-  brand                   String?
-  last4                   String?
-  limitCents              BigInt
-  closingDay              Int
-  dueDay                  Int
-  color                   String?
-  archived                Boolean  @default(false)
-  createdAt               DateTime @default(now())
-  updatedAt               DateTime @updatedAt
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  nickname   String
+  brand      String?
+  last4      String?
+  limitCents BigInt
+  closingDay Int
+  dueDay     Int
+  color      String?
+  archived   Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   defaultPaymentAccountId String?
   defaultPaymentAccount   Account? @relation("CardDefaultPayment", fields: [defaultPaymentAccountId], references: [id])
@@ -293,10 +337,15 @@ model CreditCard {
   invoices     Invoice[]
   purchases    Purchase[]
   transactions Transaction[]
+
+  @@index([userId])
 }
 
 model Invoice {
-  id             String        @id @default(cuid())
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   creditCardId   String
   creditCard     CreditCard    @relation(fields: [creditCardId], references: [id], onDelete: Cascade)
   referenceMonth String // "yyyy-MM" do vencimento (regra 5.3: fatura de agosto fecha 28/07)
@@ -311,10 +360,14 @@ model Invoice {
 
   @@unique([creditCardId, referenceMonth])
   @@index([creditCardId])
+  @@index([userId, dueDate])
 }
 
 model Purchase {
-  id               String   @id @default(cuid())
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   creditCardId     String
   creditCard       CreditCard @relation(fields: [creditCardId], references: [id], onDelete: Cascade)
   description      String
@@ -322,10 +375,12 @@ model Purchase {
   installmentTotal Int
   purchaseDate     DateTime
   categoryId       String?
-  category         Category? @relation(fields: [categoryId], references: [id])
-  createdAt        DateTime  @default(now())
+  category         Category?  @relation(fields: [categoryId], references: [id])
+  createdAt        DateTime   @default(now())
 
   transactions Transaction[]
+
+  @@index([userId])
 }
 
 model TransactionSplit {
@@ -359,7 +414,10 @@ enum RecurrenceFrequency {
 /// ou até o horizonte rolante. O previsto vira efetivado quando o usuário
 /// confirma. Nesta fase o template cobre conta (despesa/receita/transferência).
 model RecurringRule {
-  id          String              @id @default(cuid())
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   description String
   type        TransactionType
   amountCents BigInt
@@ -388,7 +446,7 @@ model RecurringRule {
 
   transactions Transaction[]
 
-  @@index([active])
+  @@index([userId, active])
 }
 
 // ─── Importação (Fase 6) ──────────────────────────────────────────────────────
@@ -424,16 +482,19 @@ enum ImportRowStatus {
 /// Regra 5.12 — staging da importação. NADA vira lançamento antes da
 /// confirmação final: até lá tudo vive aqui.
 model ImportBatch {
-  id       String       @id @default(cuid())
-  filename String
-  format   ImportFormat
-  status   ImportStatus @default(UPLOADED)
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  filename   String
+  format     ImportFormat
+  status     ImportStatus @default(UPLOADED)
   /// Conteúdo do arquivo (base64). Vai para o R2 na Fase 9.
-  rawContent String @db.Text
+  rawContent String       @db.Text
   fileSize   Int
 
-  accountId String?
-  account   Account? @relation(fields: [accountId], references: [id])
+  accountId            String?
+  account              Account? @relation(fields: [accountId], references: [id])
   /// Conta detectada no arquivo (nº do OFX), para conferência do usuário.
   detectedAccountLabel String?
 
@@ -455,7 +516,7 @@ model ImportBatch {
 
   rows ImportRow[]
 
-  @@index([status])
+  @@index([userId, status])
 }
 
 /// Uma linha do arquivo em staging, já normalizada.
@@ -508,25 +569,31 @@ model ImportRow {
 /// Regra 5.12 — padrão de descrição (+ faixa de valor opcional) → categoria.
 /// Aprendida na revisão da importação e reaplicada nas próximas.
 model CategoryRule {
-  id         String   @id @default(cuid())
-  pattern    String
-  minCents   BigInt?
-  maxCents   BigInt?
-  categoryId String
-  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  pattern      String
+  minCents     BigInt?
+  maxCents     BigInt?
+  categoryId   String
+  category     Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   /// Quantas vezes a regra já categorizou algo (ordena as mais úteis).
-  appliedCount Int     @default(0)
-  active       Boolean @default(true)
+  appliedCount Int      @default(0)
+  active       Boolean  @default(true)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  @@unique([pattern, categoryId])
-  @@index([active])
+  @@unique([userId, pattern, categoryId])
+  @@index([userId, active])
 }
 
 /// Regra 5.10: limite mensal por categoria.
 model Budget {
-  id         String   @id @default(cuid())
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   categoryId String
   category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   /// "yyyy-MM" no fuso de São Paulo.
@@ -535,8 +602,8 @@ model Budget {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  @@unique([categoryId, month])
-  @@index([month])
+  @@unique([userId, categoryId, month])
+  @@index([userId, month])
 }
 
 // ─── Investimentos (Fase 8) ───────────────────────────────────────────────────
@@ -570,8 +637,11 @@ enum InvestmentTransactionType {
 /// `investedCents` é a FONTE DA VERDADE do custo (soma exata do que foi pago);
 /// `avgPriceCents` é derivado dele a cada mudança, para leitura O(1) na tela.
 model Investment {
-  id     String          @id @default(cuid())
-  ticker String          @unique
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  ticker String
   name   String?
   class  InvestmentClass
 
@@ -594,7 +664,8 @@ model Investment {
   transactions InvestmentTransaction[]
   prices       PriceHistory[]
 
-  @@index([class])
+  @@unique([userId, ticker])
+  @@index([userId, class])
 }
 
 /// Aporte ou resgate. Quando há conta de origem/destino, o movimento de
@@ -621,8 +692,8 @@ model InvestmentTransaction {
   transactionId String?
 
   /// Preço médio e lucro realizado logo após esta operação (auditoria).
-  avgPriceAfterCents    BigInt @default(0)
-  realizedGainCents     BigInt @default(0)
+  avgPriceAfterCents BigInt @default(0)
+  realizedGainCents  BigInt @default(0)
 
   notes     String?
   createdAt DateTime @default(now())
@@ -646,15 +717,23 @@ model PriceHistory {
 
 /// Alvo de alocação por classe, para a tela mostrar o desvio.
 model AllocationTarget {
-  class         InvestmentClass @id
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  class         InvestmentClass
   targetPercent Int
   updatedAt     DateTime        @updatedAt
+
+  @@id([userId, class])
 }
 
 /// Regra 5.9: a meta é vinculada a uma conta/investimento que JÁ EXISTE. Ela não
 /// move dinheiro nem cria saldo paralelo — o progresso é lido do saldo vinculado.
 model Goal {
-  id                       String    @id @default(cuid())
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   name                     String
   targetCents              BigInt
   deadline                 DateTime?
@@ -666,6 +745,7 @@ model Goal {
   updatedAt                DateTime  @updatedAt
 
   @@index([linkedAccountId])
+  @@index([userId])
 }
 
 // ─── Backup (Fase 9) ──────────────────────────────────────────────────────────
@@ -681,7 +761,10 @@ enum RestoreStatus {
 /// enquanto o job roda e é apagado ao terminar — decisão do dono: nesta fase não
 /// existe storage, então nada de arquivo sobrevive no servidor.
 model RestoreJob {
-  id           String        @id @default(cuid())
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   status       RestoreStatus @default(PENDING)
   /// 'replace' apaga antes de gravar; 'merge' grava por cima.
   mode         String        @default("replace")
@@ -694,5 +777,5 @@ model RestoreJob {
   createdAt    DateTime      @default(now())
   finishedAt   DateTime?
 
-  @@index([createdAt])
+  @@index([userId, createdAt])
 }
