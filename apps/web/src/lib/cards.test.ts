@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { cardGradient, invoiceStateStyle, isHeavyMonth, limitBreakdown } from './cards';
+import {
+  cardGradient,
+  currentOpenInvoice,
+  invoiceStateStyle,
+  isHeavyMonth,
+  limitBreakdown,
+} from './cards';
 
 describe('degradê do cartão', () => {
   it('escurece a própria cor, sem cinza genérico', () => {
@@ -83,5 +89,24 @@ describe('mês pesado de parcelas', () => {
     expect(isHeavyMonth('100001')).toBe(true);
     expect(isHeavyMonth('100000')).toBe(false);
     expect(isHeavyMonth(0)).toBe(false);
+  });
+});
+
+describe('fatura aberta de agora', () => {
+  it('com parcelas futuras abertas, escolhe a que fecha primeiro, não a última da lista', () => {
+    // Ordem da API: mais nova primeiro.
+    const invoices = [
+      { id: 'abr', status: 'OPEN' as const, closingDate: '2027-03-28T15:00:00Z' },
+      { id: 'dez', status: 'OPEN' as const, closingDate: '2026-11-28T15:00:00Z' },
+      { id: 'nov', status: 'OPEN' as const, closingDate: '2026-10-28T15:00:00Z' },
+      { id: 'out', status: 'PAID' as const, closingDate: '2026-09-28T15:00:00Z' },
+    ];
+    expect(currentOpenInvoice(invoices)?.id).toBe('nov');
+  });
+
+  it('sem fatura aberta, não inventa', () => {
+    expect(
+      currentOpenInvoice([{ status: 'PAID' as const, closingDate: '2026-09-28' }]),
+    ).toBeUndefined();
   });
 });

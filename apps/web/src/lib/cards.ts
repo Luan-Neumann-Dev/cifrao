@@ -142,3 +142,20 @@ export const HEAVY_MONTH_CENTS = 100_000;
 export function isHeavyMonth(cents: string | number): boolean {
   return Number(cents) > HEAVY_MONTH_CENTS;
 }
+
+/**
+ * A fatura aberta "de agora": entre as abertas, a que fecha primeiro. Com
+ * parcelamento há várias abertas no futuro (uma por parcela), e a API as devolve
+ * da mais nova para a mais antiga — pegar a primeira da lista abria a tela na
+ * última parcela, meses à frente.
+ */
+export function currentOpenInvoice<T extends { status: InvoiceStatus; closingDate: string }>(
+  invoices: readonly T[],
+): T | undefined {
+  let current: T | undefined;
+  for (const inv of invoices) {
+    if (inv.status !== 'OPEN') continue;
+    if (!current || Date.parse(inv.closingDate) < Date.parse(current.closingDate)) current = inv;
+  }
+  return current;
+}

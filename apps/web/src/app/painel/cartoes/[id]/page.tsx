@@ -18,7 +18,7 @@ import {
   type Transaction,
   api,
 } from '@/lib/api';
-import { invoiceStateStyle, limitBreakdown } from '@/lib/cards';
+import { currentOpenInvoice, invoiceStateStyle, limitBreakdown } from '@/lib/cards';
 import { dayGroupLabel, dayKeyInSaoPaulo, monthLongLabel } from '@/lib/dates';
 import { brl } from '@/lib/format';
 import { cn } from '@/lib/utils';
@@ -58,7 +58,7 @@ export default function CartaoDetalhePage() {
       // Sem escolha do usuário, abre na fatura aberta — é a que ele veio ver.
       setInvoiceId((current) => {
         if (current && c.invoices.some((i) => i.id === current)) return current;
-        return (c.invoices.find((i) => i.status === 'OPEN') ?? c.invoices[0])?.id ?? null;
+        return (currentOpenInvoice(c.invoices) ?? c.invoices[0])?.id ?? null;
       });
     } catch (e) {
       toast.error((e as Error).message);
@@ -88,7 +88,7 @@ export default function CartaoDetalhePage() {
   if (loading) return <p className="text-sm text-ink-2">Carregando…</p>;
   if (!card) return <p className="text-sm text-ink-2">Cartão não encontrado.</p>;
 
-  const openInvoice = card.invoices.find((i) => i.status === 'OPEN');
+  const openInvoice = currentOpenInvoice(card.invoices);
   const limit = limitBreakdown(card.availability);
 
   return (
