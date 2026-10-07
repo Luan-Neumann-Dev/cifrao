@@ -1147,12 +1147,72 @@ e um caso "outro usuário" cada; a retrospectiva ganhou teste que exige `userId`
 no `where` de **toda** consulta. **Não houve smoke na API real com dois
 usuários** — isso é o item 1 abaixo, e agora precisa cobrir também essas rotas.
 
+### Bateria de teste cruzado A × B (07/10/2026)
+
+[`apps/api/test/cross-user.e2e.test.ts`](apps/api/test/cross-user.e2e.test.ts),
+rodando contra web + API **no ar** — fica fora do `pnpm test` e roda com
+`pnpm --filter @cifrao/api test:e2e`. Como subir o ambiente está no topo do
+arquivo: **sempre num banco descartável**, porque a zona de risco de B roda de
+verdade.
+
+A monta um conjunto completo (contas, transferência, ajuste, divisão, reembolso,
+cartão com 6x, pagamento de fatura, orçamento, meta, recorrência, regra,
+investimento com aporte e cotação, alvos, importação OFX em revisão, perfil) com
+um **marcador único** no texto. B então:
+
+- lê ~60 rotas de listagem, agregado e exportação (JSON e CSV);
+- lê por id cada registro de A (12 rotas) — tem que dar 4xx;
+- tenta ~40 escritas pelo id de A, o lote com ids de A no corpo, e as ações
+  "globais" (gerar recorrências, zerar alvos, encerrar outras sessões);
+- tenta usar conta, categoria, tag e cartão de A no próprio dado (~25 casos);
+- restaura backups forjados (5 tipos × `merge`/`replace`) e um legítimo;
+- aciona os dois níveis da zona de risco.
+
+Três redes pegam o vazamento sem saber onde ele está: **nenhuma resposta de B
+contém o marcador ou qualquer id de A**; **enquanto B está vazio, todo campo
+`*Cents` que ele vê é zero** (pega soma que mistura dinheiro sem expor texto); e
+**uma foto de 24 telas de A, tirada antes, continua idêntica** depois de cada
+rodada. Prova de que a rede pega: reintroduzir o `findUnique` sem dono no
+cronograma de compra faz a bateria reprovar com o JSON da compra de A na mão de B.
+
+**O que ela encontrou:**
+
+1. **"Excluir conta" e "apagar lançamentos" davam 500 para todo mundo** (bug da
+   Etapa 2): o `deleteMany` de `importRow` filtrava por `userId`, coluna que esse
+   model não tem — o dono vem do lote. Como a chamada é genérica por nome de
+   model, o compilador não viu. Corrigido, e o `ownerWhere` do processor (que era
+   uma cópia) passou a ser o mesmo do serviço.
+   [`owner-where.test.ts`](apps/api/src/backup/owner-where.test.ts) confere,
+   **pelo DMMF**, que o recorte de cada um dos 19 models usa campos que existem e
+   chega a um `userId`.
+2. **Backup forjado alcançava dado alheio** — o vazamento de verdade. Reescrever
+   o `userId` de cada linha não bastava: uma meta com `linkedAccountId` da conta
+   de A fazia `GET /goals` de B mostrar nome e saldo de A, e uma divisão com
+   `transactionId` de A se pendurava no lançamento dele (filho não tem `userId`).
+   E o `skipDuplicates` pulava em silêncio uma linha com o id de um registro de
+   A, deixando as referências do arquivo apontarem para o registro real.
+   **Correção:** [`restore-guard.ts`](apps/api/src/backup/restore-guard.ts) roda
+   antes de qualquer escrita, dentro da mesma transação, e recusa o arquivo
+   inteiro se algum id já for de outro dono ou se alguma referência não estiver
+   no próprio arquivo nem for de quem restaura (categoria universal vale). As
+   relações vêm do DMMF, como os tipos do `model-fields.ts`. O export legítimo
+   continua restaurando — a bateria prova isso também.
+3. `GET /imports/:id/pattern` com lote alheio devolvia `count: 0` em vez de 404.
+   Não vazava nada, mas era a única rota por id que não respondia 404.
+
+Comportamento aceito, não corrigido: `POST /budgets/apply-suggestions` com
+categoria de outro ignora a categoria em silêncio (`applied: 0`) em vez de 4xx.
+
+**Escopo da bateria — o que ela NÃO cobre:** as rotas do Better Auth no Next
+(`/api/auth/*`: sessão, 2FA, troca de senha) e as server actions do web. O
+isolamento ali é do próprio Better Auth, por sessão; a bateria só usa o cadastro
+e o token.
+
 ### O que falta — NÃO abra o registro antes disto
 
-1. **Bateria de teste cruzado (usuário A × usuário B)**, endpoint por endpoint,
-   provando que A não lê nem modifica dado de B. É ela a rede de segurança real:
-   o compilador não acusa leitura sem escopo, e a varredura de queries é
-   heurística.
+1. ~~**Bateria de teste cruzado (usuário A × usuário B)**~~ — feita (seção
+   acima). Rodar de novo a cada rota nova: é a única rede contra leitura sem
+   escopo.
 2. **Verificação de e-mail no cadastro** — sem ela, qualquer um se cadastra com o
    e-mail de outra pessoa. Depende do **Resend** (provedor já decidido, ver
    abaixo) com **domínio verificado**: o remetente de teste `onboarding@resend.dev`

@@ -239,6 +239,8 @@ export class ImportsService {
 
   /** Quantas linhas casariam com o padrão — alimenta o "N" do botão na UI. */
   async previewPattern(userId: string, id: string, pattern: string) {
+    // Lote de outro dono é 404, como em toda rota por id — não um "0" ambíguo.
+    await this.requireBatch(userId, id);
     const rows = await this.prisma.client.importRow.findMany({
       where: { batchId: id, batch: { userId }, status: { not: 'IMPORTED' } },
       select: { description: true },
