@@ -84,17 +84,18 @@ export class TransactionsController {
   }
 
   @Get(':id/splits')
-  getSplits(@Param('id') id: string) {
-    return this.splits.get(id);
+  getSplits(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.splits.get(user.id, id);
   }
 
   /** Divide o lançamento entre categorias; lista vazia desfaz a divisão. */
   @Put(':id/splits')
   setSplits(
+    @CurrentUser() user: AuthUser,
     @Param('id') id: string,
     @Body(new ZodValidationPipe(setSplitsSchema)) dto: SetSplitsInput,
   ) {
-    return this.splits.set(id, dto);
+    return this.splits.set(user.id, id, dto);
   }
 
   @Patch(':id')

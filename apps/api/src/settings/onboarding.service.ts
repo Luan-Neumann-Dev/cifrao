@@ -28,9 +28,9 @@ export class OnboardingService {
         where: { id: userId },
         select: { onboardingDoneAt: true, lastReviewSeenMonth: true },
       }),
-      this.prisma.client.account.count(),
-      this.prisma.client.creditCard.count(),
-      this.prisma.client.transaction.count(),
+      this.prisma.client.account.count({ where: { userId } }),
+      this.prisma.client.creditCard.count({ where: { userId } }),
+      this.prisma.client.transaction.count({ where: { userId } }),
     ]);
 
     const onboardingDoneAt = user?.onboardingDoneAt ?? null;

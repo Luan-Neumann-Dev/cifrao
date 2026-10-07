@@ -10,9 +10,9 @@ export class PurchasesService {
    * isto para abrir a parcela "3/6" e mostrar em que fatura cai cada uma das
    * seis — inclusive as que ainda não venceram.
    */
-  async get(id: string) {
-    const purchase = await this.prisma.client.purchase.findUnique({
-      where: { id },
+  async get(userId: string, id: string) {
+    const purchase = await this.prisma.client.purchase.findFirst({
+      where: { id, userId },
       include: {
         category: { select: { id: true, name: true, color: true, icon: true } },
         transactions: {

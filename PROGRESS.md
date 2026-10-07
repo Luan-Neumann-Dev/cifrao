@@ -1114,6 +1114,39 @@ com `x-retry-after`.
 - Banco de dev migrado: 48 categorias universais, 21 pessoais (lixo de smoke
   test), 1.205 lançamentos com dono, zero órfão.
 
+### Merge da `main` na `dev` (07/10/2026)
+
+Os 6 commits de 06/08 (seção "Pós-fases" acima) só chegaram ao GitHub em
+06/10, direto na `main`. Até ali, `main` e `dev` saíam do mesmo ponto
+(`b3b66a4`) sem se conhecer. O merge teve **um conflito só** (dashboard), mas o
+risco de verdade não aparecia como conflito: **os serviços novos de agosto
+nasceram sem dono** e compilavam perfeitamente em cima do schema com `userId`.
+
+| Serviço (rota) | O que vazava |
+|---|---|
+| `SplitsService` (`GET/PUT /transactions/:id/splits`) | lia **e reescrevia** a divisão do lançamento de qualquer um pelo id; aceitava categoria pessoal alheia |
+| `CategorySuggestionService` (`GET /categories/sugestao`) | sugeria a partir das regras e do histórico de **todos** — vazava descrição alheia indiretamente |
+| `PurchasesService` (`GET /purchases/:id`) | cronograma de parcelas de qualquer compra pelo id |
+| `MonthReviewService` (`GET /reports/revisao`) | retrospectiva somava entradas, saídas e orçamento do **banco inteiro** |
+| `OnboardingService` | contava contas do banco inteiro: o 2º usuário **nunca veria as boas-vindas** |
+| `DashboardService` (o que a main somou) | contagem de pendentes e tendência de 6 meses do banco inteiro |
+
+Mesmo padrão da Etapa 2: `@CurrentUser()` no controller, `findFirst({ id, userId })`
+no lugar de `findUnique`, categoria aceita só se for do usuário ou universal.
+
+**Migrações**: as duas de agosto têm data anterior à `isolamento_por_usuario`.
+Conferido nos dois cenários: banco limpo (a ordem de produção) aplica as 14 e
+fica idêntico ao `schema.prisma`; o banco de dev aplicou as duas pendentes por
+cima da de setembro, também sem drift. Nenhuma das duas cria model novo — só
+`Transaction.paymentMethod` e dois campos em `User` —, então nada precisou de
+`userId`.
+
+Verificado: lint, typecheck, build e `pnpm test` (**435**: shared 203, api 142,
+web 90). Os testes dos serviços novos ganharam Prisma falso que filtra por dono
+e um caso "outro usuário" cada; a retrospectiva ganhou teste que exige `userId`
+no `where` de **toda** consulta. **Não houve smoke na API real com dois
+usuários** — isso é o item 1 abaixo, e agora precisa cobrir também essas rotas.
+
 ### O que falta — NÃO abra o registro antes disto
 
 1. **Bateria de teste cruzado (usuário A × usuário B)**, endpoint por endpoint,

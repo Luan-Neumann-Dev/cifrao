@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import type { PrismaService } from '../prisma/prisma.service';
 import { OnboardingService, pendingReviewMonth } from './onboarding.service';
 
+type Scoped = { where: { userId: string } };
+
 function fakePrisma(
   user: { onboardingDoneAt: Date | null; lastReviewSeenMonth: string | null } | null,
   counts: { accounts: number; cards: number; transactions: number },
@@ -9,9 +11,12 @@ function fakePrisma(
   return {
     client: {
       user: { findUnique: async () => user, update: async () => ({}) },
-      account: { count: async () => counts.accounts },
-      creditCard: { count: async () => counts.cards },
-      transaction: { count: async () => counts.transactions },
+      // As contagens são do usuário 'u1'; qualquer outro dono não tem nada.
+      account: { count: async (a: Scoped) => (a.where.userId === 'u1' ? counts.accounts : 0) },
+      creditCard: { count: async (a: Scoped) => (a.where.userId === 'u1' ? counts.cards : 0) },
+      transaction: {
+        count: async (a: Scoped) => (a.where.userId === 'u1' ? counts.transactions : 0),
+      },
     },
   } as unknown as PrismaService;
 }
@@ -19,6 +24,18 @@ function fakePrisma(
 const SEM_NADA = { accounts: 0, cards: 0, transactions: 0 };
 
 describe('primeiros passos', () => {
+  it('usuário novo vê as boas-vindas mesmo com outro usuário já cheio de dados', async () => {
+    const service = new OnboardingService(
+      fakePrisma(
+        { onboardingDoneAt: null, lastReviewSeenMonth: null },
+        { accounts: 4, cards: 3, transactions: 5000 },
+      ),
+    );
+    const status = await service.status('u2', new Date('2026-08-15T12:00:00Z'));
+    expect(status.needsOnboarding).toBe(true);
+    expect(status.counts).toEqual({ accounts: 0, cards: 0, transactions: 0 });
+  });
+
   it('conta nova e sem nenhuma conta bancária: desvia para as boas-vindas', async () => {
     const service = new OnboardingService(
       fakePrisma({ onboardingDoneAt: null, lastReviewSeenMonth: null }, SEM_NADA),

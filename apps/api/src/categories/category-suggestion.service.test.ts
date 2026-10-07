@@ -10,13 +10,31 @@ interface Rule {
   maxCents?: bigint | null;
   active?: boolean;
   appliedCount?: number;
+  /** Dono da regra; sem informar, é o usuário do teste. */
+  userId?: string;
 }
 
-function fakePrisma(rules: Rule[], transactions: { description: string; categoryId: string }[]) {
+interface HistoryRow {
+  description: string;
+  categoryId: string;
+  userId?: string;
+}
+
+const DONO = 'u1';
+
+/** Filtra por dono como o banco faria com o `where: { userId }`. */
+function fakePrisma(rules: Rule[], transactions: HistoryRow[]) {
+  const doDono = <T extends { userId?: string }>(rows: T[], userId: string) =>
+    rows.filter((r) => (r.userId ?? DONO) === userId);
   return {
     client: {
-      categoryRule: { findMany: async () => rules },
-      transaction: { findMany: async () => transactions },
+      categoryRule: {
+        findMany: async ({ where }: { where: { userId: string } }) => doDono(rules, where.userId),
+      },
+      transaction: {
+        findMany: async ({ where }: { where: { userId: string } }) =>
+          doDono(transactions, where.userId),
+      },
     },
   } as unknown as PrismaService;
 }
@@ -30,7 +48,7 @@ describe('sugestão de categoria', () => {
       ),
     );
 
-    const s = await service.suggest({ description: 'IFOOD *4821' });
+    const s = await service.suggest(DONO, { description: 'IFOOD *4821' });
 
     expect(s?.source).toBe('rule');
     expect(s?.categoryId).toBe('delivery');
@@ -50,7 +68,7 @@ describe('sugestão de categoria', () => {
       ),
     );
 
-    const s = await service.suggest({ description: 'Mercado Extra' });
+    const s = await service.suggest(DONO, { description: 'Mercado Extra' });
 
     expect(s?.source).toBe('history');
     expect(s?.categoryId).toBe('mercado');
@@ -60,7 +78,7 @@ describe('sugestão de categoria', () => {
     const service = new CategorySuggestionService(
       fakePrisma([], [{ description: 'Posto Shell', categoryId: 'transporte' }]),
     );
-    expect(await service.suggest({ description: 'Dentista Dra. Ana' })).toBeNull();
+    expect(await service.suggest(DONO, { description: 'Dentista Dra. Ana' })).toBeNull();
   });
 
   it('regra fora da faixa de valor não casa, e cai no histórico', async () => {
@@ -79,7 +97,7 @@ describe('sugestão de categoria', () => {
       ),
     );
 
-    const s = await service.suggest({ description: 'Uber viagem', amountCents: 2240 });
+    const s = await service.suggest(DONO, { description: 'Uber viagem', amountCents: 2240 });
 
     expect(s?.source).toBe('history');
     expect(s?.categoryId).toBe('mobilidade');
@@ -89,6 +107,16 @@ describe('sugestão de categoria', () => {
     const service = new CategorySuggestionService(
       fakePrisma([{ id: 'r1', pattern: 'ifood', categoryId: 'delivery', active: false }], []),
     );
-    expect(await service.suggest({ description: 'iFood' })).toBeNull();
+    expect(await service.suggest(DONO, { description: 'iFood' })).toBeNull();
+  });
+
+  it('regra e histórico de outro usuário não sugerem nada', async () => {
+    const service = new CategorySuggestionService(
+      fakePrisma(
+        [{ id: 'r1', pattern: 'ifood', categoryId: 'delivery', active: true, userId: 'outro' }],
+        [{ description: 'iFood pedido', categoryId: 'alimentacao', userId: 'outro' }],
+      ),
+    );
+    expect(await service.suggest(DONO, { description: 'iFood pedido' })).toBeNull();
   });
 });

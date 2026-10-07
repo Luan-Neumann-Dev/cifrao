@@ -32,11 +32,11 @@ export class CategorySuggestionService {
    * usuário. Sem regra, olha o histórico: se "iFood *4821" já foi categorizado
    * cinco vezes como Delivery, a sexta provavelmente também é.
    */
-  async suggest(query: SuggestCategoryQuery): Promise<CategorySuggestion | null> {
+  async suggest(userId: string, query: SuggestCategoryQuery): Promise<CategorySuggestion | null> {
     const amountCents = BigInt(query.amountCents ?? 0);
 
     const rules = await this.prisma.client.categoryRule.findMany({
-      where: { active: true },
+      where: { userId, active: true },
       select: {
         id: true,
         pattern: true,
@@ -57,15 +57,15 @@ export class CategorySuggestionService {
       };
     }
 
-    return this.fromHistory(query.description);
+    return this.fromHistory(userId, query.description);
   }
 
   /** Categoria mais usada entre lançamentos de descrição parecida. */
-  private async fromHistory(description: string): Promise<CategorySuggestion | null> {
+  private async fromHistory(userId: string, description: string): Promise<CategorySuggestion | null> {
     if (!normalizeDescription(description)) return null;
 
     const recent = await this.prisma.client.transaction.findMany({
-      where: { categoryId: { not: null }, type: { in: ['EXPENSE', 'INCOME'] } },
+      where: { userId, categoryId: { not: null }, type: { in: ['EXPENSE', 'INCOME'] } },
       orderBy: { date: 'desc' },
       take: HISTORY_WINDOW,
       select: { description: true, categoryId: true },

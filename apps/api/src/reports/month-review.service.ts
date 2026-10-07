@@ -26,20 +26,23 @@ export class MonthReviewService {
    * Tudo agregado no banco e com as mesmas funções que os relatórios usam, para
    * o número da retrospectiva bater com o do relatório do mesmo mês.
    */
-  async build(month?: string) {
+  async build(userId: string, month?: string) {
     const target = month ?? recentMonthKeys(2, monthKeyInSaoPaulo(nowUtc()))[0];
     const { start, end } = monthBounds(target);
-    const where = { status: { not: 'FORECAST' as const }, date: { gte: start, lt: end } };
+    const where = { userId, status: { not: 'FORECAST' as const }, date: { gte: start, lt: end } };
 
     const [income, expense, budgets, categories, comparison] = await Promise.all([
       netIncomeCents(this.prisma.client, where),
       netExpenseByCategory(this.prisma.client, where),
       this.prisma.client.budget.findMany({
-        where: { month: target },
+        where: { userId, month: target },
         include: { category: { select: { id: true, name: true, color: true, icon: true } } },
       }),
-      this.prisma.client.category.findMany({ select: { id: true, name: true, color: true, icon: true } }),
-      this.comparisonAverages(target),
+      this.prisma.client.category.findMany({
+        where: { OR: [{ userId }, { userId: null }] },
+        select: { id: true, name: true, color: true, icon: true },
+      }),
+      this.comparisonAverages(userId, target),
     ]);
 
     const byId = new Map(categories.map((c) => [c.id, c]));
@@ -92,14 +95,14 @@ export class MonthReviewService {
   }
 
   /** Média dos meses anteriores, para o "R$ 700 a mais que a média". */
-  private async comparisonAverages(month: string) {
+  private async comparisonAverages(userId: string, month: string) {
     // Os `COMPARISON_MONTHS` meses ANTES do mês da retrospectiva.
     const keys = recentMonthKeys(COMPARISON_MONTHS + 1, month).slice(0, COMPARISON_MONTHS);
     if (keys.length === 0) return { months: 0, avgIncomeCents: 0n, avgExpenseCents: 0n };
 
     const first = monthBounds(keys[0]).start;
     const last = monthBounds(keys[keys.length - 1]).end;
-    const where = { status: { not: 'FORECAST' as const }, date: { gte: first, lt: last } };
+    const where = { userId, status: { not: 'FORECAST' as const }, date: { gte: first, lt: last } };
 
     const [income, expense] = await Promise.all([
       netIncomeCents(this.prisma.client, where),

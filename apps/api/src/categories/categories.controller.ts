@@ -47,8 +47,11 @@ export class CategoriesController {
 
   /** Categoria provável para o que está sendo digitado no formulário. */
   @Get('sugestao')
-  suggest(@Query(new ZodValidationPipe(suggestCategoryQuerySchema)) query: SuggestCategoryQuery) {
-    return this.suggestions.suggest(query);
+  suggest(
+    @CurrentUser() user: AuthUser,
+    @Query(new ZodValidationPipe(suggestCategoryQuerySchema)) query: SuggestCategoryQuery,
+  ) {
+    return this.suggestions.suggest(user.id, query);
   }
 
   @Post()

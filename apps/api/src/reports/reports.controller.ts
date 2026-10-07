@@ -35,8 +35,11 @@ export class ReportsController {
 
   /** Retrospectiva do mês; sem `month`, a do mês passado. */
   @Get('revisao')
-  monthReview(@Query(new ZodValidationPipe(monthQuerySchema)) query: MonthQuery) {
-    return this.review.build(query.month);
+  monthReview(
+    @CurrentUser() user: AuthUser,
+    @Query(new ZodValidationPipe(monthQuerySchema)) query: MonthQuery,
+  ) {
+    return this.review.build(user.id, query.month);
   }
 
   /** CSV pronto para planilha. O PDF sai pela impressão do navegador. */

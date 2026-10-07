@@ -6,9 +6,9 @@ import { PrismaService } from '../prisma/prisma.service';
 export class SplitsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async get(transactionId: string) {
-    const transaction = await this.prisma.client.transaction.findUnique({
-      where: { id: transactionId },
+  async get(userId: string, transactionId: string) {
+    const transaction = await this.prisma.client.transaction.findFirst({
+      where: { id: transactionId, userId },
       select: { id: true, amountCents: true },
     });
     if (!transaction) throw new NotFoundException('Lançamento não encontrado');
@@ -27,10 +27,10 @@ export class SplitsService {
    * A soma das partes tem que bater exatamente com o valor: sobrar um centavo
    * aqui é um centavo que some do relatório por categoria sem ninguém perceber.
    */
-  async set(transactionId: string, input: SetSplitsInput) {
+  async set(userId: string, transactionId: string, input: SetSplitsInput) {
     return this.prisma.client.$transaction(async (tx) => {
-      const transaction = await tx.transaction.findUnique({
-        where: { id: transactionId },
+      const transaction = await tx.transaction.findFirst({
+        where: { id: transactionId, userId },
         select: { id: true, type: true, amountCents: true },
       });
       if (!transaction) throw new NotFoundException('Lançamento não encontrado');
@@ -53,7 +53,9 @@ export class SplitsService {
         if (categorias.size !== input.splits.length) {
           throw new BadRequestException('Categoria repetida na divisão — some as duas partes.');
         }
-        const existentes = await tx.category.count({ where: { id: { in: [...categorias] } } });
+        const existentes = await tx.category.count({
+          where: { id: { in: [...categorias] }, OR: [{ userId }, { userId: null }] },
+        });
         if (existentes !== categorias.size) {
           throw new BadRequestException('Categoria não encontrada.');
         }

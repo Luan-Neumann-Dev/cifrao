@@ -7,9 +7,18 @@ import { PurchasesService } from './purchases.service';
  * fatura diferente. O cronograma é o que a tela do cartão abre ao clicar em
  * "3/6" — precisa listar as seis, na ordem, com a fatura de cada uma.
  */
+/** A compra falsa pertence sempre a este usuário. */
+const DONO = 'u1';
+
 function fakePrisma(purchase: unknown): PrismaService {
   return {
-    client: { purchase: { findUnique: async () => purchase } },
+    client: {
+      purchase: {
+        // Igual ao banco: id de outro dono não é encontrado.
+        findFirst: async ({ where }: { where: { userId: string } }) =>
+          where.userId === DONO ? purchase : null,
+      },
+    },
   } as unknown as PrismaService;
 }
 
@@ -51,7 +60,7 @@ describe('cronograma da compra parcelada (regra 5.4)', () => {
       }),
     );
 
-    const res = await service.get('p1');
+    const res = await service.get(DONO, 'p1');
 
     expect(res.installmentTotal).toBe(6);
     expect(res.installments).toHaveLength(6);
@@ -75,7 +84,7 @@ describe('cronograma da compra parcelada (regra 5.4)', () => {
       }),
     );
 
-    const res = await service.get('p1');
+    const res = await service.get(DONO, 'p1');
 
     expect(res.installments[0].invoicePaid).toBe(true);
     expect(res.installments[1].invoicePaid).toBe(false);
@@ -83,6 +92,13 @@ describe('cronograma da compra parcelada (regra 5.4)', () => {
 
   it('compra inexistente vira 404, não resposta vazia', async () => {
     const service = new PurchasesService(fakePrisma(null));
-    await expect(service.get('nao-existe')).rejects.toThrow('Compra não encontrada');
+    await expect(service.get(DONO, 'nao-existe')).rejects.toThrow('Compra não encontrada');
+  });
+
+  it('compra de outro usuário vira 404 — o cronograma não vaza', async () => {
+    const service = new PurchasesService(
+      fakePrisma({ id: 'p1', installmentTotal: 1, category: null, transactions: [parcela(1, '2026-02')] }),
+    );
+    await expect(service.get('intruso', 'p1')).rejects.toThrow('Compra não encontrada');
   });
 });
