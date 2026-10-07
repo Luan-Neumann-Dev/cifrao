@@ -38,6 +38,12 @@ function makeProcessor(file: unknown, mode: 'replace' | 'merge' = 'replace') {
         return { updateMany: vi.fn(async () => ({ count: 1 })) };
       }
       return {
+        // Trava de dono: nenhum id do arquivo é alheio (consulta com NOT vem
+        // vazia) e toda referência externa é do próprio usuário.
+        findMany: vi.fn(async (args: { where: { AND: [{ id: { in: string[] } }, object] } }) => {
+          const [ids, owner] = args.where.AND;
+          return 'NOT' in owner ? [] : ids.id.in.map((id) => ({ id }));
+        }),
         createMany: vi.fn(async (args: { data: Record<string, unknown>[] }) => {
           escritas.push({ model, ids: args.data.map((r) => String(r.id)), rows: args.data });
           return { count: args.data.length };

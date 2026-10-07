@@ -37,20 +37,23 @@ function delegate(db: PrismaClient, model: string): AnyDelegate {
 }
 
 /**
- * Recorte do dono por model. Quatro dos 17 não têm `userId` próprio — são filhos
- * e o dono vem pela relação.
+ * Recorte do dono por model. Quatro dos 17 do backup não têm `userId` próprio —
+ * são filhos e o dono vem pela relação —, e o `importRow` da zona de risco também
+ * não: o dono é o do lote. Usado também pelo `replace` da restauração.
  *
  * `scope` muda o caso da categoria, e a diferença é importante: no EXPORT as
  * universais entram, para o arquivo ficar autossuficiente e as referências dos
  * lançamentos resolverem; no DELETE elas ficam de fora, porque apagar uma
  * universal derrubaria a categoria de todos os usuários.
  */
-function ownerWhere(
+export function ownerWhere(
   model: string,
   userId: string,
   scope: 'export' | 'delete',
 ): Record<string, unknown> {
   switch (model) {
+    case 'importRow':
+      return { batch: { userId } };
     case 'transactionSplit':
     case 'transactionTag':
       return { transaction: { userId } };

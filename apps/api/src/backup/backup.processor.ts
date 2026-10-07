@@ -9,8 +9,9 @@ import {
 } from '@cifrao/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { QueueService } from '../queue/queue.service';
-import { RESTORE_QUEUE, type RestoreJobData } from './backup.service';
+import { RESTORE_QUEUE, type RestoreJobData, ownerWhere } from './backup.service';
 import { reviveRow } from './model-fields';
+import { type GuardDb, assertRestoreOwnership } from './restore-guard';
 
 /** Lotes do createMany: grande o bastante para ser rápido, pequeno para caber. */
 const CHUNK = 500;
@@ -31,22 +32,6 @@ const OWNED_BY_PARENT = new Set([
   'investmentTransaction',
   'priceHistory',
 ]);
-
-/** Recorte do dono no `deleteMany` do modo `replace`. */
-function ownerWhere(model: string, userId: string): Record<string, unknown> {
-  switch (model) {
-    case 'transactionSplit':
-    case 'transactionTag':
-      return { transaction: { userId } };
-    case 'investmentTransaction':
-    case 'priceHistory':
-      return { investment: { userId } };
-    default:
-      // Categoria inclusive: o `replace` só apaga as do usuário, nunca as
-      // universais (userId null), que são de todo mundo.
-      return { userId };
-  }
-}
 
 function delegate(db: Prisma.TransactionClient, model: string): AnyDelegate {
   const found = (db as unknown as Record<string, AnyDelegate>)[model];
@@ -103,9 +88,13 @@ export class BackupProcessor implements OnModuleInit {
 
       await db.$transaction(
         async (tx) => {
+          // Antes de qualquer escrita: o arquivo não pode alcançar dado de outro
+          // usuário, nem por id repetido nem por referência (restore-guard.ts).
+          await assertRestoreOwnership(tx as unknown as GuardDb, file, userId);
+
           if (replace) {
             for (const model of fullWipeOrder()) {
-              await delegate(tx, model).deleteMany({ where: ownerWhere(model, userId) });
+              await delegate(tx, model).deleteMany({ where: ownerWhere(model, userId, 'delete') });
             }
           }
 
