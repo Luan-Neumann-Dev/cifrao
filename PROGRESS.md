@@ -628,6 +628,273 @@ Antes de começar, o dono perguntou sobre trocar o Postgres pelo **Turso** e se 
 
 ---
 
+## Pós-fases — revisão tela a tela contra o design
+
+Depois das 10 fases, o dono passou a revisar o app **uma tela por vez** contra os
+protótipos em [design/](design/). Não é fase nova: é acerto de fidelidade e de
+uso, com o mesmo rito (teste para o que é regra, commit pequeno, parar).
+
+### Navegação — sidebar lateral
+
+As 14 seções viviam numa régua horizontal que só cabia rolando, escondendo
+metade do app. Viraram [app-shell.tsx](apps/web/src/components/app-shell.tsx):
+sidebar fixa de 264px a partir de `lg`, gaveta com overlay abaixo disso (fecha no
+Escape, na navegação e trava a rolagem do fundo), agrupada em Dia a dia / Onde
+está o dinheiro / Planejamento / Dados, com Configurações e Sair no rodapé.
+`isActiveNavLink` ([nav.ts](apps/web/src/lib/nav.ts)) está testado porque
+`/painel` casaria com todas as rotas filhas por prefixo.
+
+### Transferência que não saía — e o erro que mentia
+
+Bug relatado: "avisa data inválida". Não era a data. Em
+[transaction-dialog.tsx](apps/web/src/app/painel/lancamentos/transaction-dialog.tsx)
+o destino era inicializado com `accounts[1]`; com uma conta só, o estado nascia
+vazio enquanto o `<select>` **exibia** a primeira conta — ia `toAccountId: ""` no
+POST. E o cliente jogava fora as `issues` do Zod, então todo 400 virava "Dados
+inválidos", sem dizer o campo.
+
+Duas correções: os selects passaram a ter placeholder explícito e `required` (o
+destino não oferece a conta de origem, que o schema recusa de qualquer jeito), e
+[api-error.ts](apps/web/src/lib/api-error.ts) traduz as issues para
+`"Conta de destino: obrigatório"`. **Lição que vale para o resto do app: select
+controlado sem `<option value="">` mente para o usuário** — mostra a primeira
+opção e envia vazio.
+
+### Tela de Contas — fiel ao [design/Cifrao Contas.dc.html](design/Cifrao%20Contas.dc.html)
+
+O protótipo tem **três estados** e existia só um (grade de dois cards com botões
+de editar/ajustar em cima). Agora:
+
+- **Lista** ([contas/page.tsx](apps/web/src/app/painel/contas/page.tsx)) — título
+  em Manrope, pílula "Transferir", cartão de patrimônio em degradê com o valor
+  quebrado em três tamanhos, linhas de conta em coluna única (quadrado colorido
+  com a inicial, tipo com marcador, saldo e chevron) e "Nova conta" tracejado.
+- **Detalhe** ([contas/[id]/page.tsx](apps/web/src/app/painel/contas/%5Bid%5D/page.tsx))
+  — cabeçalho com marca e ações, saldo grande, variação do período e o gráfico de
+  6 meses que finalmente consome o `GET /accounts/:id/balance-evolution` escrito
+  na Fase 2 e nunca usado; abaixo, o extrato agrupado por dia com chips de
+  período, tipo, categoria e busca.
+- **Transferência** ([contas/transferir/page.tsx](apps/web/src/app/painel/contas/transferir/page.tsx))
+  — cartão de valor, De/Para com o botão de trocar entre eles e o aviso da regra
+  5.7. Os cartões De/Para são o visual do design com um `<select>` nativo
+  invisível por cima: no celular abre o seletor do sistema.
+
+Decisões deste acerto:
+
+1. **Degradê e sombras saem de `var(--primary)` por `color-mix`**, não do
+   `#820AD1` fixo do protótipo — senão a cor de acento da Fase 9 deixava de
+   valer justo na tela mais colorida.
+2. **A tela de transferência ganhou Data e Descrição**, que o design não previu:
+   `createTransferSchema` exige as duas. Ficaram num cartão discreto, com hoje e
+   "Transferência" já preenchidos.
+3. **`DialogContent` ganhou `sheet` e `hideClose`** (opcionais, ninguém mais
+   mudou): o modal de ajuste de saldo é bottom sheet no celular, como no design.
+4. **Rótulo de dia e de mês são escritos à mão**
+   ([dates.ts](apps/web/src/lib/dates.ts)) porque `formatInSaoPaulo` não recebe
+   locale — sairia "Fri" em vez de "Sex". O filtro de período converte horário de
+   parede de São Paulo para UTC, com teste: pedir "junho" tem que trazer o
+   lançamento do dia 30 às 22h, que em UTC já é 1º de julho (é a armadilha #4).
+5. **O extrato usa `accountDeltaCents` do `shared`**, o mesmo que o serviço usa
+   para manter saldo — assim transferência aparece com o sinal certo dos dois
+   lados, sem regra duplicada no front.
+
+Testes do acerto: `accounts.test.ts` (marca da conta, cor do saldo, prévia do
+ajuste da regra 5.8), `dates.test.ts` (fuso do período, rótulos) e
+`api-error.test.ts` — o web foi de 14 para **43 testes**.
+
+### Tela de Cartões — fiel ao [design/Cifrao Cartoes.dc.html](design/Cifrao%20Cartoes.dc.html)
+
+O protótipo tem lista, detalhe com duas abas, formulário em tela cheia e o modal
+de pagamento. Existia uma grade de cards de texto e um detalhe com faturas em
+acordeão. Agora:
+
+- **Lista** ([cartoes/page.tsx](apps/web/src/app/painel/cartoes/page.tsx)) — o
+  "plástico" em degradê da cor do cartão, empilhado, com fatura atual e limite
+  disponível no rodapé de cada um; o cabeçalho soma a fatura aberta de todos.
+- **Detalhe** ([cartoes/[id]/page.tsx](apps/web/src/app/painel/cartoes/%5Bid%5D/page.tsx))
+  — plástico + cartão de limite lado a lado, com a **barra empilhada da regra
+  5.5** (fatura aberta sólida, parcelas futuras hachuradas, o resto é o
+  disponível de verdade). Abas Fatura / Parcelas futuras; régua de faturas com
+  setas; cabeçalho da fatura com estado, valor, fechamento, vencimento e o botão
+  de pagar; extrato por dia onde a parcela **abre o cronograma inteiro**.
+- **Formulário** ([cartoes/card-form.tsx](apps/web/src/app/painel/cartoes/card-form.tsx))
+  — tela cheia (`/novo` e `/[id]/editar`), com prévia ao vivo do plástico,
+  steppers de dia e o exemplo dinâmico de fechamento.
+- **Pagar fatura** ([pay-dialog.tsx](apps/web/src/app/painel/cartoes/%5Bid%5D/pay-dialog.tsx))
+  — sheet no celular, com o aviso da regra 5.6 ("é transferência, não despesa"),
+  escolha da conta e Total/Parcial.
+
+Decisões deste acerto:
+
+1. **Endpoint novo: `GET /purchases/:id`**
+   ([purchases.service.ts](apps/api/src/credit-cards/purchases.service.ts)). O
+   design mostra a parcela "3/6" abrindo as seis, com a fatura de cada uma e a
+   marca "esta fatura". Isso não dava para derivar no front: a partir de uma
+   parcela não se recupera o total sem ambiguidade de centavos, porque
+   `splitInstallments` distribui o resto. Testado com Prisma falso (3 testes).
+2. **A barra do limite tem um terceiro pedaço que o design não previu**: fatura
+   fechada e ainda não quitada. Só aparece quando é maior que zero — esconder
+   isso seria esconder dívida.
+3. **"Nova compra" ficou ao lado das abas.** O protótipo não tem esse botão em
+   lugar nenhum do detalhe, mas é daqui que se lança compra no cartão.
+4. **`···· 3921` usa a monoespaçada do sistema.** O design pede JetBrains Mono;
+   a Seção 4 fixa Inter e Manrope, e fonte nova é dependência nova (Seção 2).
+5. **O stepper de dia dá a volta em 28**, não em 31: dia 29 a 31 não existe em
+   todo mês e a fatura escorregaria — o `clampDay` do `card-logic` já trata, mas
+   é melhor não deixar escolher.
+
+Testes: `cards.test.ts` cobre o degradê, a barra da regra 5.5 (inclusive estouro
+de limite e cartão sem limite, que dividiria por zero) e o estado da fatura;
+`purchases.service.test.ts` cobre o cronograma da regra 5.4. Web em **53
+testes**, api em **113**.
+
+### Tela de Lançamentos — fiel ao [design/Cifrao Lancamentos.dc.html](design/Cifrao%20Lancamentos.dc.html)
+
+Esta foi a maior: o formulário do protótipo pedia **quatro coisas que não
+existiam no modelo de dados**. O dono decidiu construir as quatro.
+
+**Backend novo (migração `20260806234004_forma_de_pagamento`):**
+
+1. **`paymentMethod` no Transaction** (`PIX`, `DEBIT`, `CREDIT`, `CASH`,
+   `BOLETO`, opcional). Os chips do design agora guardam de verdade, e o filtro
+   da lista aceita a forma. **`CREDIT` é recusado em `POST /transactions`**: a
+   compra no crédito passa por fatura e parcelamento (5.3 e 5.4), então entra por
+   `POST /credit-cards/:id/purchases`, que grava a forma sozinho.
+2. **`GET /categories/sugestao`**
+   ([category-suggestion.service.ts](apps/api/src/categories/category-suggestion.service.ts))
+   — a etiqueta "sugerido" da grade. Primeiro tenta as `CategoryRule` da Fase 6
+   (escolha explícita do usuário, confiança 1); sem regra, soma a semelhança das
+   descrições do histórico por categoria. Cinco acertos medianos valem mais que
+   um isolado.
+3. **`PUT /transactions/:id/splits`**
+   ([splits.service.ts](apps/api/src/transactions/splits.service.ts)) — o
+   `TransactionSplit` existia no Prisma desde a Fase 0 e nenhuma API o usava. A
+   soma das partes tem que fechar **exatamente** com o valor; a categoria única
+   passa a ser a da maior parte, para as telas que ainda não leem divisão.
+   Transferência não se divide (5.7).
+4. **Repetir** liga o formulário no `RecurringRule` da Fase 5.
+
+**Front:** a lista virou grupos por dia com total, filtros em chips grudados no
+topo, chips do que está filtrado (com × para desligar um a um), rodapé com total
+filtrado e entradas/saídas, FAB no celular e a barra escura de seleção múltipla.
+Previsto sai com a borda tracejada e opacidade do design, num grupo "Próximos"
+no fim. O formulário virou sheet com valor grande, teclado numérico **só no
+celular**, chips de data, forma de pagamento, bloco de crédito com a fatura de
+destino e as parcelas, e grade de categorias com a sugerida em primeiro.
+
+Decisões deste acerto:
+
+1. **Os totais do rodapé usam `sumIncomeCents`/`sumExpenseCents` do `shared`** —
+   as mesmas funções dos relatórios. Assim os números batem entre as telas por
+   construção: transferência fora (5.7), estorno abatendo o gasto (5.13),
+   previsto fora do realizado.
+2. **Despesa não é vermelha na lista**, é tinta normal, como no protótipo. Lista
+   toda vermelha não destaca nada; o vermelho fica para o que exige ação.
+3. **Teclado numérico só abaixo de `sm`** (decisão do dono): no desktop o campo
+   aceita digitação direta, com o mesmo visual.
+4. **Editar não troca conta nem tipo** — isso é excluir e lançar de novo, e o
+   formulário diz isso. Trocar a conta de um lançamento salvo exigiria desfazer
+   e refazer saldo nas duas pontas.
+5. **`vitest.config.ts` do web ganhou o alias `@/`**: sem ele, um helper que
+   importa outro por `@/` quebrava só no teste.
+
+Testes: `transactions.test.ts` (12) cobre o agrupamento por dia com fuso, o
+rótulo Hoje/Ontem, os previstos em grupo próprio e os totais do rodapé com as
+regras 5.7 e 5.13; `splits.service.test.ts` (9) cobre a soma que tem que fechar,
+inclusive o centavo a mais e a menos; `category-suggestion.service.test.ts` (5)
+cobre a precedência regra > histórico. **Web 65 testes, api 127.**
+
+Depois, os filtros foram reestruturados a pedido do dono: sete chips numa régua
+rolante escondiam metade deles — o mesmo problema que a sidebar resolveu no
+menu. Ficou **período + botão "Filtros" (com o número do que está ligado) +
+busca ocupando o resto da linha**. O resto mora num painel que aplica na hora e
+mostra o resultado no rodapé antes de fechar; tipo, situação, tag e forma viraram
+pílulas, conta e categoria seguem em select (aguentam lista longa). Os chips
+abaixo passaram a listar só o que o botão esconde.
+
+### Primeiros passos e retrospectiva — as duas telas que faltavam
+
+Estavam em [design/Cifrao Complementares.dc.html](design/Cifrao%20Complementares.dc.html)
+mas **nenhuma fase do CLAUDE.md as pediu**, então nunca foram construídas. O dono
+percebeu ao criar a conta pela primeira vez.
+
+Migração `20260807003010_primeiros_passos_e_retrospectiva`: `onboardingDoneAt` e
+`lastReviewSeenMonth` no `User`.
+
+- **`/bem-vindo`** ([bem-vindo/page.tsx](apps/web/src/app/bem-vindo/page.tsx)) —
+  quatro passos: primeira conta (com os bancos comuns já listados), cartão com
+  prévia ao vivo, trazer lançamentos e as categorias. Fica **fora do `/painel`**:
+  sem sidebar nem cabeçalho, porque quem chega aqui ainda não tem o que navegar.
+- **`/painel/revisao`** ([revisao/page.tsx](apps/web/src/app/painel/revisao/page.tsx))
+  — retrospectiva em slides de tela cheia, uma cor por capítulo: entrou, para
+  onde foi, onde mais gastou e se o orçamento segurou.
+- **`GET /reports/revisao`**
+  ([month-review.service.ts](apps/api/src/reports/month-review.service.ts)) —
+  compõe `netIncomeCents` e `netExpenseByCategory`, os mesmos agregados dos
+  relatórios e do orçamento. Assim "estourou" na retrospectiva e "estourou" no
+  orçamento dizem a mesma coisa.
+
+Decisões deste acerto (confirmadas com o dono):
+
+1. **O onboarding desvia, mas deixa pular** (`OnboardingGate` no layout do
+   painel). E **só desvia quem não tem nenhuma conta cadastrada** — quem
+   restaurou um backup tem dados mas nunca viu os primeiros passos, e seria
+   absurdo jogá-lo lá.
+2. **A retrospectiva avisa nos 7 primeiros dias do mês** e depois some; a rota
+   fica sempre acessível (com `?mes=`), e agora também no menu. O mês visto é
+   guardado no servidor, então o aviso não reaparece em outro dispositivo.
+3. **"Conectar Open Finance" do protótipo virou "Importar extrato"**: sincronizar
+   banco é integração externa que este app não tem. Ficaram as duas portas que
+   existem de verdade — importar (Fase 6) e lançar na mão.
+4. **Slide sem dado não entra.** Mês sem orçamento não mostra o slide de
+   orçamento; mês sem nada mostra uma tela explicando, não quatro slides
+   zerados.
+5. **Gasto sem categoria aparece no "onde mais gastou"**, com esse nome. Escondê-lo
+   daria um slide que não fecha com o total de saídas do slide anterior.
+
+Testes: `onboarding.service.test.ts` (9) cobre o desvio, o caso do backup
+restaurado e a janela do aviso — inclusive a virada de dia em São Paulo e a
+retrospectiva de dezembro pedida em janeiro. **Api 136 testes.**
+
+### Painel — fiel ao [design/Cifrao Dashboard.dc.html](design/Cifrao%20Dashboard.dc.html), com modo privacidade
+
+O painel tinha os dados certos numa estrutura que não era a desenhada. Agora
+segue o protótipo: saudação com **navegador de mês** (‹ agosto ›), saldo de hoje
+em tamanhos escalonados com o "disponível de verdade" destacado dentro dele, a
+**régua do mês**, três cartões de estatística com faísca, faixa de pendentes, e
+o corpo em duas colunas (faturas, rosca de categorias, orçamento e últimos
+lançamentos à esquerda; patrimônio e insight à direita).
+
+- **Régua do mês** ([month-ruler.tsx](apps/web/src/app/painel/month-ruler.tsx))
+  — a peça de assinatura: o que já passou fica abaixo da linha em cinza, o que
+  vem fica acima e colorido, e o marcador de HOJE separa os dois. A haste é
+  proporcional ao valor, então o que pesa mais salta aos olhos.
+- **Modo privacidade** ([privacy.tsx](apps/web/src/lib/privacy.tsx)) — o olho no
+  cabeçalho troca todo valor por `••••`.
+
+Decisões deste acerto:
+
+1. **A privacidade fica no `localStorage`, não no servidor.** É decisão do
+   momento e do aparelho — esconder valores no ônibus não deveria esconder no
+   computador de casa. Por isso não entrou no `User` como as outras
+   preferências da Fase 9.
+2. **O sinal de negativo sobrevive ao mascaramento** (`-R$ ••••`). Esconder
+   quanto é uma coisa; esconder que está no vermelho é outra.
+3. **Dois campos novos no `/dashboard`**: `monthlyTrend` (6 meses, para a
+   variação e a faísca dos cartões) e `pendingCount`. A tendência sai de **uma
+   consulta cobrindo a janela inteira**, não uma por mês (armadilha #5), e
+   respeita a regra 5.13 — estorno abate o gasto em vez de virar receita.
+4. **A rosca de categorias é SVG à mão, não Recharts.** São seis fatias com
+   clique; o gráfico completo custaria mais peso do que entrega. Recharts
+   continua nos gráficos de verdade (evolução, comprometimento, relatórios).
+5. **"Conectar Open Finance" e a barra de progresso animada do protótipo ficaram
+   de fora** — a primeira não existe no app, a segunda é enfeite.
+
+Testes: `privacy.test.ts` (5) cobre o mascaramento, inclusive a preservação do
+`R$` e do sinal negativo. **Web 70 testes.**
+
+---
+
 ## Retomando o trabalho em outra sessão
 
 Estado atual: **as 10 fases (0 a 9) estão concluídas.** O app está inteiro:

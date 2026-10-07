@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Query,
   UseGuards,
 } from '@nestjs/common';
@@ -13,11 +14,13 @@ import {
   type BulkActionInput,
   type CreateTransactionInput,
   type ReimburseInput,
+  type SetSplitsInput,
   type TransactionFilter,
   type UpdateTransactionInput,
   bulkActionSchema,
   createTransactionSchema,
   reimburseSchema,
+  setSplitsSchema,
   transactionFilterSchema,
   updateTransactionSchema,
 } from '@cifrao/shared';
@@ -25,12 +28,16 @@ import { CurrentUser } from '../auth/current-user.decorator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import type { AuthUser } from '../auth/jwt-verifier';
 import { ZodValidationPipe } from '../common/zod-validation.pipe';
+import { SplitsService } from './splits.service';
 import { TransactionsService } from './transactions.service';
 
 @Controller('transactions')
 @UseGuards(JwtAuthGuard)
 export class TransactionsController {
-  constructor(private readonly service: TransactionsService) {}
+  constructor(
+    private readonly service: TransactionsService,
+    private readonly splits: SplitsService,
+  ) {}
 
   @Get()
   list(
@@ -74,6 +81,20 @@ export class TransactionsController {
   @Delete(':id/reimburse')
   undoReimburse(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.service.undoReimburse(user.id, id);
+  }
+
+  @Get(':id/splits')
+  getSplits(@Param('id') id: string) {
+    return this.splits.get(id);
+  }
+
+  /** Divide o lançamento entre categorias; lista vazia desfaz a divisão. */
+  @Put(':id/splits')
+  setSplits(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(setSplitsSchema)) dto: SetSplitsInput,
+  ) {
+    return this.splits.set(id, dto);
   }
 
   @Patch(':id')

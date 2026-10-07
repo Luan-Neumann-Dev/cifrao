@@ -1,10 +1,22 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import {
   type CreateCategoryInput,
   type MergeCategoriesInput,
+  type SuggestCategoryQuery,
   type UpdateCategoryInput,
   createCategorySchema,
   mergeCategoriesSchema,
+  suggestCategoryQuerySchema,
   updateCategorySchema,
 } from '@cifrao/shared';
 import { CurrentUser } from '../auth/current-user.decorator';
@@ -12,11 +24,15 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import type { AuthUser } from '../auth/jwt-verifier';
 import { ZodValidationPipe } from '../common/zod-validation.pipe';
 import { CategoriesService } from './categories.service';
+import { CategorySuggestionService } from './category-suggestion.service';
 
 @Controller('categories')
 @UseGuards(JwtAuthGuard)
 export class CategoriesController {
-  constructor(private readonly service: CategoriesService) {}
+  constructor(
+    private readonly service: CategoriesService,
+    private readonly suggestions: CategorySuggestionService,
+  ) {}
 
   @Get()
   list(@CurrentUser() user: AuthUser) {
@@ -27,6 +43,12 @@ export class CategoriesController {
   @Get('uso')
   usage(@CurrentUser() user: AuthUser) {
     return this.service.usage(user.id);
+  }
+
+  /** Categoria provável para o que está sendo digitado no formulário. */
+  @Get('sugestao')
+  suggest(@Query(new ZodValidationPipe(suggestCategoryQuerySchema)) query: SuggestCategoryQuery) {
+    return this.suggestions.suggest(query);
   }
 
   @Post()

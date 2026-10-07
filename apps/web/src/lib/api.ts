@@ -7,11 +7,13 @@ import type {
   InvestmentClass,
   InvoiceStatus,
   NotificationKind,
+  PaymentMethod,
   RecurrenceFrequency,
   StatementDateFormat,
   TransactionStatus,
   TransactionType,
 } from '@cifrao/shared';
+import { type ApiErrorBody, messageFromApiError } from './api-error';
 
 /**
  * Cliente da API (via proxy /api/* -> Nest). O JWT httpOnly vai junto no cookie.
@@ -24,14 +26,13 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
     headers: { 'content-type': 'application/json', ...(init?.headers ?? {}) },
   });
   if (!res.ok) {
-    let message = `Erro ${res.status}`;
+    let body: ApiErrorBody | null = null;
     try {
-      const body = (await res.json()) as { message?: string };
-      if (body?.message) message = body.message;
+      body = (await res.json()) as ApiErrorBody;
     } catch {
       // corpo não-JSON
     }
-    throw new Error(message);
+    throw new Error(messageFromApiError(res.status, body));
   }
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
@@ -47,6 +48,13 @@ export interface Account {
   color: string | null;
   institution: string | null;
   archived: boolean;
+}
+
+/** Saldo no fim de cada mês — `GET /accounts/:id/balance-evolution`. */
+export interface BalancePoint {
+  /** "yyyy-MM" no fuso de São Paulo. */
+  month: string;
+  balanceCents: string;
 }
 
 export interface Category {
@@ -80,15 +88,68 @@ export interface Transaction {
   notes: string | null;
   isReimbursable: boolean;
   reimbursedAt: string | null;
+  /** Regra 5.13: preenchido quando este lançamento é o estorno de um gasto. */
+  reimbursesTransactionId?: string | null;
+  paymentMethod?: PaymentMethod | null;
   account: TransactionRef | null;
   fromAccount: TransactionRef | null;
   toAccount: TransactionRef | null;
+  creditCard?: { id: string; nickname: string; color: string | null } | null;
   category: (TransactionRef & { icon: string | null }) | null;
   tags: { tag: Tag }[];
   creditCardId?: string | null;
   invoiceId?: string | null;
+  /** Compra pai do parcelamento (regra 5.4); abre o cronograma da parcela. */
+  purchaseId?: string | null;
   installmentNumber?: number | null;
   installmentTotal?: number | null;
+}
+
+/** `GET /settings/onboarding` — primeiros passos e retrospectiva pendente. */
+export interface OnboardingStatus {
+  onboardingDoneAt: string | null;
+  needsOnboarding: boolean;
+  counts: { accounts: number; cards: number; transactions: number };
+  /** "yyyy-MM" da retrospectiva a oferecer agora, ou null. */
+  reviewMonth: string | null;
+}
+
+/** `GET /reports/revisao` — a retrospectiva do mês. */
+export interface MonthReview {
+  month: string;
+  incomeCents: string;
+  expenseCents: string;
+  leftoverCents: string;
+  spentPercent: number | null;
+  comparison: { months: number; avgIncomeCents: string; avgExpenseCents: string };
+  topCategories: {
+    category: { id: string; name: string; color: string | null; icon: string | null };
+    totalCents: string;
+  }[];
+  budgets: {
+    category: { id: string; name: string; color: string | null; icon: string | null };
+    limitCents: string;
+    spentCents: string;
+    exceeded: boolean;
+  }[];
+  empty: boolean;
+}
+
+/** `GET /categories/sugestao` — categoria provável para a descrição digitada. */
+export interface CategorySuggestion {
+  categoryId: string;
+  source: 'rule' | 'history';
+  ruleId?: string;
+  confidence: number;
+}
+
+export interface SplitsResponse {
+  transactionId: string;
+  splits: {
+    id: string;
+    amountCents: string;
+    category: { id: string; name: string; color: string | null; icon: string | null };
+  }[];
 }
 
 export interface Paginated<T> {
@@ -151,6 +212,30 @@ export interface CommitmentPoint {
   month: string;
   totalCents: string;
   remainingCents: string;
+}
+
+/** Uma parcela do cronograma de `GET /purchases/:id` (regra 5.4). */
+export interface PurchaseInstallment {
+  transactionId: string;
+  installmentNumber: number | null;
+  amountCents: string;
+  date: string;
+  status: TransactionStatus;
+  invoiceId: string | null;
+  /** "yyyy-MM" da fatura que recebeu esta parcela. */
+  referenceMonth: string | null;
+  dueDate: string | null;
+  invoicePaid: boolean;
+}
+
+export interface PurchaseDetail {
+  id: string;
+  description: string;
+  totalCents: string;
+  installmentTotal: number;
+  purchaseDate: string;
+  category: (TransactionRef & { icon: string | null }) | null;
+  installments: PurchaseInstallment[];
 }
 
 // ─── Dashboard (Fase 4) ────────────────────────────────────────────────────────
@@ -230,6 +315,8 @@ export interface Dashboard {
   balances: {
     availableTodayCents: string;
     netWorthCents: string;
+    /** Carteira a preço de mercado (Fase 8), já dentro do patrimônio. */
+    portfolioValueCents: string;
     availableEndOfMonthCents: string;
     accounts: DashboardAccount[];
   };
@@ -241,6 +328,15 @@ export interface Dashboard {
     resultCents: string;
   };
   monthTotals: { incomeCents: string; expenseCents: string; netCents: string };
+  /** Últimos 6 meses, o de referência por último — a faísca dos cartões. */
+  monthlyTrend: {
+    month: string;
+    incomeCents: string;
+    expenseCents: string;
+    netCents: string;
+  }[];
+  /** Lançamentos ainda em PENDING, esperando confirmação. */
+  pendingCount: number;
   openInvoices: DashboardInvoice[];
   categorySpending: DashboardCategorySpend[];
   budgetSummary: DashboardBudgetSummary;

@@ -20,6 +20,18 @@ export const TRANSACTION_STATUSES = ['PENDING', 'CLEARED', 'FORECAST'] as const;
 export const transactionStatusSchema = z.enum(TRANSACTION_STATUSES);
 export type TransactionStatus = z.infer<typeof transactionStatusSchema>;
 
+/**
+ * Como o dinheiro saiu (ou entrou). CREDIT implica cartão e fatura; os demais
+ * saem direto da conta. É informativo — quem manda no saldo continua sendo a
+ * conta ou o cartão do lançamento.
+ */
+export const PAYMENT_METHODS = ['PIX', 'DEBIT', 'CREDIT', 'CASH', 'BOLETO'] as const;
+export const paymentMethodSchema = z.enum(PAYMENT_METHODS);
+export type PaymentMethod = z.infer<typeof paymentMethodSchema>;
+
+/** Formas que saem da conta — todas menos o crédito, que passa pela fatura. */
+export const ACCOUNT_PAYMENT_METHODS = ['PIX', 'DEBIT', 'CASH', 'BOLETO'] as const;
+
 export const INVOICE_STATUSES = ['OPEN', 'CLOSED', 'PAID', 'PARTIAL'] as const;
 export const invoiceStatusSchema = z.enum(INVOICE_STATUSES);
 export type InvoiceStatus = z.infer<typeof invoiceStatusSchema>;

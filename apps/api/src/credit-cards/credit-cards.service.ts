@@ -212,6 +212,8 @@ export class CreditCardsService {
             status: input.status,
             notes: i === 0 ? input.notes : undefined,
             isReimbursable: input.isReimbursable,
+            // Compra de cartão é crédito por definição — não vem do cliente.
+            paymentMethod: 'CREDIT',
             creditCardId: cardId,
             invoiceId: invoice.id,
             purchaseId,
