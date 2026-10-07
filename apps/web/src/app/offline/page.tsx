@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { LogoMark } from '@/components/logo';
 
 export const metadata: Metadata = { title: 'Sem conexão · Cifrão' };
 
@@ -11,6 +12,7 @@ export default function OfflinePage() {
   return (
     <div className="center-screen">
       <div className="card text-center">
+        <LogoMark className="mx-auto mb-4 h-14 w-14" />
         <p className="title">
           <span className="title-brand">Cifrão</span> sem conexão
         </p>

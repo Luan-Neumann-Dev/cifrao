@@ -24,6 +24,7 @@ import {
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { type ReactNode, useEffect, useState } from 'react';
+import { Logo } from '@/components/logo';
 import { NotificationsBell } from '@/components/notifications-bell';
 import { Button } from '@/components/ui/button';
 import { DemoBanner } from '@/demo/demo-banner';
@@ -164,7 +165,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             >
               <Menu className="h-5 w-5" />
             </Button>
-            <span className="text-lg font-extrabold text-primary lg:hidden">Cifrão</span>
+            <Logo className="text-lg lg:hidden" markClassName="h-7 w-7" />
             <div className="flex-1" />
             <NotificationsBell />
             <Button variant="ghost" size="icon" className="shrink-0" onClick={sair} title="Sair">
@@ -199,8 +200,8 @@ function Sidebar({
       )}
     >
       <div className="flex items-center gap-2 px-5 py-4">
-        <Link href="/painel" className="text-xl font-extrabold tracking-tight text-primary">
-          Cifrão
+        <Link href="/painel" className="text-xl">
+          <Logo />
         </Link>
         <div className="flex-1" />
         {onClose && (

@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { type FormEvent, useState } from 'react';
+import { Logo } from '@/components/logo';
 import { authErrorMessage } from '@/lib/auth-error';
 import { signIn } from '@/lib/auth-client';
 import { syncApiToken } from '@/lib/session-actions';
@@ -35,7 +36,7 @@ export default function LoginPage() {
   return (
     <section className="card">
       <h1 className="title">
-        <span className="title-brand">Cifrão</span>
+        <Logo markClassName="h-9 w-9" />
       </h1>
       <p className="subtitle">Entre na sua conta.</p>
 

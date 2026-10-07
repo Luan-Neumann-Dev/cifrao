@@ -1318,3 +1318,17 @@ nenhum resto da demo.
   refazê-lo em cima do mesmo cenário.
 - Período livre nos relatórios e meses fora da janela gravada respondem "Fora do
   período com dados nesta demonstração".
+
+## Identidade visual (07/10/2026)
+
+- Marca escolhida pelo dono: **"c" cortado por duas barras** — o cifrão
+  português original, de duas barras. Fundo roxo `#820AD1`, traço branco.
+- `components/logo.tsx`: `LogoMark` (só o símbolo) e `Logo` (símbolo + "cifrão"
+  em minúsculas, Manrope 800). No app o fundo do símbolo é `var(--primary)`,
+  então acompanha o tema escuro e a cor de acento.
+- Aplicado no cabeçalho do celular, na barra lateral, no login e no casco offline.
+- `public/icon.svg` é a fonte do desenho e também vira favicon SVG. Os PNGs do PWA
+  (192, 512, maskable com margem de segurança, apple-touch) e o `favicon.ico`
+  (16/32/48) foram gerados a partir dele com o `sharp` que já vem com o Next —
+  geração pontual, sem script nem dependência nova no projeto.
+- Service worker subiu para `cifrao-v2` para descartar os ícones antigos do cache.

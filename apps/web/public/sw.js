@@ -10,7 +10,7 @@
  * Ao mudar a estratégia, suba a versão: o cache antigo é apagado no activate.
  */
 
-const VERSION = 'cifrao-v1';
+const VERSION = 'cifrao-v2';
 const SHELL_CACHE = `${VERSION}-shell`;
 const ASSET_CACHE = `${VERSION}-assets`;
 const OFFLINE_URL = '/offline';
