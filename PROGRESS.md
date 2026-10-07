@@ -1236,3 +1236,82 @@ adiciona dependência** (SMTP obrigaria `nodemailer`); free permanente sem cart�
 (3.000/mês, 100/dia). O único uso hoje seria a recuperação de senha, cujo
 callback `sendResetPassword` em `apps/web/src/lib/auth.ts` ainda só escreve o
 link no `console.log`.
+
+---
+
+## Demonstração pública (07/10/2026)
+
+O objetivo mudou: **publicar uma URL para quem vem do LinkedIn ver o projeto**,
+sem custo. Hospedar a versão completa de graça esbarra na API, que precisa ficar
+ligada (fila pg-boss, cron) — os planos gratuitos dormem. A decisão do dono foi
+separar: uma **demo sem backend** na Vercel, e a versão completa no repositório,
+com licença MIT e passo a passo para quem quiser rodar.
+
+### Decisões
+
+1. **Uma branch, não duas.** O dono propôs uma branch `demo`; ficou uma flag de
+   build (`NEXT_PUBLIC_DEMO=true`) no mesmo código. Duas branches divergiriam como
+   `main` e `dev` divergiram por dois meses — e a demo passaria a mostrar um app
+   que não existe mais.
+2. **As telas não sabem que a demo existe** (pedido do dono: "não poluir as
+   telas"). Tudo mora em `apps/web/src/demo/`; os pontos de encaixe são a
+   `api()`, a checagem de sessão (`lib/require-session.ts`), o layout das telas
+   de login, a faixa e o "Sair" no shell, e o layout raiz (relógio).
+3. **Dados gravados da API de verdade, não inventados.**
+   [`scripts/record-demo.mjs`](apps/web/scripts/record-demo.mjs) monta um
+   cenário de 6 meses PELA API (4 contas, 2 cartões, parcelamentos de 10x/6x/3x,
+   faturas pagas, reembolso parcial, divisão, ajuste, orçamento, metas,
+   recorrências, carteira com aportes mensais, importação em revisão) e grava as
+   respostas que as telas pedem. Sorteio com semente fixa: regravar dá o mesmo
+   cenário. ~100 KB comprimidos.
+4. **Relógio congelado no instante da gravação** (`demo/clock.ts`), em vez de
+   deslocar datas: deslocar quebraria o filtro "ano" dos relatórios, "vence em 3
+   dias" e "dias restantes" do orçamento. Congelado, tudo fica coerente para
+   sempre; a faixa avisa de que mês são os dados.
+5. **Listagem de lançamentos filtrada em memória** com as mesmas regras do
+   backend (`demo/transactions-query.ts`, testado), porque a tela aceita qualquer
+   combinação de filtro. O resto é resposta gravada por caminho exato.
+6. **Escrita é recusada** com uma mensagem que cai no toast de erro que cada tela
+   já tem. Downloads (CSV, backup), que o navegador busca direto em `/api/...`,
+   são servidos por `app/demo-downloads/` só no build da demo, com o nome de
+   arquivo que a API de verdade mandou.
+
+### Armadilha que vale registro
+
+O webpack **só descarta um `import()` morto quando a condição está escrita no
+próprio lugar** (`process.env.NEXT_PUBLIC_DEMO === 'true'`). Atrás de `IS_DEMO`,
+importado de outro módulo, ele não enxerga a constante — e o build normal saiu
+com os 2 MB de dados gravados dentro (nunca baixados, mas lá). Corrigido nos dois
+imports que puxam dados; verificado num build limpo que o build normal não tem
+nenhum resto da demo.
+
+### No caminho
+
+- **Bug da versão real corrigido:** a tela do cartão abria na fatura aberta mais
+  distante — com parcelamento, meses à frente —, porque a API devolve a mais nova
+  primeiro. `currentOpenInvoice` (testado) escolhe a aberta que fecha primeiro.
+- A raiz `/` era ainda a tela de health check da Fase 0; agora leva ao painel
+  (que manda para o login sem sessão).
+
+### Verificado
+
+- `pnpm lint`, `typecheck`, `test` (**492**: shared 203, api 186, web 103) e
+  `build` verdes.
+- Build da demo **sem banco e sem segredo nenhum** (o cenário da Vercel) e
+  servido localmente: as 25 telas, incluindo detalhes de cartão, conta e
+  importação, abrem sem erro; login e cadastro levam ao painel; navegação por mês,
+  faixa, toast de escrita recusada e downloads conferidos no navegador, também em
+  380px.
+- **Não verificado:** o deploy na Vercel em si (configuração no README).
+
+### Pendências
+
+- **Linha do tempo "O que vem por aí":** rótulos de vencimentos próximos se
+  sobrepõem (vale para a versão real). Na demo, o cenário espalha os vencimentos
+  para disfarçar; o componente precisa resolver colisão.
+- **`seed:demo` quebrado desde o isolamento por usuário** (não grava `userId`) e
+  com categorias sorteadas ao acaso. Saiu do README; o gravador da demo faz o
+  papel de "dados de exemplo" pela API. Remover o modo `--demo` do seed ou
+  refazê-lo em cima do mesmo cenário.
+- Período livre nos relatórios e meses fora da janela gravada respondem "Fora do
+  período com dados nesta demonstração".

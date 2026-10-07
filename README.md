@@ -1,9 +1,13 @@
 # Cifrão
 
-App web de finanças pessoais **de uso individual**: contas, cartões com fatura de
-verdade, parcelamento, orçamento, metas, importação de extrato, relatórios e
-carteira de investimentos. Roda na internet só para eu poder usar de qualquer
-lugar — não é SaaS, não tem multi-tenant.
+App web de finanças pessoais: contas, cartões com fatura de verdade,
+parcelamento, orçamento, metas, importação de extrato, relatórios e carteira de
+investimentos. Feito para uso pessoal — o cadastro fecha depois da primeira
+conta.
+
+**[Ver a demonstração](#demonstração)** — roda no navegador, sem cadastro, com
+dados de exemplo. Para usar de verdade, veja
+[Rodando a versão completa](#rodando-a-versão-completa).
 
 O que ele faz e por quê está em [CLAUDE.md](CLAUDE.md) (requisitos) e em
 [PROGRESS.md](PROGRESS.md) (o que foi construído, fase a fase, com as decisões).
@@ -21,7 +25,29 @@ packages/db   Prisma  — schema, migrações e seeds
 packages/shared  Zod, tipos e a lógica pura (dinheiro, datas, faturas, relatórios)
 ```
 
-## Desenvolvimento
+## Demonstração
+
+A demo é **o mesmo código**, num build com `NEXT_PUBLIC_DEMO=true`: sem backend,
+sem banco e sem login. As respostas da API foram gravadas de uma instância de
+verdade (`apps/web/scripts/record-demo.mjs` monta um cenário pela própria API e
+grava o que as telas pedem), então faturas, parcelas e saldos são os que as
+regras calcularam — nada é inventado na tela. O relógio fica congelado no dia da
+gravação, para os dados nunca "envelhecerem"; ações que gravariam mostram um
+aviso. Tudo isso mora em `apps/web/src/demo/` — as telas não sabem que a demo
+existe — e o build normal não leva nada de lá.
+
+Publicar na Vercel (plano gratuito): importe o repositório e configure
+
+| Campo | Valor |
+|---|---|
+| Root Directory | `apps/web` |
+| Build Command | `cd ../.. && pnpm turbo run build --filter=@cifrao/web` |
+| Environment Variable | `NEXT_PUBLIC_DEMO` = `true` |
+
+Regravar os dados (mesmo cenário, data nova): suba web e API num banco
+**descartável e vazio** e rode `node apps/web/scripts/record-demo.mjs`.
+
+## Rodando a versão completa
 
 Requisitos: Node 22+, pnpm 10+, Docker (só para o Postgres).
 
@@ -36,12 +62,13 @@ cp apps/web/.env.example apps/web/.env.local   # defina BETTER_AUTH_SECRET
 pnpm build
 pnpm --filter @cifrao/db exec prisma migrate deploy
 pnpm --filter @cifrao/db seed                  # categorias padrão
-pnpm --filter @cifrao/db seed:demo             # + ~5.000 lançamentos em 24 meses
 
 pnpm dev                                       # web :3000 · api :3001
 ```
 
-Verificação: `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build`.
+Verificação: `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build`. Com web e
+API no ar num banco descartável, `pnpm --filter @cifrao/api test:e2e` roda a
+bateria de isolamento entre usuários.
 
 > Nesta máquina as portas 3000/3100 e 5432/5433 já estavam ocupadas; por isso o
 > Postgres de desenvolvimento é publicado em **55432**.
@@ -115,3 +142,7 @@ As três que mais mudam o desenho do código:
 - **fatura de cartão é entidade própria**, e pagar fatura é transferência, não
   despesa nova;
 - **transferência não entra em receita nem em despesa** em relatório nenhum.
+
+## Licença
+
+[MIT](LICENSE) — pode copiar, adaptar e usar.
