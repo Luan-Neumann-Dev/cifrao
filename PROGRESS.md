@@ -1292,6 +1292,12 @@ nenhum resto da demo.
   primeiro. `currentOpenInvoice` (testado) escolhe a aberta que fecha primeiro.
 - A raiz `/` era ainda a tela de health check da Fase 0; agora leva ao painel
   (que manda para o login sem sessão).
+- **Linha do tempo "O que vem por aí" sem rótulo atropelado:** vencimentos
+  próximos (dois no mesmo dia, um colado no HOJE) dividem-se em faixas de altura
+  (`lib/ruler-lanes.ts`, testado) e a régua cresce o que precisar. Conferido no
+  navegador com sete vencimentos amontoados. Junto, um bug: `isCurrentMonth`
+  terminava em `|| true` — o HOJE e o "passou × vem" apareciam em qualquer mês
+  navegado, e o mês era comparado em UTC, não em São Paulo.
 
 ### Verificado
 
@@ -1306,9 +1312,6 @@ nenhum resto da demo.
 
 ### Pendências
 
-- **Linha do tempo "O que vem por aí":** rótulos de vencimentos próximos se
-  sobrepõem (vale para a versão real). Na demo, o cenário espalha os vencimentos
-  para disfarçar; o componente precisa resolver colisão.
 - **`seed:demo` quebrado desde o isolamento por usuário** (não grava `userId`) e
   com categorias sorteadas ao acaso. Saiu do README; o gravador da demo faz o
   papel de "dados de exemplo" pela API. Remover o modo `--demo` do seed ou
