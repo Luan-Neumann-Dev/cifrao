@@ -21,6 +21,12 @@ import { type ApiErrorBody, messageFromApiError } from './api-error';
  * com Number(...) só na apresentação.
  */
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {
+  // Build da demonstração: respostas gravadas, sem backend (src/demo/). A
+  // condição fica escrita aqui, e não via IS_DEMO, para o webpack descartar o
+  // import — e os dados gravados — do build normal (ver is-demo.ts).
+  if (process.env.NEXT_PUBLIC_DEMO === 'true') {
+    return (await import('@/demo/adapter')).demoApi<T>(path, init);
+  }
   const res = await fetch(`/api${path}`, {
     ...init,
     headers: { 'content-type': 'application/json', ...(init?.headers ?? {}) },

@@ -5,3 +5,5 @@
 **/coverage/**
 packages/db/src/generated/**
 pnpm-lock.yaml
+# Respostas gravadas pelo scripts/record-demo.mjs — geradas, não editadas à mão.
+apps/web/src/demo/fixtures/**

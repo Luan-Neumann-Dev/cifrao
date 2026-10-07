@@ -3,6 +3,8 @@ import { Inter, Manrope } from 'next/font/google';
 import type { ReactNode } from 'react';
 import { Toaster } from 'sonner';
 import { ServiceWorker } from '@/components/service-worker';
+import { DemoBoot } from '@/demo/demo-boot';
+import { IS_DEMO } from '@/demo/is-demo';
 import { THEME_BOOTSTRAP_SCRIPT } from '@/lib/theme';
 import './globals.css';
 
@@ -57,6 +59,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP_SCRIPT }} />
       </head>
       <body>
+        {IS_DEMO && <DemoBoot />}
         {children}
         <Toaster position="top-center" richColors closeButton />
         <ServiceWorker />

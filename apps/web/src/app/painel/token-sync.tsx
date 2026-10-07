@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import { IS_DEMO } from '@/demo/is-demo';
 import { syncApiToken } from '@/lib/session-actions';
 
 /**
@@ -9,6 +10,7 @@ import { syncApiToken } from '@/lib/session-actions';
  */
 export function TokenSync() {
   useEffect(() => {
+    if (IS_DEMO) return; // sem conta na demonstração
     void syncApiToken();
   }, []);
   return null;

@@ -26,6 +26,8 @@ import { usePathname, useRouter } from 'next/navigation';
 import { type ReactNode, useEffect, useState } from 'react';
 import { NotificationsBell } from '@/components/notifications-bell';
 import { Button } from '@/components/ui/button';
+import { DemoBanner } from '@/demo/demo-banner';
+import { IS_DEMO, REPO_URL } from '@/demo/is-demo';
 import { signOut } from '@/lib/auth-client';
 import { isActiveNavLink } from '@/lib/nav';
 import { clearApiToken } from '@/lib/session-actions';
@@ -114,6 +116,11 @@ export function AppShell({ children }: { children: ReactNode }) {
   }, [menuOpen]);
 
   async function sair() {
+    // Na demonstração não há sessão: "sair" leva ao código do projeto.
+    if (IS_DEMO) {
+      window.location.href = REPO_URL;
+      return;
+    }
     await signOut();
     await clearApiToken();
     router.push('/login');
@@ -144,6 +151,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       {/* `app-content` existe para a folha de impressão zerar o recuo da sidebar. */}
       <div className="app-content lg:pl-64">
+        {IS_DEMO && <DemoBanner />}
         <header className="sticky top-0 z-30 border-b border-line bg-surface/85 backdrop-blur print:hidden">
           <div className="flex items-center gap-2 px-4 py-3">
             <Button

@@ -4,6 +4,9 @@ import type { NextConfig } from 'next';
 // Em dev e em produção (mesmo host, atrás do proxy), o front fala com a API
 // por /api/*. Nada de CORS permissivo (armadilha #7). O destino vem do env.
 const apiUrl = process.env.API_INTERNAL_URL ?? 'http://localhost:3001';
+// Build da demonstração (src/demo/): sem backend; só os downloads, que o
+// navegador busca direto em /api/..., são servidos por uma rota local.
+const isDemo = process.env.NEXT_PUBLIC_DEMO === 'true';
 
 const nextConfig: NextConfig = {
   /**
@@ -29,6 +32,14 @@ const nextConfig: NextConfig = {
     : {}),
 
   async rewrites() {
+    if (isDemo) {
+      return {
+        afterFiles: [
+          { source: '/api/reports/export', destination: '/demo-downloads/reports/export' },
+          { source: '/api/backup/:file', destination: '/demo-downloads/backup/:file' },
+        ],
+      };
+    }
     return {
       // afterFiles roda antes de rotas dinâmicas; por isso EXCLUÍMOS /api/auth/*
       // do proxy — esse prefixo é servido pelo handler do Better Auth no Next.
