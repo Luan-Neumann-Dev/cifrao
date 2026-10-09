@@ -103,6 +103,45 @@
   box-sizing: border-box;
 }
 
+/*
+ * Barras de rolagem no tom do app, não as do navegador (que no escuro vinham
+ * com trilho branco). Finas, trilho transparente, alça em --ink-2 diluído —
+ * segue o tema sozinha. `color-scheme` faz o resto do nativo (calendário do
+ * <input type=date>, select) acompanhar o tema também.
+ */
+:root {
+  color-scheme: light;
+  --scroll-thumb: color-mix(in srgb, var(--ink-2) 35%, transparent);
+  --scroll-thumb-hover: color-mix(in srgb, var(--ink-2) 60%, transparent);
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scroll-thumb) transparent;
+}
+
+/* Safari ainda não lê scrollbar-color; o Chrome lê e ignora o bloco abaixo. */
+@supports not (scrollbar-color: auto) {
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--scroll-thumb);
+    border-radius: 999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--scroll-thumb-hover);
+  }
+}
+
 html,
 body {
   margin: 0;
